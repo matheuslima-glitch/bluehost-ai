@@ -199,12 +199,12 @@ export default function DomainManagement() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="filter-status">Status</Label>
-                <Select value={filters.status} onValueChange={(value) => handleFilterChange("status", value)}>
+                <Select value={filters.status || "all"} onValueChange={(value) => handleFilterChange("status", value === "all" ? "" : value)}>
                   <SelectTrigger id="filter-status">
                     <SelectValue placeholder="Todos os status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="active">Ativo</SelectItem>
                     <SelectItem value="expired">Expirado</SelectItem>
                     <SelectItem value="pending">Pendente</SelectItem>
@@ -215,12 +215,12 @@ export default function DomainManagement() {
 
               <div className="space-y-2">
                 <Label htmlFor="filter-platform">Plataforma</Label>
-                <Select value={filters.platform} onValueChange={(value) => handleFilterChange("platform", value)}>
+                <Select value={filters.platform || "all"} onValueChange={(value) => handleFilterChange("platform", value === "all" ? "" : value)}>
                   <SelectTrigger id="filter-platform">
                     <SelectValue placeholder="Todas as plataformas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas</SelectItem>
+                    <SelectItem value="all">Todas</SelectItem>
                     <SelectItem value="wordpress">WordPress</SelectItem>
                     <SelectItem value="atomicat">AtomiCat</SelectItem>
                   </SelectContent>
@@ -230,14 +230,14 @@ export default function DomainManagement() {
               <div className="space-y-2">
                 <Label htmlFor="filter-traffic">Fonte de Tráfego</Label>
                 <Select
-                  value={filters.traffic_source}
-                  onValueChange={(value) => handleFilterChange("traffic_source", value)}
+                  value={filters.traffic_source || "all"}
+                  onValueChange={(value) => handleFilterChange("traffic_source", value === "all" ? "" : value)}
                 >
                   <SelectTrigger id="filter-traffic">
                     <SelectValue placeholder="Todas as fontes" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas</SelectItem>
+                    <SelectItem value="all">Todas</SelectItem>
                     <SelectItem value="facebook">Facebook</SelectItem>
                     <SelectItem value="google">Google</SelectItem>
                     <SelectItem value="native">Native</SelectItem>
