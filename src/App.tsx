@@ -11,6 +11,7 @@ import Layout from "./pages/Layout";
 import Dashboard from "./pages/Dashboard";
 import DomainSearch from "./pages/DomainSearch";
 import DomainManagement from "./pages/DomainManagement";
+import DomainDetails from "./pages/DomainDetails";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -31,6 +32,7 @@ const App = () => (
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="search" element={<DomainSearch />} />
                 <Route path="domains" element={<DomainManagement />} />
+                <Route path="domains/:id" element={<DomainDetails />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
               <Route path="*" element={<NotFound />} />

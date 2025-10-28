@@ -95,6 +95,7 @@ export type Database = {
             | null
           monthly_visits: number | null
           nameservers: string[] | null
+          platform: string | null
           propagation_ends_at: string | null
           purchase_date: string | null
           purchase_price: number | null
@@ -120,6 +121,7 @@ export type Database = {
             | null
           monthly_visits?: number | null
           nameservers?: string[] | null
+          platform?: string | null
           propagation_ends_at?: string | null
           purchase_date?: string | null
           purchase_price?: number | null
@@ -145,6 +147,7 @@ export type Database = {
             | null
           monthly_visits?: number | null
           nameservers?: string[] | null
+          platform?: string | null
           propagation_ends_at?: string | null
           purchase_date?: string | null
           purchase_price?: number | null
