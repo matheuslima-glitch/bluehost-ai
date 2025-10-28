@@ -53,7 +53,7 @@ export function AppSidebar() {
                       className={({ isActive }) =>
                         isActive
                           ? "bg-primary text-primary-foreground font-medium"
-                          : "!text-blue-600 dark:!text-white hover:bg-accent"
+                          : "!text-blue-600 dark:!text-black hover:bg-accent"
                       }
                     >
                       <item.icon className="h-4 w-4" />
@@ -74,11 +74,7 @@ export function AppSidebar() {
             <span className="text-xs text-muted-foreground">Usuário ativo</span>
           </div>
         </div>
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={signOut}
-        >
+        <Button variant="outline" className="w-full" onClick={signOut}>
           <LogOut className="h-4 w-4 mr-2" />
           Sair
         </Button>
