@@ -23,7 +23,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import ImplementationChecklist from "@/components/ImplementationChecklist";
 
 interface Domain {
   id: string;
@@ -99,8 +98,6 @@ export default function DomainManagement() {
           Atualizar
         </Button>
       </div>
-
-      <ImplementationChecklist />
 
       <Card>
         <CardHeader>
