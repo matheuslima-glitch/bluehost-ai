@@ -13,10 +13,10 @@ serve(async (req) => {
   try {
     const { keywords, quantity = 5, language = 'portuguese', structure, niche } = await req.json();
     
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error('Lovable API key not configured');
+    if (!GEMINI_API_KEY) {
+      throw new Error('Gemini API key not configured');
     }
 
     const languageMap: Record<string, string> = {
@@ -39,56 +39,46 @@ serve(async (req) => {
 }`;
 
     const response = await fetch(
-      'https://ai.gateway.lovable.dev/v1/chat/completions',
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { 
-              role: 'user', 
-              content: prompt 
-            }
-          ],
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }]
         })
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Lovable AI error:', {
+      console.error('Gemini AI error:', {
         status: response.status,
         statusText: response.statusText,
         body: errorText
       });
-      throw new Error(`Lovable AI error: ${response.status} - ${errorText}`);
-    }
-
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const errorText = await response.text();
-      console.error('Non-JSON response:', errorText);
-      throw new Error('API returned non-JSON response');
+      throw new Error(`Gemini AI error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('Lovable AI response:', JSON.stringify(data));
+    console.log('Gemini AI response:', JSON.stringify(data));
     
-    if (!data.choices || data.choices.length === 0) {
-      console.error('No choices in response:', data);
-      throw new Error('Failed to generate suggestions - no choices returned');
+    if (!data.candidates || data.candidates.length === 0) {
+      console.error('No candidates in response:', data);
+      throw new Error('Failed to generate suggestions - no candidates returned');
     }
 
-    if (!data.choices[0].message || !data.choices[0].message.content) {
+    if (!data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
       console.error('Invalid response structure:', data);
       throw new Error('Failed to generate suggestions - invalid response structure');
     }
 
-    const textResponse = data.choices[0].message.content;
+    const textResponse = data.candidates[0].content.parts[0].text;
     console.log('Raw text response:', textResponse);
     
     // Try to extract JSON from the response
