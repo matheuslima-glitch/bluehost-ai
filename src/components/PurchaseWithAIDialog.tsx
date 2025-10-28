@@ -61,7 +61,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       }
 
       // Step 1: Generate and verify domain availability with AI
-      addProgressStep("generation", "in_progress", `Buscando ${quantity} domínios disponíveis com IA...`);
+      addProgressStep("generation", "in_progress", `Buscando ${quantity} domínios disponíveis...`);
 
       const { data: suggestions, error: suggestionsError } = await supabase.functions.invoke("ai-domain-suggestions", {
         body: {
@@ -79,8 +79,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       }
 
       if (!suggestions?.domains || suggestions.domains.length === 0) {
-        addProgressStep("generation", "error", "Nenhum domínio disponível foi encontrado");
-        throw new Error("Nenhum domínio disponível foi encontrado após múltiplas tentativas");
+        addProgressStep("generation", "error", "Nenhum domínio disponível foi encontrado após verificação");
+        throw new Error("Nenhum domínio disponível foi encontrado. Todos os domínios gerados estão indisponíveis.");
       }
 
       const foundCount = suggestions.domains.length;
@@ -89,7 +89,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       addProgressStep(
         "generation",
         "completed",
-        `✅ ${foundCount} domínios disponíveis encontrados após ${attempts} tentativa(s)!`,
+        `✅ ${foundCount} domínios verificados e disponíveis encontrados após ${attempts} tentativa(s)!`,
       );
 
       // Salvar domínios encontrados
@@ -121,11 +121,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         throw new Error("Usuário não autenticado");
       }
 
-      addProgressStep(
-        "purchase",
-        "in_progress",
-        `Iniciando compra de ${foundDomains.length} domínios com estrutura ${selectedStructure}...`,
-      );
+      addProgressStep("purchase", "in_progress", `Iniciando compra de ${foundDomains.length} domínios...`);
 
       // Step 2: Purchase and configure domains
       const { data: purchaseResult, error: purchaseError } = await supabase.functions.invoke("purchase-domains", {
@@ -326,7 +322,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     );
   }
 
-  // Dialog de seleção de estrutura (NOVO)
+  // Dialog de seleção de estrutura
   if (showStructureSelection) {
     return (
       <Dialog open={true} onOpenChange={() => {}}>
@@ -358,20 +354,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="wordpress">
-                    <div className="flex flex-col">
-                      <span className="font-semibold">WordPress</span>
-                      <span className="text-xs text-gray-500">
-                        Configuração completa (Cloudflare, DNS, SSL, Firewall)
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="atomicat">
-                    <div className="flex flex-col">
-                      <span className="font-semibold">Atomicat</span>
-                      <span className="text-xs text-gray-500">Apenas compra do domínio</span>
-                    </div>
-                  </SelectItem>
+                  <SelectItem value="wordpress">WordPress</SelectItem>
+                  <SelectItem value="atomicat">Atomicat</SelectItem>
                 </SelectContent>
               </Select>
             </div>
