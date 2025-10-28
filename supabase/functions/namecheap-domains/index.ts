@@ -19,7 +19,11 @@ serve(async (req) => {
   }
 
   try {
-    const { action, domain, domains, structure, language, niche } = await req.json();
+    const body = await req.json();
+    const { action, domain, domains, structure, language, niche } = body;
+    
+    console.log('Request body:', body);
+    console.log('Action:', action);
     
     if (!NAMECHEAP_API_KEY || !NAMECHEAP_API_USER) {
       throw new Error('Namecheap API credentials not configured');
@@ -350,7 +354,8 @@ serve(async (req) => {
       );
     }
 
-    throw new Error('Invalid action');
+    console.error('Invalid action received:', action);
+    throw new Error(`Invalid action: ${action}. Valid actions are: balance, check, purchase, purchase_with_ai, list`);
   } catch (error) {
     console.error('Error in namecheap-domains function:', error);
     return new Response(

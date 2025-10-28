@@ -44,10 +44,23 @@ serve(async (req) => {
       }
     );
 
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Gemini API error:', errorData);
+      throw new Error(`Gemini API error: ${JSON.stringify(errorData)}`);
+    }
+
     const data = await response.json();
+    console.log('Gemini response:', JSON.stringify(data));
     
-    if (!data.candidates || !data.candidates[0]) {
-      throw new Error('Failed to generate suggestions');
+    if (!data.candidates || data.candidates.length === 0) {
+      console.error('No candidates in response:', data);
+      throw new Error('Failed to generate suggestions - no candidates returned');
+    }
+
+    if (!data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
+      console.error('Invalid response structure:', data);
+      throw new Error('Failed to generate suggestions - invalid response structure');
     }
 
     const textResponse = data.candidates[0].content.parts[0].text;

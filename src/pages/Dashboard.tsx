@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Globe, TrendingUp, AlertCircle, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Globe, TrendingUp, AlertCircle, Clock, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,12 +14,15 @@ export default function Dashboard() {
     expiring: 0,
     expired: 0,
     suspended: 0,
+    critical: 0,
   });
   const [integrations, setIntegrations] = useState({
     namecheap: 0,
     cloudflare: 0,
     cpanel: 431,
   });
+  const [balance, setBalance] = useState<{ usd: number; brl: number } | null>(null);
+  const [totalVisits, setTotalVisits] = useState(0);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
@@ -29,6 +32,7 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
+      // Load domains
       const { data: domains, error } = await supabase
         .from("domains")
         .select("*");
@@ -37,6 +41,7 @@ export default function Dashboard() {
 
       const now = new Date();
       const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
 
       const stats = {
         total: domains?.length || 0,
@@ -48,6 +53,11 @@ export default function Dashboard() {
         }).length || 0,
         expired: domains?.filter(d => d.status === "expired").length || 0,
         suspended: domains?.filter(d => d.status === "suspended").length || 0,
+        critical: domains?.filter(d => {
+          if (!d.expiration_date) return false;
+          const expDate = new Date(d.expiration_date);
+          return expDate > now && expDate < fifteenDaysFromNow;
+        }).length || 0,
       };
 
       const integrationCounts = {
@@ -56,9 +66,27 @@ export default function Dashboard() {
         cpanel: domains?.filter(d => d.integration_source === "cpanel").length || 431,
       };
 
+      // Calculate total visits from all domains
+      const totalMonthlyVisits = domains?.reduce((sum, d) => sum + (d.monthly_visits || 0), 0) || 0;
+
       setStats(stats);
       setIntegrations(integrationCounts);
+      setTotalVisits(totalMonthlyVisits);
+
+      // Load Namecheap balance
+      try {
+        const { data: balanceData, error: balanceError } = await supabase.functions.invoke("namecheap-domains", {
+          body: { action: "balance" }
+        });
+
+        if (!balanceError && balanceData?.balance) {
+          setBalance(balanceData.balance);
+        }
+      } catch (balanceErr) {
+        console.error("Error loading balance:", balanceErr);
+      }
     } catch (error: any) {
+      console.error("Dashboard load error:", error);
       toast.error("Erro ao carregar dados do dashboard");
     } finally {
       setLoading(false);
@@ -141,7 +169,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total de Domínios</CardTitle>
@@ -151,6 +179,19 @@ export default function Dashboard() {
             <div className="text-2xl font-bold">{stats.total}</div>
             <p className="text-xs text-muted-foreground mt-1">
               {stats.active} ativos
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Expirados</CardTitle>
+            <XCircle className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.expired}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Domínios expirados
             </p>
           </CardContent>
         </Card>
@@ -170,25 +211,25 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Domínios Críticos</CardTitle>
+            <CardTitle className="text-sm font-medium">Críticos</CardTitle>
             <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.expired}</div>
-            <p className="text-xs text-destructive mt-1">
-              Requerem ação
+            <div className="text-2xl font-bold">{stats.critical}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Próximos 15 dias
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Domínios Suspensos</CardTitle>
+            <CardTitle className="text-sm font-medium">Suspensos</CardTitle>
             <AlertTriangle className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.suspended}</div>
-            <p className="text-xs text-warning mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Verificar pendências
             </p>
           </CardContent>
@@ -210,6 +251,12 @@ export default function Dashboard() {
                 <p className="text-sm font-medium">Namecheap</p>
                 <p className="text-2xl font-bold">{integrations.namecheap}</p>
                 <p className="text-xs text-muted-foreground">domínios</p>
+                {balance && (
+                  <div className="mt-2">
+                    <p className="text-sm font-semibold text-primary">${balance.usd.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">R$ {balance.brl.toFixed(2)}</p>
+                  </div>
+                )}
               </div>
               <CheckCircle2 className="h-6 w-6 text-success" />
             </div>
@@ -228,6 +275,10 @@ export default function Dashboard() {
                 <p className="text-sm font-medium">Cloudflare</p>
                 <p className="text-2xl font-bold">{integrations.cloudflare}</p>
                 <p className="text-xs text-muted-foreground">zonas</p>
+                <div className="mt-2">
+                  <p className="text-sm font-semibold text-primary">{totalVisits.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">acessos mensais</p>
+                </div>
               </div>
               <CheckCircle2 className="h-6 w-6 text-success" />
             </div>
