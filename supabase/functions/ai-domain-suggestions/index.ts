@@ -26,24 +26,23 @@ serve(async (req) => {
     };
 
     const WEBHOOK_URL = "https://webhook.institutoexperience.com/webhook/2ad42b09-808e-42b9-bbb9-6e47d828004a";
-    const MAX_ATTEMPTS = 10; // Máximo de tentativas
-    const BATCH_SIZE = quantity * 3; // Gerar 3x mais domínios para ter opções
+    const MAX_ATTEMPTS = 15; // Aumentado para 15 tentativas
+    const DOMAINS_PER_BATCH = 10; // Gerar 10 domínios por tentativa
 
     let availableDomains: string[] = [];
     let attempt = 0;
+    let totalGenerated = 0;
+    let totalChecked = 0;
 
-    console.log(`Starting domain generation. Target: ${quantity} domains`);
+    console.log(`🚀 Starting domain search. Target: ${quantity} available domains`);
 
     // Loop até encontrar a quantidade necessária ou atingir máximo de tentativas
     while (availableDomains.length < quantity && attempt < MAX_ATTEMPTS) {
       attempt++;
-      console.log(`Attempt ${attempt}/${MAX_ATTEMPTS} - Currently have ${availableDomains.length}/${quantity} domains`);
+      console.log(`\n📍 Attempt ${attempt}/${MAX_ATTEMPTS}`);
+      console.log(`Current status: ${availableDomains.length}/${quantity} domains found`);
 
-      // Calcular quantos domínios ainda precisamos
-      const needed = quantity - availableDomains.length;
-      const toGenerate = Math.max(needed * 2, BATCH_SIZE); // Gerar pelo menos o dobro do necessário
-
-      const prompt = `Olá, preciso de ${toGenerate} domínios do nicho ${niche || keywords} e no idioma ${languageMap[language]}. Me dê eles em .online
+      const prompt = `Olá, preciso de ${DOMAINS_PER_BATCH} domínios do nicho ${niche || keywords} e no idioma ${languageMap[language]}. Me dê eles em .online
 
 - Lembre-se de SEMPRE usar .online
 - Lembre-se de NUNCA usar acentos.
@@ -56,8 +55,10 @@ serve(async (req) => {
   ]
 }`;
 
-      // Chamar Gemini AI
-      const response = await fetch(
+      // ETAPA 1: Chamar Gemini AI para gerar domínios
+      console.log(`🤖 Calling Gemini AI to generate ${DOMAINS_PER_BATCH} domains...`);
+
+      const geminiResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: "POST",
@@ -78,43 +79,34 @@ serve(async (req) => {
         },
       );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Gemini AI error:", {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText,
-        });
-        throw new Error(`Gemini AI error: ${response.status} - ${errorText}`);
+      if (!geminiResponse.ok) {
+        const errorText = await geminiResponse.text();
+        console.error("❌ Gemini AI error:", geminiResponse.status);
+        continue;
       }
 
-      const data = await response.json();
-      console.log("Gemini AI response received");
+      const geminiData = await geminiResponse.json();
 
-      if (!data.candidates || data.candidates.length === 0) {
-        console.error("No candidates in response:", data);
-        continue; // Tentar novamente
+      if (!geminiData.candidates || geminiData.candidates.length === 0) {
+        console.error("❌ No candidates in Gemini response");
+        continue;
       }
 
-      if (
-        !data.candidates[0].content ||
-        !data.candidates[0].content.parts ||
-        data.candidates[0].content.parts.length === 0
-      ) {
-        console.error("Invalid response structure:", data);
-        continue; // Tentar novamente
+      if (!geminiData.candidates[0].content?.parts?.[0]?.text) {
+        console.error("❌ Invalid Gemini response structure");
+        continue;
       }
 
-      const textResponse = data.candidates[0].content.parts[0].text;
+      const textResponse = geminiData.candidates[0].content.parts[0].text;
 
       // Extrair domínios da resposta
-      let generatedDomains = [];
+      let generatedDomains: string[] = [];
       try {
         const jsonText = textResponse.replace(/```json\s*|\s*```/g, "").trim();
         const parsed = JSON.parse(jsonText);
         generatedDomains = parsed.domains || [];
       } catch (parseError) {
-        console.error("Failed to parse JSON, falling back to line extraction");
+        console.log("⚠️  Failed to parse JSON, trying line extraction...");
         generatedDomains = textResponse
           .split("\n")
           .map((line: string) => line.trim())
@@ -127,72 +119,125 @@ serve(async (req) => {
       }
 
       if (generatedDomains.length === 0) {
-        console.error("No domains generated in this attempt");
+        console.error("❌ No domains generated in this attempt");
         continue;
       }
 
-      console.log(`Generated ${generatedDomains.length} domains, checking availability...`);
+      totalGenerated += generatedDomains.length;
+      console.log(`✅ Generated ${generatedDomains.length} domains: ${generatedDomains.join(", ")}`);
 
-      // Verificar disponibilidade via webhook
+      // ETAPA 2: VERIFICAÇÃO OBRIGATÓRIA VIA WEBHOOK
+      console.log(`\n🔍 CHECKING AVAILABILITY via webhook...`);
+      console.log(`Webhook URL: ${WEBHOOK_URL}`);
+
       try {
+        // Preparar payload no formato correto
+        const webhookPayload = {
+          domains: generatedDomains.join(","),
+        };
+
+        console.log(`📤 Sending to webhook:`, JSON.stringify(webhookPayload));
+
         const webhookResponse = await fetch(WEBHOOK_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            domains: generatedDomains.join(","),
-          }),
+          body: JSON.stringify(webhookPayload),
         });
 
+        console.log(`📥 Webhook response status: ${webhookResponse.status}`);
+
         if (!webhookResponse.ok) {
-          console.error("Webhook error:", webhookResponse.status);
+          const errorText = await webhookResponse.text();
+          console.error("❌ Webhook error:", errorText);
           continue;
         }
 
         const webhookData = await webhookResponse.json();
-        console.log("Webhook response:", JSON.stringify(webhookData));
+        console.log(`📊 Webhook response data:`, JSON.stringify(webhookData, null, 2));
 
-        // Extrair domínios disponíveis da resposta
+        totalChecked += generatedDomains.length;
+
+        // Extrair domínios disponíveis
         const newAvailableDomains = webhookData.dominios_disponiveis || [];
+        const unavailableDomains = webhookData.dominios_indisponiveis || [];
+
+        console.log(`✅ Available: ${newAvailableDomains.length} domains`);
+        console.log(`❌ Unavailable: ${unavailableDomains.length} domains`);
+
+        if (newAvailableDomains.length > 0) {
+          console.log(`Available domains:`, newAvailableDomains.join(", "));
+        }
+        if (unavailableDomains.length > 0) {
+          console.log(`Unavailable domains:`, unavailableDomains.join(", "));
+        }
 
         // Adicionar novos domínios disponíveis (evitar duplicatas)
         for (const domain of newAvailableDomains) {
           if (!availableDomains.includes(domain) && availableDomains.length < quantity) {
             availableDomains.push(domain);
+            console.log(`➕ Added available domain: ${domain}`);
           }
         }
 
-        console.log(`After check: ${availableDomains.length}/${quantity} available domains found`);
+        console.log(`\n📊 Progress: ${availableDomains.length}/${quantity} available domains found`);
       } catch (webhookError) {
-        console.error("Error calling webhook:", webhookError);
-        // Continuar tentando mesmo se o webhook falhar
+        console.error("❌ Critical error calling webhook:", webhookError);
+        console.error("Error details:", webhookError instanceof Error ? webhookError.message : String(webhookError));
+        // IMPORTANTE: Se o webhook falhar, não adicionar nenhum domínio como disponível
+      }
+
+      // Aguardar um pouco entre tentativas para não sobrecarregar as APIs
+      if (availableDomains.length < quantity && attempt < MAX_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
+    // Resultado final
+    console.log(`\n🏁 SEARCH COMPLETED`);
+    console.log(`Total attempts: ${attempt}`);
+    console.log(`Total domains generated: ${totalGenerated}`);
+    console.log(`Total domains checked: ${totalChecked}`);
+    console.log(`Total available found: ${availableDomains.length}`);
+    console.log(`Target was: ${quantity}`);
+
     // Verificar se conseguimos a quantidade necessária
+    if (availableDomains.length === 0) {
+      throw new Error("Nenhum domínio disponível foi encontrado após verificação via webhook");
+    }
+
     if (availableDomains.length < quantity) {
-      console.warn(`Only found ${availableDomains.length}/${quantity} domains after ${attempt} attempts`);
+      console.warn(`⚠️  Only found ${availableDomains.length}/${quantity} domains after ${attempt} attempts`);
     }
 
     // Retornar apenas a quantidade solicitada
     const finalDomains = availableDomains.slice(0, quantity);
 
-    console.log(`Returning ${finalDomains.length} domains: ${finalDomains.join(", ")}`);
+    console.log(`\n✅ Returning ${finalDomains.length} verified available domains:`);
+    console.log(finalDomains.join("\n"));
 
     return new Response(
       JSON.stringify({
         domains: finalDomains,
         attempts: attempt,
         total_found: availableDomains.length,
+        total_generated: totalGenerated,
+        total_checked: totalChecked,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
-    console.error("Error in ai-domain-suggestions function:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("❌ Error in ai-domain-suggestions function:", error);
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+        details: error instanceof Error ? error.stack : undefined,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });
