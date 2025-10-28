@@ -13,10 +13,10 @@ serve(async (req) => {
   try {
     const { keywords, quantity = 5, language = 'portuguese', structure, niche } = await req.json();
     
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
-    if (!GEMINI_API_KEY) {
-      throw new Error('Gemini API key not configured');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('Lovable API key not configured');
     }
 
     const languageMap: Record<string, string> = {
@@ -39,42 +39,46 @@ serve(async (req) => {
 }`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+      'https://api.lovable.app/v1/chat/completions',
       {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }]
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { 
+              role: 'user', 
+              content: prompt 
+            }
+          ],
+          temperature: 0.7,
         })
       }
     );
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('Gemini API error:', errorData);
-      throw new Error(`Gemini API error: ${JSON.stringify(errorData)}`);
+      console.error('Lovable AI error:', errorData);
+      throw new Error(`Lovable AI error: ${JSON.stringify(errorData)}`);
     }
 
     const data = await response.json();
-    console.log('Gemini response:', JSON.stringify(data));
+    console.log('Lovable AI response:', JSON.stringify(data));
     
-    if (!data.candidates || data.candidates.length === 0) {
-      console.error('No candidates in response:', data);
-      throw new Error('Failed to generate suggestions - no candidates returned');
+    if (!data.choices || data.choices.length === 0) {
+      console.error('No choices in response:', data);
+      throw new Error('Failed to generate suggestions - no choices returned');
     }
 
-    if (!data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
+    if (!data.choices[0].message || !data.choices[0].message.content) {
       console.error('Invalid response structure:', data);
       throw new Error('Failed to generate suggestions - invalid response structure');
     }
 
-    const textResponse = data.candidates[0].content.parts[0].text;
+    const textResponse = data.choices[0].message.content;
     console.log('Raw text response:', textResponse);
     
     // Try to extract JSON from the response
