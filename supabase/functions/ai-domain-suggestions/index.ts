@@ -39,7 +39,7 @@ serve(async (req) => {
 }`;
 
     const response = await fetch(
-      'https://api.lovable.app/v1/chat/completions',
+      'https://ai.gateway.lovable.dev/v1/chat/completions',
       {
         method: 'POST',
         headers: {
@@ -54,15 +54,25 @@ serve(async (req) => {
               content: prompt 
             }
           ],
-          temperature: 0.7,
         })
       }
     );
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Lovable AI error:', errorData);
-      throw new Error(`Lovable AI error: ${JSON.stringify(errorData)}`);
+      const errorText = await response.text();
+      console.error('Lovable AI error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`Lovable AI error: ${response.status} - ${errorText}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const errorText = await response.text();
+      console.error('Non-JSON response:', errorText);
+      throw new Error('API returned non-JSON response');
     }
 
     const data = await response.json();
