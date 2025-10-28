@@ -25,9 +25,12 @@ serve(async (req) => {
       spanish: "Espanhol",
     };
 
-    const WEBHOOK_URL = "https://webhook.institutoexperience.com/webhook/2ad42b09-808e-42b9-bbb9-6e47d828004a";
-    const MAX_ATTEMPTS = 15; // Aumentado para 15 tentativas
-    const DOMAINS_PER_BATCH = 10; // Gerar 10 domínios por tentativa
+    
+    const WEBHOOK_URL = Deno.env.get("N8N_PROXY_URL") || 
+      "https://dsehaqdqnrkjrhbvkfrk.supabase.co/functions/v1/check-domain-proxy";
+    
+    const MAX_ATTEMPTS = 15;
+    const DOMAINS_PER_BATCH = 10;
 
     let availableDomains: string[] = [];
     let attempt = 0;
@@ -35,8 +38,8 @@ serve(async (req) => {
     let totalChecked = 0;
 
     console.log(`🚀 Starting domain search. Target: ${quantity} available domains`);
+    console.log(`🔗 Using proxy: ${WEBHOOK_URL}`);
 
-    // Loop até encontrar a quantidade necessária ou atingir máximo de tentativas
     while (availableDomains.length < quantity && attempt < MAX_ATTEMPTS) {
       attempt++;
       console.log(`\n📍 Attempt ${attempt}/${MAX_ATTEMPTS}`);
@@ -55,7 +58,6 @@ serve(async (req) => {
   ]
 }`;
 
-      // ETAPA 1: Chamar Gemini AI para gerar domínios
       console.log(`🤖 Calling Gemini AI to generate ${DOMAINS_PER_BATCH} domains...`);
 
       const geminiResponse = await fetch(
@@ -80,7 +82,6 @@ serve(async (req) => {
       );
 
       if (!geminiResponse.ok) {
-        const errorText = await geminiResponse.text();
         console.error("❌ Gemini AI error:", geminiResponse.status);
         continue;
       }
@@ -99,7 +100,6 @@ serve(async (req) => {
 
       const textResponse = geminiData.candidates[0].content.parts[0].text;
 
-      // Extrair domínios da resposta
       let generatedDomains: string[] = [];
       try {
         const jsonText = textResponse.replace(/```json\s*|\s*```/g, "").trim();
@@ -126,17 +126,15 @@ serve(async (req) => {
       totalGenerated += generatedDomains.length;
       console.log(`✅ Generated ${generatedDomains.length} domains: ${generatedDomains.join(", ")}`);
 
-      // ETAPA 2: VERIFICAÇÃO OBRIGATÓRIA VIA WEBHOOK
-      console.log(`\n🔍 CHECKING AVAILABILITY via webhook...`);
-      console.log(`Webhook URL: ${WEBHOOK_URL}`);
+      console.log(`\n🔍 CHECKING AVAILABILITY via proxy...`);
+      console.log(`Proxy URL: ${WEBHOOK_URL}`);
 
       try {
-        // Preparar payload no formato correto
         const webhookPayload = {
           domains: generatedDomains.join(","),
         };
 
-        console.log(`📤 Sending to webhook:`, JSON.stringify(webhookPayload));
+        console.log(`📤 Sending to proxy:`, JSON.stringify(webhookPayload));
 
         const webhookResponse = await fetch(WEBHOOK_URL, {
           method: "POST",
@@ -146,26 +144,26 @@ serve(async (req) => {
           body: JSON.stringify(webhookPayload),
         });
 
-        console.log(`📥 Webhook response status: ${webhookResponse.status}`);
+        console.log(`📥 Proxy response status: ${webhookResponse.status}`);
 
         if (!webhookResponse.ok) {
           const errorText = await webhookResponse.text();
-          console.error("❌ Webhook error:", errorText);
+          console.error("❌ Proxy error:", errorText);
           continue;
         }
 
         const webhookData = await webhookResponse.json();
-        console.log(`📊 Webhook response data:`, JSON.stringify(webhookData, null, 2));
+        console.log(`📊 Proxy response data:`, JSON.stringify(webhookData, null, 2));
 
         totalChecked += generatedDomains.length;
 
-        // 🔧 CORREÇÃO: Acessar os dados dentro de "dados_originais"
-        // O N8N retorna: { mensagem_formatada: "...", dados_originais: { dominios_disponiveis: [...] } }
-        const dadosOriginais = webhookData.dados_originais || webhookData;
+        // 🔧 CORREÇÃO: Ler resposta do proxy corretamente
+        // Proxy retorna: { success: true, data: { dados_originais: {...} } }
+        const proxyData = webhookData.data || webhookData;
+        const dadosOriginais = proxyData.dados_originais || proxyData;
         
-        // Extrair domínios disponíveis - tentar ambos os formatos para compatibilidade
-        const newAvailableDomains = dadosOriginais.dominios_disponiveis || webhookData.dominios_disponiveis || [];
-        const unavailableDomains = dadosOriginais.dominios_indisponiveis || webhookData.dominios_indisponiveis || [];
+        const newAvailableDomains = dadosOriginais.dominios_disponiveis || [];
+        const unavailableDomains = dadosOriginais.dominios_indisponiveis || [];
 
         console.log(`✅ Available: ${newAvailableDomains.length} domains`);
         console.log(`❌ Unavailable: ${unavailableDomains.length} domains`);
@@ -177,7 +175,6 @@ serve(async (req) => {
           console.log(`Unavailable domains:`, unavailableDomains.join(", "));
         }
 
-        // Adicionar novos domínios disponíveis (evitar duplicatas)
         for (const domain of newAvailableDomains) {
           if (!availableDomains.includes(domain) && availableDomains.length < quantity) {
             availableDomains.push(domain);
@@ -187,18 +184,15 @@ serve(async (req) => {
 
         console.log(`\n📊 Progress: ${availableDomains.length}/${quantity} available domains found`);
       } catch (webhookError) {
-        console.error("❌ Critical error calling webhook:", webhookError);
+        console.error("❌ Critical error calling proxy:", webhookError);
         console.error("Error details:", webhookError instanceof Error ? webhookError.message : String(webhookError));
-        // IMPORTANTE: Se o webhook falhar, não adicionar nenhum domínio como disponível
       }
 
-      // Aguardar um pouco entre tentativas para não sobrecarregar as APIs
       if (availableDomains.length < quantity && attempt < MAX_ATTEMPTS) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
-    // Resultado final
     console.log(`\n🏁 SEARCH COMPLETED`);
     console.log(`Total attempts: ${attempt}`);
     console.log(`Total domains generated: ${totalGenerated}`);
@@ -206,7 +200,6 @@ serve(async (req) => {
     console.log(`Total available found: ${availableDomains.length}`);
     console.log(`Target was: ${quantity}`);
 
-    // Verificar se conseguimos a quantidade necessária
     if (availableDomains.length === 0) {
       throw new Error("Nenhum domínio disponível foi encontrado após verificação via webhook");
     }
@@ -215,7 +208,6 @@ serve(async (req) => {
       console.warn(`⚠️  Only found ${availableDomains.length}/${quantity} domains after ${attempt} attempts`);
     }
 
-    // Retornar apenas a quantidade solicitada
     const finalDomains = availableDomains.slice(0, quantity);
 
     console.log(`\n✅ Returning ${finalDomains.length} verified available domains:`);
