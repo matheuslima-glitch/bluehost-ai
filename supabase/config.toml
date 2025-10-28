@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.purchase-domains]
 verify_jwt = true
+
+[functions.check-domain-proxy]
+verify_jwt = true
