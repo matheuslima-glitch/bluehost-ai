@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { keywords } = await req.json();
+    const { keywords, quantity = 5, language = 'portuguese', structure } = await req.json();
     
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     
@@ -19,17 +19,13 @@ serve(async (req) => {
       throw new Error('Gemini API key not configured');
     }
 
-    const prompt = `Generate 10 creative, short, and memorable domain name suggestions based on these keywords: "${keywords}". 
-    
-    Rules:
-    - Each domain should be between 5-15 characters
-    - Include only .com extensions
-    - Be creative but professional
-    - Easy to remember and type
-    - No hyphens or numbers unless absolutely necessary
-    - Consider combining words, using prefixes/suffixes
-    
-    Return ONLY a JSON array of domain names, nothing else. Format: ["domain1.com", "domain2.com", ...]`;
+    const languageMap: Record<string, string> = {
+      'portuguese': 'português',
+      'english': 'English',
+      'spanish': 'español'
+    };
+
+    const prompt = `Gere ${quantity} sugestões de domínio para o nicho "${keywords}" em ${languageMap[language]}. Use extensões .com, .site ou .online. Retorne apenas os domínios, um por linha.`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
@@ -56,22 +52,13 @@ serve(async (req) => {
 
     const textResponse = data.candidates[0].content.parts[0].text;
     
-    // Try to parse JSON from response
-    let suggestions = [];
-    try {
-      // Extract JSON array from response (might be wrapped in markdown code blocks)
-      const jsonMatch = textResponse.match(/\[.*\]/s);
-      if (jsonMatch) {
-        suggestions = JSON.parse(jsonMatch[0]);
-      } else {
-        // Fallback: extract domain-like strings
-        const domainMatches = textResponse.match(/[\w-]+\.com/g);
-        suggestions = domainMatches || [];
-      }
-    } catch (e) {
-      console.error('Failed to parse suggestions:', e);
-      suggestions = [];
-    }
+    const suggestions = textResponse
+      .split('\n')
+      .map((line: string) => line.trim())
+      .filter((line: string) => 
+        line && (line.includes('.com') || line.includes('.site') || line.includes('.online'))
+      )
+      .slice(0, quantity);
 
     return new Response(
       JSON.stringify({ suggestions }),

@@ -86,6 +86,7 @@ export type Database = {
         Row: {
           auto_renew: boolean | null
           created_at: string | null
+          dns_configured: boolean | null
           domain_name: string
           expiration_date: string | null
           id: string
@@ -94,14 +95,23 @@ export type Database = {
             | null
           monthly_visits: number | null
           nameservers: string[] | null
+          propagation_ends_at: string | null
+          purchase_date: string | null
+          purchase_price: number | null
+          purchased_by: string | null
           registrar: string | null
+          ssl_status: string | null
           status: Database["public"]["Enums"]["domain_status"] | null
+          structure_type: string | null
+          traffic_source: string | null
           updated_at: string | null
           user_id: string
+          zone_id: string | null
         }
         Insert: {
           auto_renew?: boolean | null
           created_at?: string | null
+          dns_configured?: boolean | null
           domain_name: string
           expiration_date?: string | null
           id?: string
@@ -110,14 +120,23 @@ export type Database = {
             | null
           monthly_visits?: number | null
           nameservers?: string[] | null
+          propagation_ends_at?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          purchased_by?: string | null
           registrar?: string | null
+          ssl_status?: string | null
           status?: Database["public"]["Enums"]["domain_status"] | null
+          structure_type?: string | null
+          traffic_source?: string | null
           updated_at?: string | null
           user_id: string
+          zone_id?: string | null
         }
         Update: {
           auto_renew?: boolean | null
           created_at?: string | null
+          dns_configured?: boolean | null
           domain_name?: string
           expiration_date?: string | null
           id?: string
@@ -126,9 +145,44 @@ export type Database = {
             | null
           monthly_visits?: number | null
           nameservers?: string[] | null
+          propagation_ends_at?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          purchased_by?: string | null
           registrar?: string | null
+          ssl_status?: string | null
           status?: Database["public"]["Enums"]["domain_status"] | null
+          structure_type?: string | null
+          traffic_source?: string | null
           updated_at?: string | null
+          user_id?: string
+          zone_id?: string | null
+        }
+        Relationships: []
+      }
+      namecheap_balance: {
+        Row: {
+          balance_brl: number
+          balance_usd: number
+          created_at: string | null
+          id: string
+          last_synced_at: string | null
+          user_id: string
+        }
+        Insert: {
+          balance_brl?: number
+          balance_usd?: number
+          created_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          user_id: string
+        }
+        Update: {
+          balance_brl?: number
+          balance_usd?: number
+          created_at?: string | null
+          id?: string
+          last_synced_at?: string | null
           user_id?: string
         }
         Relationships: []

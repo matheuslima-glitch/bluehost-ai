@@ -69,11 +69,10 @@ export function AppSidebar() {
 
       <SidebarFooter className="border-t border-border p-4">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">{user?.email}</span>
+          <div className="flex flex-col overflow-hidden">
+            <span className="text-sm font-medium truncate max-w-[180px]">{user?.email}</span>
             <span className="text-xs text-muted-foreground">Usuário ativo</span>
           </div>
-          <ThemeToggle />
         </div>
         <Button
           variant="outline"
