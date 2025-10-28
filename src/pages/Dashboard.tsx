@@ -88,6 +88,8 @@ export default function Dashboard() {
 
               if (!analyticsError && analyticsData?.requests) {
                 cloudflareVisits += analyticsData.requests;
+              } else if (analyticsError) {
+                console.error(`Analytics error for ${domain.domain_name}:`, analyticsError);
               }
             } catch (err) {
               console.error(`Error loading analytics for ${domain.domain_name}:`, err);
@@ -103,11 +105,15 @@ export default function Dashboard() {
           body: { action: "balance" }
         });
 
-        if (!balanceError && balanceData?.balance) {
+        if (balanceError) {
+          console.error("Balance error:", balanceError);
+          // Keep balance as null to show "Indisponível"
+        } else if (balanceData?.balance) {
           setBalance(balanceData.balance);
         }
       } catch (balanceErr) {
         console.error("Error loading balance:", balanceErr);
+        // Keep balance as null
       }
 
       // Load expired domains from Namecheap API
@@ -331,7 +337,10 @@ export default function Dashboard() {
                     </p>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Carregando...</p>
+                  <div>
+                    <p className="text-lg font-semibold text-muted-foreground">Indisponível</p>
+                    <p className="text-xs text-muted-foreground">Verifique as credenciais</p>
+                  </div>
                 )}
               </div>
               <CheckCircle2 className="h-6 w-6 text-success" />
@@ -352,8 +361,17 @@ export default function Dashboard() {
                 <p className="text-2xl font-bold">{integrations.cloudflare}</p>
                 <p className="text-xs text-muted-foreground">zonas</p>
                 <div className="mt-2">
-                  <p className="text-sm font-semibold text-primary">{totalVisits.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground">acessos mensais</p>
+                  {totalVisits > 0 ? (
+                    <>
+                      <p className="text-sm font-semibold text-primary">{totalVisits.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">acessos mensais</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground">Sem dados</p>
+                      <p className="text-xs text-muted-foreground">Verifique as credenciais</p>
+                    </>
+                  )}
                 </div>
               </div>
               <CheckCircle2 className="h-6 w-6 text-success" />

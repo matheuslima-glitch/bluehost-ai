@@ -5,9 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const CLOUDFLARE_EMAIL = 'diretoria@institutoexperience.com.br';
-const CLOUDFLARE_API_KEY = 'e9029260de042477291a02ff8d6f87213e779';
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -16,7 +13,16 @@ serve(async (req) => {
   try {
     const { zoneId } = await req.json();
     
+    const CLOUDFLARE_EMAIL = Deno.env.get('CLOUDFLARE_EMAIL');
+    const CLOUDFLARE_API_KEY = Deno.env.get('CLOUDFLARE_API_KEY');
+    
+    if (!CLOUDFLARE_EMAIL || !CLOUDFLARE_API_KEY) {
+      console.error('Cloudflare credentials not configured');
+      throw new Error('Cloudflare credentials not configured');
+    }
+    
     if (!zoneId) {
+      console.error('Zone ID is required');
       throw new Error('Zone ID is required');
     }
 
