@@ -1,4 +1,4 @@
-project_id = "qggmrqivolxpkmvbgwul"
+project_id = "dsehaqdqnrkjrhbvkfrk"
 
 [functions.cloudflare-analytics]
 verify_jwt = true
