@@ -6,9 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const NAMECHEAP_API_KEY = Deno.env.get('NAMECHEAP_API_KEY');
-const NAMECHEAP_API_USER = Deno.env.get('NAMECHEAP_API_USER');
-const CLIENT_IP = '18.216.155.225';
+const NAMECHEAP_API_KEY = 'edc0274a31f449698fa9170f2b40505b';
+const NAMECHEAP_API_USER = 'LerrickeNunes';
+const CLIENT_IP = '185.158.133.1';
 const ZAPI_INSTANCE = '3CD976230F68605F4EE09E692ED0BBB5';
 const ZAPI_TOKEN = 'D64F7F490F5835B4836603AA';
 const ZAPI_CLIENT_TOKEN = 'Fc134654c3e834bc3b0ee73aaf626f5c8S';
@@ -56,6 +56,7 @@ serve(async (req) => {
 
       const response = await fetch(`${baseURL}?${params}`);
       const xmlText = await response.text();
+      console.log('Namecheap balance response:', xmlText);
       
       // Parse balance from XML
       const balanceMatch = xmlText.match(/AccountBalance="([^"]+)"/);
@@ -72,6 +73,36 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ balance: { usd: balance, brl: balanceBRL } }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // List domains with filters
+    if (action === 'list_domains') {
+      const { listType } = body; // EXPIRED or EXPIRING
+      
+      const params = new URLSearchParams({
+        ApiUser: NAMECHEAP_API_USER,
+        ApiKey: NAMECHEAP_API_KEY,
+        UserName: NAMECHEAP_API_USER,
+        Command: 'namecheap.domains.getList',
+        ClientIp: CLIENT_IP,
+        ...(listType && { ListType: listType })
+      });
+
+      const response = await fetch(`${baseURL}?${params}`);
+      const xmlText = await response.text();
+      console.log(`Namecheap list domains (${listType}) response:`, xmlText);
+
+      // Parse domain list from XML
+      const domainMatches = [...xmlText.matchAll(/<Domain[^>]*Name="([^"]+)"[^>]*Expires="([^"]+)"/g)];
+      const domains = domainMatches.map(match => ({
+        name: match[1],
+        expirationDate: match[2]
+      }));
+
+      return new Response(
+        JSON.stringify({ domains }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

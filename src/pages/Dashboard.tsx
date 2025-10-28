@@ -25,6 +25,10 @@ export default function Dashboard() {
   const [totalVisits, setTotalVisits] = useState(0);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [balanceCurrency, setBalanceCurrency] = useState<"usd" | "brl">("usd");
+  const [expiredDomains, setExpiredDomains] = useState(0);
+  const [expiringDomains, setExpiringDomains] = useState(0);
+  const [criticalDomains, setCriticalDomains] = useState(0);
 
   useEffect(() => {
     loadDashboardData();
@@ -66,12 +70,32 @@ export default function Dashboard() {
         cpanel: domains?.filter(d => d.integration_source === "cpanel").length || 431,
       };
 
-      // Calculate total visits from all domains
-      const totalMonthlyVisits = domains?.reduce((sum, d) => sum + (d.monthly_visits || 0), 0) || 0;
-
       setStats(stats);
       setIntegrations(integrationCounts);
-      setTotalVisits(totalMonthlyVisits);
+
+      // Load Cloudflare analytics for all domains
+      let cloudflareVisits = 0;
+      if (domains && domains.length > 0) {
+        for (const domain of domains) {
+          if (domain.zone_id) {
+            try {
+              const { data: analyticsData, error: analyticsError } = await supabase.functions.invoke(
+                "cloudflare-analytics",
+                {
+                  body: { zoneId: domain.zone_id }
+                }
+              );
+
+              if (!analyticsError && analyticsData?.requests) {
+                cloudflareVisits += analyticsData.requests;
+              }
+            } catch (err) {
+              console.error(`Error loading analytics for ${domain.domain_name}:`, err);
+            }
+          }
+        }
+      }
+      setTotalVisits(cloudflareVisits);
 
       // Load Namecheap balance
       try {
@@ -84,6 +108,43 @@ export default function Dashboard() {
         }
       } catch (balanceErr) {
         console.error("Error loading balance:", balanceErr);
+      }
+
+      // Load expired domains from Namecheap API
+      try {
+        const { data: expiredData, error: expiredError } = await supabase.functions.invoke("namecheap-domains", {
+          body: { action: "list_domains", listType: "EXPIRED" }
+        });
+
+        if (!expiredError && expiredData?.domains) {
+          setExpiredDomains(expiredData.domains.length);
+        }
+      } catch (expiredErr) {
+        console.error("Error loading expired domains:", expiredErr);
+      }
+
+      // Load expiring domains from Namecheap API
+      try {
+        const { data: expiringData, error: expiringError } = await supabase.functions.invoke("namecheap-domains", {
+          body: { action: "list_domains", listType: "EXPIRING" }
+        });
+
+        if (!expiringError && expiringData?.domains) {
+          setExpiringDomains(expiringData.domains.length);
+          
+          // Filter critical domains (expiring in 15 days)
+          const now = new Date();
+          const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+          
+          const critical = expiringData.domains.filter((d: any) => {
+            const expDate = new Date(d.expirationDate);
+            return expDate <= fifteenDaysFromNow;
+          });
+          
+          setCriticalDomains(critical.length);
+        }
+      } catch (expiringErr) {
+        console.error("Error loading expiring domains:", expiringErr);
       }
     } catch (error: any) {
       console.error("Dashboard load error:", error);
@@ -189,7 +250,7 @@ export default function Dashboard() {
             <XCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.expired}</div>
+            <div className="text-2xl font-bold">{expiredDomains}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Domínios expirados
             </p>
@@ -202,7 +263,7 @@ export default function Dashboard() {
             <Clock className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.expiring}</div>
+            <div className="text-2xl font-bold">{expiringDomains}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Próximos 30 dias
             </p>
@@ -215,7 +276,7 @@ export default function Dashboard() {
             <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.critical}</div>
+            <div className="text-2xl font-bold">{criticalDomains}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Próximos 15 dias
             </p>
@@ -247,15 +308,30 @@ export default function Dashboard() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-medium">Namecheap</p>
-                <p className="text-2xl font-bold">{integrations.namecheap}</p>
-                <p className="text-xs text-muted-foreground">domínios</p>
-                {balance && (
-                  <div className="mt-2">
-                    <p className="text-sm font-semibold text-primary">${balance.usd.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">R$ {balance.brl.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground mb-2">Saldo da conta</p>
+                {balance ? (
+                  <div className="space-y-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 hover:bg-transparent"
+                      onClick={() => setBalanceCurrency(balanceCurrency === "usd" ? "brl" : "usd")}
+                    >
+                      <p className="text-2xl font-bold text-primary">
+                        {balanceCurrency === "usd" 
+                          ? `$${balance.usd.toFixed(2)}`
+                          : `R$ ${balance.brl.toFixed(2)}`
+                        }
+                      </p>
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Clique para alternar moeda
+                    </p>
                   </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Carregando...</p>
                 )}
               </div>
               <CheckCircle2 className="h-6 w-6 text-success" />

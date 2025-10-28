@@ -46,7 +46,9 @@ export default function PurchaseWithAIDialog({
     setLoading(true);
 
     try {
-      // Gerar sugestões de domínios com IA
+      // Step 1: Generate domain suggestions with AI
+      toast.info("Gerando sugestões de domínios...");
+      
       const { data: suggestions, error: suggestionsError } = await supabase.functions.invoke(
         "ai-domain-suggestions",
         {
@@ -55,31 +57,41 @@ export default function PurchaseWithAIDialog({
             quantity,
             language,
             structure,
-          },
-        }
-      );
-
-      if (suggestionsError) throw suggestionsError;
-
-      // Processar compra dos domínios
-      const { data: purchaseData, error: purchaseError } = await supabase.functions.invoke(
-        "namecheap-domains",
-        {
-          body: {
-            action: "purchase_with_ai",
-            domains: suggestions.suggestions,
-            structure,
-            language,
             niche,
           },
         }
       );
 
-      if (purchaseError) throw purchaseError;
+      if (suggestionsError) {
+        console.error("AI suggestions error:", suggestionsError);
+        throw suggestionsError;
+      }
 
-      toast.success(
-        `${purchaseData.purchased} domínio(s) comprado(s) com sucesso!`
-      );
+      if (!suggestions?.domains || suggestions.domains.length === 0) {
+        throw new Error("Nenhum domínio foi gerado pela IA");
+      }
+
+      console.log("Generated domains:", suggestions.domains);
+      toast.info(`${suggestions.domains.length} domínios gerados. Verificando disponibilidade...`);
+
+      // Step 2: Send to verification webhook
+      const webhookUrl = "https://webhook.institutoexperience.com/webhook/2ad42b09-808e-42b9-bbb9-6e47d828004a";
+      
+      const webhookResponse = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          domains: suggestions.domains
+        }),
+      });
+
+      if (!webhookResponse.ok) {
+        throw new Error("Erro ao verificar disponibilidade dos domínios");
+      }
+
+      toast.success("Processo de compra iniciado! Você será notificado quando concluído.");
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {

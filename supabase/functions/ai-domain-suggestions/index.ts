@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { keywords, quantity = 5, language = 'portuguese', structure } = await req.json();
+    const { keywords, quantity = 5, language = 'portuguese', structure, niche } = await req.json();
     
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     
@@ -20,12 +20,23 @@ serve(async (req) => {
     }
 
     const languageMap: Record<string, string> = {
-      'portuguese': 'português',
-      'english': 'English',
-      'spanish': 'español'
+      'portuguese': 'Português',
+      'english': 'Inglês',
+      'spanish': 'Espanhol'
     };
 
-    const prompt = `Gere ${quantity} sugestões de domínio para o nicho "${keywords}" em ${languageMap[language]}. Use extensões .com, .site ou .online. Retorne apenas os domínios, um por linha.`;
+    const prompt = `Olá, preciso de ${quantity} domínios do nicho ${niche || keywords} e no idioma ${languageMap[language]}. Me dê eles em .online
+
+- Lembre-se de SEMPRE usar .online
+- Lembre-se de NUNCA usar acentos.
+- Lembre-se de NUNCA usar traços.
+- Retorne APENAS um objeto JSON válido no seguinte formato, sem nenhum texto adicional:
+{
+  "domains": [
+    "primeirodominio.online",
+    "segundodominio.online"
+  ]
+}`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
@@ -64,17 +75,37 @@ serve(async (req) => {
     }
 
     const textResponse = data.candidates[0].content.parts[0].text;
+    console.log('Raw text response:', textResponse);
     
-    const suggestions = textResponse
-      .split('\n')
-      .map((line: string) => line.trim())
-      .filter((line: string) => 
-        line && (line.includes('.com') || line.includes('.site') || line.includes('.online'))
-      )
-      .slice(0, quantity);
+    // Try to extract JSON from the response
+    let domains = [];
+    try {
+      // Remove markdown code blocks if present
+      const jsonText = textResponse.replace(/```json\s*|\s*```/g, '').trim();
+      const parsed = JSON.parse(jsonText);
+      domains = parsed.domains || [];
+    } catch (parseError) {
+      console.error('Failed to parse JSON, falling back to line extraction:', parseError);
+      // Fallback: extract .online domains from text
+      domains = textResponse
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.includes('.online'))
+        .map((line: string) => {
+          // Extract just the domain.online part
+          const match = line.match(/([a-z0-9]+\.online)/i);
+          return match ? match[1].toLowerCase() : null;
+        })
+        .filter((domain: string | null): domain is string => domain !== null)
+        .slice(0, quantity);
+    }
+
+    if (domains.length === 0) {
+      throw new Error('No valid domains generated');
+    }
 
     return new Response(
-      JSON.stringify({ suggestions }),
+      JSON.stringify({ domains }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
