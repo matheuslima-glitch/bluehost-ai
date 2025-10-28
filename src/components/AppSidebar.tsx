@@ -51,11 +51,9 @@ export function AppSidebar() {
                     <NavLink
                       to={item.url}
                       className={({ isActive }) =>
-                        `flex items-center gap-2 w-full ${
-                          isActive
-                            ? "bg-primary text-primary-foreground font-medium"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        }`
+                        isActive
+                          ? "bg-primary text-primary-foreground font-medium"
+                          : "text-foreground hover:bg-accent hover:text-accent-foreground"
                       }
                     >
                       <item.icon className="h-4 w-4" />
