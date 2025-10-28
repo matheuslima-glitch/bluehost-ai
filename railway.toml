@@ -1,0 +1,61 @@
+[build]
+builder = "NIXPACKS"
+
+[build.nixpacksPlan]
+providers = ["node"]
+
+[[build.nixpacksPlan.phases.setup]]
+nixPkgs = ["nodejs_18"]
+
+[[build.nixpacksPlan.phases.install]]
+cmds = ["npm install"]
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+```
+
+5. Clique "Commit new file"
+6. Railway vai re-deployar automaticamente
+7. Aguarde 1-2 minutos
+
+---
+
+### OPÇÃO 2: Remover bun.lockb (se existir)
+
+Se você tem um arquivo `bun.lockb` no repositório:
+
+1. Vá no repositório GitHub
+2. Encontre o arquivo `bun.lockb`
+3. Clique nele > Delete file
+4. Commit
+5. Railway vai re-deployar
+
+---
+
+### OPÇÃO 3: Via Railway Dashboard (mais rápido)
+
+1. Railway Dashboard > Settings
+2. Procure por "Build Command"
+3. Adicione: `npm install`
+4. "Start Command": `npm start`
+5. Salve
+6. Re-deploy
+
+---
+
+## 🎯 QUAL USAR?
+
+**Use OPÇÃO 1** - é a mais confiável!
+
+---
+
+## ✅ DEPOIS DE ADICIONAR railway.toml
+
+O build vai funcionar e você vai ver:
+```
+✅ mise caddy@2.10.2 ✓ installed
+✅ mise node@22.21.0 ✓ installed
+✅ npm install (sem erro de bun!)
+✅ Deploy successful
