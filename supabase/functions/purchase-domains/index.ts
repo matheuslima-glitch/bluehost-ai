@@ -26,9 +26,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const progress: PurchaseProgress[] = [];
-  const purchasedDomains: DomainPurchaseData[] = [];
-
   try {
     const { domains, structure = 'wordpress', userId } = await req.json();
     
@@ -55,6 +52,9 @@ serve(async (req) => {
     const ZAPI_INSTANCE = '3CD976230F68605F4EE09E692ED0BBB5';
     const ZAPI_TOKEN = 'D64F7F490F5835B4836603AA';
     const ZAPI_CLIENT_TOKEN = 'Fc134654c3e834bc3b0ee73aaf626f5c8S';
+
+    const progress: PurchaseProgress[] = [];
+    const purchasedDomains: DomainPurchaseData[] = [];
 
     // Função auxiliar para adicionar progresso
     const addProgress = (step: string, status: PurchaseProgress['status'], message: string) => {
@@ -307,8 +307,7 @@ serve(async (req) => {
           addProgress('firewall', 'completed', `Firewall configurado para ${domain}`);
 
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-          addProgress('purchase', 'error', `Erro ao processar ${domain}: ${errorMessage}`);
+          addProgress('purchase', 'error', `Erro ao processar ${domain}: ${error.message}`);
         }
       }
 
@@ -370,8 +369,7 @@ serve(async (req) => {
 
         addProgress('notification', 'completed', 'Notificação enviada com sucesso');
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-        addProgress('notification', 'error', `Erro ao enviar notificação: ${errorMessage}`);
+        addProgress('notification', 'error', `Erro ao enviar notificação: ${error.message}`);
       }
 
       return new Response(
@@ -387,8 +385,7 @@ serve(async (req) => {
       );
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      addProgress('error', 'error', `Erro no processo: ${errorMessage}`);
+      addProgress('error', 'error', `Erro no processo: ${error.message}`);
       throw error;
     }
 
