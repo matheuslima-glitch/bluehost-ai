@@ -196,7 +196,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Salvar classificações no banco
+      // Salvar classificações no banco - atualizar apenas o campo traffic_source
       for (const classification of classifications) {
         // Buscar o domain_id
         const { data: domain } = await supabase
@@ -207,13 +207,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
           .single();
 
         if (domain) {
-          await supabase.from("domain_classifications").insert({
-            domain_id: domain.id,
-            classification_type: "traffic_source",
-            classification_value: classification.trafficSource,
-            created_by: user.id,
-          });
-
           // Atualizar o campo traffic_source na tabela domains
           await supabase.from("domains").update({ traffic_source: classification.trafficSource }).eq("id", domain.id);
         }
