@@ -26,6 +26,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const progress: PurchaseProgress[] = [];
+
   try {
     const { domains, structure = 'wordpress', userId } = await req.json();
     
@@ -53,7 +55,6 @@ serve(async (req) => {
     const ZAPI_TOKEN = 'D64F7F490F5835B4836603AA';
     const ZAPI_CLIENT_TOKEN = 'Fc134654c3e834bc3b0ee73aaf626f5c8S';
 
-    const progress: PurchaseProgress[] = [];
     const purchasedDomains: DomainPurchaseData[] = [];
 
     // Função auxiliar para adicionar progresso
@@ -307,7 +308,8 @@ serve(async (req) => {
           addProgress('firewall', 'completed', `Firewall configurado para ${domain}`);
 
         } catch (error) {
-          addProgress('purchase', 'error', `Erro ao processar ${domain}: ${error.message}`);
+          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+          addProgress('purchase', 'error', `Erro ao processar ${domain}: ${errorMessage}`);
         }
       }
 
@@ -369,7 +371,8 @@ serve(async (req) => {
 
         addProgress('notification', 'completed', 'Notificação enviada com sucesso');
       } catch (error) {
-        addProgress('notification', 'error', `Erro ao enviar notificação: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+        addProgress('notification', 'error', `Erro ao enviar notificação: ${errorMessage}`);
       }
 
       return new Response(
@@ -385,7 +388,8 @@ serve(async (req) => {
       );
 
     } catch (error) {
-      addProgress('error', 'error', `Erro no processo: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      addProgress('error', 'error', `Erro no processo: ${errorMessage}`);
       throw error;
     }
 

@@ -182,12 +182,13 @@ export default function PurchaseWithAIDialog({
           .single();
 
         if (domain) {
-          await supabase.from('domain_classifications').insert({
-            domain_id: domain.id,
-            classification_type: 'traffic_source',
-            classification_value: classification.trafficSource,
-            created_by: user.id
-          });
+          // TODO: Descomentar após executar a migration
+          // await supabase.from('domain_classifications').insert({
+          //   domain_id: domain.id,
+          //   classification_type: 'traffic_source',
+          //   classification_value: classification.trafficSource,
+          //   created_by: user.id
+          // });
 
           // Atualizar o campo traffic_source na tabela domains
           await supabase
