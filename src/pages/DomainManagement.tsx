@@ -151,11 +151,11 @@ export default function DomainManagement() {
   const currentDomains = filteredDomains.slice(startIndex, endIndex);
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-      active: { label: "Ativo", variant: "default" },
+    const variants: Record<string, { label: string; variant: "success" | "destructive" | "warning" | "secondary" }> = {
+      active: { label: "Ativo", variant: "success" },
       expired: { label: "Expirado", variant: "destructive" },
       pending: { label: "Pendente", variant: "secondary" },
-      suspended: { label: "Suspenso", variant: "outline" },
+      suspended: { label: "Suspenso", variant: "warning" },
     };
 
     const config = variants[status] || variants.active;
@@ -207,7 +207,6 @@ export default function DomainManagement() {
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="active">Ativo</SelectItem>
                     <SelectItem value="expired">Expirado</SelectItem>
-                    <SelectItem value="pending">Pendente</SelectItem>
                     <SelectItem value="suspended">Suspenso</SelectItem>
                   </SelectContent>
                 </Select>
