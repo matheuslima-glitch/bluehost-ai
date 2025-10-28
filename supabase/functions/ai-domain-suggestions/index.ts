@@ -12,10 +12,6 @@ serve(async (req) => {
 
   try {
     const { keywords, quantity = 5, language = "portuguese", structure, niche } = await req.json();
-    
-    // Extrair token de autenticação para passar para o proxy
-    const authHeader = req.headers.get("authorization");
-    const apiKey = req.headers.get("apikey");
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
@@ -144,8 +140,6 @@ serve(async (req) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": authHeader || "",
-            "apikey": apiKey || "",
           },
           body: JSON.stringify(webhookPayload),
         });
