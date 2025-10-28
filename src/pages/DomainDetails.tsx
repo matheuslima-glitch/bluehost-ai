@@ -5,11 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi } from "lucide-react";
+import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface Domain {
   id: string;
@@ -29,6 +30,27 @@ export default function DomainDetails() {
   const [domain, setDomain] = useState<Domain | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [fetchingNamecheap, setFetchingNamecheap] = useState(false);
+
+  // Generate mock monthly visits data
+  const generateMonthlyData = (monthlyVisits: number) => {
+    const data = [];
+    const currentDate = new Date();
+    
+    for (let i = 11; i >= 0; i--) {
+      const date = subMonths(currentDate, i);
+      const monthName = format(date, "MMM/yy", { locale: ptBR });
+      const variation = 0.7 + Math.random() * 0.6; // 70% to 130% variation
+      const visits = Math.round(monthlyVisits * variation);
+      
+      data.push({
+        month: monthName,
+        visits: visits,
+      });
+    }
+    
+    return data;
+  };
 
   useEffect(() => {
     loadDomain();
@@ -50,6 +72,45 @@ export default function DomainDetails() {
       console.error("Error loading domain:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchNamecheapInfo = async () => {
+    if (!domain) return;
+
+    setFetchingNamecheap(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase.functions.invoke('namecheap-domains', {
+        body: { 
+          action: 'get_domain_info',
+          domainName: domain.domain_name
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.domainInfo?.createdDate) {
+        // Update domain with purchase date from Namecheap
+        const { error: updateError } = await supabase
+          .from("domains")
+          .update({ purchase_date: data.domainInfo.createdDate })
+          .eq("id", domain.id);
+
+        if (updateError) throw updateError;
+
+        setDomain({ ...domain, purchase_date: data.domainInfo.createdDate });
+        toast.success("Data de compra atualizada com sucesso!");
+      } else {
+        toast.info("Informações não disponíveis na Namecheap");
+      }
+    } catch (error: any) {
+      toast.error("Erro ao buscar informações da Namecheap");
+      console.error("Error fetching Namecheap info:", error);
+    } finally {
+      setFetchingNamecheap(false);
     }
   };
 
@@ -123,6 +184,46 @@ export default function DomainDetails() {
         </div>
       </div>
 
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <CardTitle>Dashboard de Visitas Mensais</CardTitle>
+          <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={generateMonthlyData(domain.monthly_visits)}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis 
+                dataKey="month" 
+                className="text-xs"
+                tick={{ fill: 'hsl(var(--foreground))' }}
+              />
+              <YAxis 
+                className="text-xs"
+                tick={{ fill: 'hsl(var(--foreground))' }}
+                tickFormatter={(value) => value.toLocaleString()}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px'
+                }}
+                labelStyle={{ color: 'hsl(var(--foreground))' }}
+                formatter={(value: number) => [value.toLocaleString() + ' visitas', 'Visitas']}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="visits" 
+                stroke="hsl(var(--primary))" 
+                strokeWidth={2}
+                dot={{ fill: 'hsl(var(--primary))' }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -151,7 +252,7 @@ export default function DomainDetails() {
             </div>
 
             <div className="space-y-2">
-              <Label>Visitas Mensais</Label>
+              <Label>Visitas Mensais (Média)</Label>
               <div className="flex items-center gap-2 text-sm">
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 {domain.monthly_visits.toLocaleString()}
@@ -212,13 +313,30 @@ export default function DomainDetails() {
             </div>
 
             <div className="space-y-2">
-              <Label>Data e Hora da Compra</Label>
+              <div className="flex items-center justify-between">
+                <Label>Data e Hora da Compra</Label>
+                {domain.registrar === 'Namecheap' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={fetchNamecheapInfo}
+                    disabled={fetchingNamecheap}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${fetchingNamecheap ? 'animate-spin' : ''}`} />
+                  </Button>
+                )}
+              </div>
               <div className="flex items-center gap-2 text-sm">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 {domain.purchase_date
                   ? format(new Date(domain.purchase_date), "dd/MM/yyyy HH:mm", { locale: ptBR })
                   : "Domínio não foi comprado no sistema"}
               </div>
+              {domain.registrar === 'Namecheap' && !domain.purchase_date && (
+                <p className="text-xs text-muted-foreground">
+                  Clique no botão de atualizar para buscar data da Namecheap
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

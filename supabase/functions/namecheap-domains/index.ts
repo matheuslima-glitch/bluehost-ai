@@ -337,6 +337,38 @@ serve(async (req) => {
       );
     }
 
+    // Get domain info
+    if (action === 'get_domain_info') {
+      const { domainName } = body;
+      
+      const params = new URLSearchParams({
+        ApiUser: NAMECHEAP_API_USER,
+        ApiKey: NAMECHEAP_API_KEY,
+        UserName: NAMECHEAP_API_USER,
+        Command: 'namecheap.domains.getInfo',
+        ClientIp: CLIENT_IP,
+        DomainName: domainName
+      });
+
+      const response = await fetch(`${baseURL}?${params}`);
+      const xmlText = await response.text();
+      console.log(`Namecheap domain info response for ${domainName}:`, xmlText);
+
+      // Parse creation date and other info
+      const createdDateMatch = xmlText.match(/<DomainDetails[^>]*CreatedDate="([^"]+)"/);
+      const expiresDateMatch = xmlText.match(/<DomainDetails[^>]*ExpiredDate="([^"]+)"/);
+      
+      const domainInfo = {
+        createdDate: createdDateMatch ? createdDateMatch[1] : null,
+        expiresDate: expiresDateMatch ? expiresDateMatch[1] : null,
+      };
+
+      return new Response(
+        JSON.stringify({ domainInfo }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // List domains
     if (action === 'list') {
       const params = new URLSearchParams({
@@ -386,7 +418,7 @@ serve(async (req) => {
     }
 
     console.error('Invalid action received:', action);
-    throw new Error(`Invalid action: ${action}. Valid actions are: balance, check, purchase, purchase_with_ai, list`);
+    throw new Error(`Invalid action: ${action}. Valid actions are: balance, check, purchase, purchase_with_ai, list, get_domain_info`);
   } catch (error) {
     console.error('Error in namecheap-domains function:', error);
     return new Response(
