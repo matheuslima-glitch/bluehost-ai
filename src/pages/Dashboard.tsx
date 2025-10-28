@@ -29,6 +29,7 @@ export default function Dashboard() {
   const [expiredDomains, setExpiredDomains] = useState(0);
   const [expiringDomains, setExpiringDomains] = useState(0);
   const [criticalDomains, setCriticalDomains] = useState(0);
+  const [suspendedDomains, setSuspendedDomains] = useState(0);
 
   useEffect(() => {
     loadDashboardData();
@@ -123,7 +124,10 @@ export default function Dashboard() {
         });
 
         if (!expiredError && expiredData?.domains) {
+          console.log("Domínios expirados:", expiredData.domains);
           setExpiredDomains(expiredData.domains.length);
+        } else {
+          console.error("Erro ao carregar domínios expirados:", expiredError);
         }
       } catch (expiredErr) {
         console.error("Error loading expired domains:", expiredErr);
@@ -136,6 +140,7 @@ export default function Dashboard() {
         });
 
         if (!expiringError && expiringData?.domains) {
+          console.log("Domínios expirando:", expiringData.domains);
           setExpiringDomains(expiringData.domains.length);
           
           // Filter critical domains (expiring in 15 days)
@@ -147,10 +152,33 @@ export default function Dashboard() {
             return expDate <= fifteenDaysFromNow;
           });
           
+          console.log("Domínios críticos (15 dias):", critical);
           setCriticalDomains(critical.length);
+        } else {
+          console.error("Erro ao carregar domínios expirando:", expiringError);
         }
       } catch (expiringErr) {
         console.error("Error loading expiring domains:", expiringErr);
+      }
+
+      // Load suspended domains from Namecheap API (they might be in the all domains list)
+      try {
+        const { data: allDomainsData, error: allDomainsError } = await supabase.functions.invoke("namecheap-domains", {
+          body: { action: "list" }
+        });
+
+        if (!allDomainsError && allDomainsData?.domains) {
+          // Namecheap doesn't have a direct "suspended" status
+          // We need to check the domains in the database that have suspended status
+          const suspendedCount = domains?.filter(d => d.status === "suspended").length || 0;
+          console.log("Domínios suspensos:", suspendedCount);
+          setSuspendedDomains(suspendedCount);
+        }
+      } catch (suspendedErr) {
+        console.error("Error loading suspended domains:", suspendedErr);
+        // Fallback to database count
+        const suspendedCount = domains?.filter(d => d.status === "suspended").length || 0;
+        setSuspendedDomains(suspendedCount);
       }
     } catch (error: any) {
       console.error("Dashboard load error:", error);
@@ -295,7 +323,7 @@ export default function Dashboard() {
             <AlertTriangle className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.suspended}</div>
+            <div className="text-2xl font-bold">{suspendedDomains}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Verificar pendências
             </p>
