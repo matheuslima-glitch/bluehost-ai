@@ -159,9 +159,13 @@ serve(async (req) => {
 
         totalChecked += generatedDomains.length;
 
-        // Extrair domínios disponíveis
-        const newAvailableDomains = webhookData.dominios_disponiveis || [];
-        const unavailableDomains = webhookData.dominios_indisponiveis || [];
+        // 🔧 CORREÇÃO: Acessar os dados dentro de "dados_originais"
+        // O N8N retorna: { mensagem_formatada: "...", dados_originais: { dominios_disponiveis: [...] } }
+        const dadosOriginais = webhookData.dados_originais || webhookData;
+        
+        // Extrair domínios disponíveis - tentar ambos os formatos para compatibilidade
+        const newAvailableDomains = dadosOriginais.dominios_disponiveis || webhookData.dominios_disponiveis || [];
+        const unavailableDomains = dadosOriginais.dominios_indisponiveis || webhookData.dominios_indisponiveis || [];
 
         console.log(`✅ Available: ${newAvailableDomains.length} domains`);
         console.log(`❌ Unavailable: ${unavailableDomains.length} domains`);
