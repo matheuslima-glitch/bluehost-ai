@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 import {
   Table,
   TableBody,
@@ -54,6 +56,7 @@ interface Filters {
 
 export default function DomainManagement() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [filteredDomains, setFilteredDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +73,39 @@ export default function DomainManagement() {
   });
 
   const ITEMS_PER_PAGE = 20;
+
+  // Fetch custom filters from database
+  const { data: customFilters = [] } = useQuery({
+    queryKey: ["custom-filters", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("custom_filters")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Combine default and custom filters
+  const platformOptions = [
+    "wordpress",
+    "atomicat",
+    ...customFilters.filter(f => f.filter_type === "platform").map(f => f.filter_value)
+  ];
+
+  const trafficSourceOptions = [
+    "facebook",
+    "google",
+    "native",
+    "outbrain",
+    "taboola",
+    "revcontent",
+    ...customFilters.filter(f => f.filter_type === "traffic_source").map(f => f.filter_value)
+  ];
 
   useEffect(() => {
     loadDomains();
@@ -228,8 +264,11 @@ export default function DomainManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="wordpress">WordPress</SelectItem>
-                    <SelectItem value="atomicat">AtomiCat</SelectItem>
+                    {platformOptions.map((platform) => (
+                      <SelectItem key={platform} value={platform}>
+                        {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -245,12 +284,11 @@ export default function DomainManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="facebook">Facebook</SelectItem>
-                    <SelectItem value="google">Google</SelectItem>
-                    <SelectItem value="native">Native</SelectItem>
-                    <SelectItem value="outbrain">Outbrain</SelectItem>
-                    <SelectItem value="taboola">Taboola</SelectItem>
-                    <SelectItem value="revcontent">RevContent</SelectItem>
+                    {trafficSourceOptions.map((source) => (
+                      <SelectItem key={source} value={source}>
+                        {source.charAt(0).toUpperCase() + source.slice(1)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
