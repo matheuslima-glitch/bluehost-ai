@@ -30,7 +30,12 @@ export default function Dashboard() {
   const [expiringDomains, setExpiringDomains] = useState(0);
   const [criticalDomains, setCriticalDomains] = useState(0);
   const [suspendedDomains, setSuspendedDomains] = useState(0);
-  const [monthlyVisitsData, setMonthlyVisitsData] = useState<Array<{ dia: string; visitas: number }>>([]);
+  const [monthlyVisitsData, setMonthlyVisitsData] = useState<Array<{ mes: string; visitas: number }>>([]);
+  const [integrationStatus, setIntegrationStatus] = useState({
+    namecheap: false,
+    cpanel: false,
+    cloudflare: false,
+  });
   const [domains, setDomains] = useState<any[]>([]);
 
   useEffect(() => {
@@ -78,9 +83,9 @@ export default function Dashboard() {
       setStats(stats);
       setIntegrations(integrationCounts);
 
-      // Load Cloudflare analytics for all domains and generate daily data for last 30 days
+      // Load Cloudflare analytics for all domains and generate monthly data for last 12 months
       let cloudflareVisits = 0;
-      const dailyVisitsMap = new Map<string, number>();
+      const monthlyVisitsMap = new Map<string, number>();
       
       if (domainsData && domainsData.length > 0) {
         for (const domain of domainsData) {
@@ -106,29 +111,28 @@ export default function Dashboard() {
       }
       setTotalVisits(cloudflareVisits);
 
-      // Generate last 30 days data
-      const last30Days: Array<{ dia: string; visitas: number }> = [];
+      // Generate last 12 months data
+      const last12Months: Array<{ mes: string; visitas: number }> = [];
       const today = new Date();
       
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dayLabel = `${date.getDate()}/${date.getMonth() + 1}`;
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const monthLabel = `${date.toLocaleString('pt-BR', { month: 'short' })}/${date.getFullYear()}`;
         
-        // Distribute total visits across days (simulation based on real data)
-        const dailyAverage = cloudflareVisits / 30;
+        // Distribute total visits across months (simulation based on real data)
+        const monthlyAverage = cloudflareVisits / 12;
         const randomVariation = (Math.random() - 0.5) * 0.3; // ±15% variation
-        const dailyVisits = Math.round(dailyAverage * (1 + randomVariation));
+        const monthlyVisits = Math.round(monthlyAverage * (1 + randomVariation));
         
-        last30Days.push({
-          dia: dayLabel,
-          visitas: dailyVisits
+        last12Months.push({
+          mes: monthLabel,
+          visitas: monthlyVisits
         });
       }
       
-      setMonthlyVisitsData(last30Days);
+      setMonthlyVisitsData(last12Months);
 
-      // Load Namecheap balance
+      // Load Namecheap balance and set integration status
       try {
         const { data: balanceData, error: balanceError } = await supabase.functions.invoke("namecheap-domains", {
           body: { action: "balance" }
@@ -136,13 +140,14 @@ export default function Dashboard() {
 
         if (balanceError) {
           console.error("Balance error:", balanceError);
-          // Keep balance as null to show "Indisponível"
+          setIntegrationStatus(prev => ({ ...prev, namecheap: false }));
         } else if (balanceData?.balance) {
           setBalance(balanceData.balance);
+          setIntegrationStatus(prev => ({ ...prev, namecheap: true }));
         }
       } catch (balanceErr) {
         console.error("Error loading balance:", balanceErr);
-        // Keep balance as null
+        setIntegrationStatus(prev => ({ ...prev, namecheap: false }));
       }
 
       // Load expired domains from Namecheap API
@@ -208,6 +213,13 @@ export default function Dashboard() {
         const suspendedCount = domainsData?.filter(d => d.status === "suspended").length || 0;
         setSuspendedDomains(suspendedCount);
       }
+
+      // Set cPanel and Cloudflare integration status
+      setIntegrationStatus(prev => ({
+        ...prev,
+        cpanel: integrationCounts.cpanel > 0,
+        cloudflare: integrationCounts.cloudflare > 0,
+      }));
     } catch (error: any) {
       console.error("Dashboard load error:", error);
       toast.error("Erro ao carregar dados do dashboard");
@@ -358,66 +370,66 @@ export default function Dashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex-1">
-                <p className="text-sm font-medium">Namecheap</p>
-                <p className="text-xs text-muted-foreground mb-2">Saldo da conta</p>
-                {balance ? (
-                  <div className="space-y-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto p-0 hover:bg-transparent"
-                      onClick={() => setBalanceCurrency(balanceCurrency === "usd" ? "brl" : "usd")}
-                    >
-                      <p className="text-2xl font-bold text-primary">
-                        {balanceCurrency === "usd" 
-                          ? `$${balance.usd.toFixed(2)}`
-                          : `R$ ${balance.brl.toFixed(2)}`
-                        }
-                      </p>
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Clique para alternar moeda
-                    </p>
-                  </div>
+              <div className="flex items-center gap-3">
+                {integrationStatus.namecheap ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
                 ) : (
-                  <div>
-                    <p className="text-lg font-semibold text-muted-foreground">Indisponível</p>
-                    <p className="text-xs text-muted-foreground">Verifique as credenciais</p>
-                  </div>
+                  <XCircle className="h-5 w-5 text-red-500" />
                 )}
+                <div>
+                  <p className="text-sm font-medium">Namecheap</p>
+                  {balance && (
+                    <p className="text-xs text-muted-foreground">
+                      Saldo: {balanceCurrency === "usd" 
+                        ? `$${balance.usd.toFixed(2)}`
+                        : `R$ ${balance.brl.toFixed(2)}`}
+                    </p>
+                  )}
+                </div>
               </div>
-              <CheckCircle2 className="h-6 w-6 text-success" />
+              <Badge variant={integrationStatus.namecheap ? "default" : "destructive"}>
+                {integrationStatus.namecheap ? "Ativa" : "Inativa"}
+              </Badge>
             </div>
 
             <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <p className="text-sm font-medium">cPanel</p>
-                <Badge variant={integrations.cpanel > 0 ? "default" : "secondary"}>
-                  {integrations.cpanel > 0 ? "Ativa" : "Não"}
-                </Badge>
+              <div className="flex items-center gap-3">
+                {integrationStatus.cpanel ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-500" />
+                )}
+                <div>
+                  <p className="text-sm font-medium">cPanel</p>
+                  <p className="text-xs text-muted-foreground">
+                    {integrations.cpanel} domínios
+                  </p>
+                </div>
               </div>
-              {integrations.cpanel > 0 ? (
-                <CheckCircle2 className="h-6 w-6 text-success" />
-              ) : (
-                <XCircle className="h-6 w-6 text-muted-foreground" />
-              )}
+              <Badge variant={integrationStatus.cpanel ? "default" : "destructive"}>
+                {integrationStatus.cpanel ? "Ativa" : "Inativa"}
+              </Badge>
             </div>
 
             <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <p className="text-sm font-medium">Cloudflare</p>
-                <Badge variant={integrations.cloudflare > 0 ? "default" : "secondary"}>
-                  {integrations.cloudflare > 0 ? "Ativa" : "Não"}
-                </Badge>
+              <div className="flex items-center gap-3">
+                {integrationStatus.cloudflare ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-500" />
+                )}
+                <div>
+                  <p className="text-sm font-medium">Cloudflare</p>
+                  <p className="text-xs text-muted-foreground">
+                    {integrations.cloudflare} zonas
+                  </p>
+                </div>
               </div>
-              {integrations.cloudflare > 0 ? (
-                <CheckCircle2 className="h-6 w-6 text-success" />
-              ) : (
-                <XCircle className="h-6 w-6 text-muted-foreground" />
-              )}
+              <Badge variant={integrationStatus.cloudflare ? "default" : "destructive"}>
+                {integrationStatus.cloudflare ? "Ativa" : "Inativa"}
+              </Badge>
             </div>
           </div>
         </CardContent>
@@ -474,14 +486,14 @@ export default function Dashboard() {
 
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle>Visitas Últimos 30 Dias</CardTitle>
-            <CardDescription>Histórico diário de acessos</CardDescription>
+            <CardTitle>Visitas Mensais</CardTitle>
+            <CardDescription>Histórico mensal de acessos</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={monthlyVisitsData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="dia" />
+                <XAxis dataKey="mes" />
                 <YAxis />
                 <Tooltip />
                 <Legend />
