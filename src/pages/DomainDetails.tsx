@@ -351,9 +351,6 @@ export default function DomainDetails() {
                   ))}
                 </div>
               )}
-              <p className="text-xs text-muted-foreground">
-                Pressione Enter para adicionar uma tag
-              </p>
             </div>
 
             <div className="space-y-2">
