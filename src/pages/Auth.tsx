@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Globe, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export default function Auth() {
   const { signIn, signUp, user, loading: authLoading } = useAuth();
@@ -23,11 +24,7 @@ export default function Auth() {
   const [signupName, setSignupName] = useState("");
 
   if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (user) {

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import {
   Table,
   TableBody,
@@ -207,11 +208,7 @@ export default function DomainManagement() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-pulse">Carregando domínios...</div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (

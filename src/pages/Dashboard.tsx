@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -273,11 +274,7 @@ export default function Dashboard() {
   ];
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-pulse">Carregando...</div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (

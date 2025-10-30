@@ -14,6 +14,7 @@ import { ptBR } from "date-fns/locale";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 interface Domain {
   id: string;
@@ -211,11 +212,7 @@ export default function DomainDetails() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-pulse">Carregando detalhes do domínio...</div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!domain) {
