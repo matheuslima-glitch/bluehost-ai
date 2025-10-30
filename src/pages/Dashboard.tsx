@@ -361,79 +361,118 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Integration Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Status das Integrações
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center gap-3">
-                {integrationStatus.namecheap ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-red-500" />
-                )}
-                <div>
-                  <p className="text-sm font-medium">Namecheap</p>
-                  {balance && (
-                    <p className="text-xs text-muted-foreground">
-                      Saldo: {balanceCurrency === "usd" 
-                        ? `$${balance.usd.toFixed(2)}`
-                        : `R$ ${balance.brl.toFixed(2)}`}
-                    </p>
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Integration Status */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Status das Integrações
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  {integrationStatus.namecheap ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-500" />
                   )}
+                  <div>
+                    <p className="text-sm font-medium">Namecheap</p>
+                  </div>
                 </div>
+                <Badge variant={integrationStatus.namecheap ? "default" : "destructive"}>
+                  {integrationStatus.namecheap ? "Ativa" : "Inativa"}
+                </Badge>
               </div>
-              <Badge variant={integrationStatus.namecheap ? "default" : "destructive"}>
-                {integrationStatus.namecheap ? "Ativa" : "Inativa"}
-              </Badge>
-            </div>
 
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center gap-3">
-                {integrationStatus.cpanel ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-red-500" />
-                )}
-                <div>
-                  <p className="text-sm font-medium">cPanel</p>
-                  <p className="text-xs text-muted-foreground">
-                    {integrations.cpanel} domínios
-                  </p>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  {integrationStatus.cpanel ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-500" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium">cPanel</p>
+                    <p className="text-xs text-muted-foreground">
+                      {integrations.cpanel} domínios
+                    </p>
+                  </div>
                 </div>
+                <Badge variant={integrationStatus.cpanel ? "default" : "destructive"}>
+                  {integrationStatus.cpanel ? "Ativa" : "Inativa"}
+                </Badge>
               </div>
-              <Badge variant={integrationStatus.cpanel ? "default" : "destructive"}>
-                {integrationStatus.cpanel ? "Ativa" : "Inativa"}
-              </Badge>
-            </div>
 
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center gap-3">
-                {integrationStatus.cloudflare ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-red-500" />
-                )}
-                <div>
-                  <p className="text-sm font-medium">Cloudflare</p>
-                  <p className="text-xs text-muted-foreground">
-                    {integrations.cloudflare} zonas
-                  </p>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  {integrationStatus.cloudflare ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-500" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium">Cloudflare</p>
+                    <p className="text-xs text-muted-foreground">
+                      {integrations.cloudflare} zonas
+                    </p>
+                  </div>
+                </div>
+                <Badge variant={integrationStatus.cloudflare ? "default" : "destructive"}>
+                  {integrationStatus.cloudflare ? "Ativa" : "Inativa"}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Namecheap Balance */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Saldo Namecheap</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {balance ? (
+              <div className="space-y-4">
+                <div className="text-4xl font-bold text-blue-500">
+                  {balanceCurrency === "usd" 
+                    ? `$${balance.usd.toFixed(2)}`
+                    : `R$ ${balance.brl.toFixed(2)}`
+                  }
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={balanceCurrency === "usd" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setBalanceCurrency("usd")}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="text-lg">🇺🇸</span>
+                    USD
+                  </Button>
+                  <Button
+                    variant={balanceCurrency === "brl" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setBalanceCurrency("brl")}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="text-lg">🇧🇷</span>
+                    BRL
+                  </Button>
                 </div>
               </div>
-              <Badge variant={integrationStatus.cloudflare ? "default" : "destructive"}>
-                {integrationStatus.cloudflare ? "Ativa" : "Inativa"}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            ) : (
+              <div>
+                <p className="text-lg font-semibold text-muted-foreground">Indisponível</p>
+                <p className="text-xs text-muted-foreground">Verifique as credenciais</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
