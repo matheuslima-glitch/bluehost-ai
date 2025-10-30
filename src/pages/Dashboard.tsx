@@ -83,70 +83,69 @@ export default function Dashboard() {
       setStats(stats);
       setIntegrations(integrationCounts);
 
-      // Load Cloudflare analytics for all domains and generate monthly data for last 12 months
-      let cloudflareVisits = 0;
-      const monthlyVisitsMap = new Map<string, number>();
-      
-      if (domainsData && domainsData.length > 0) {
-        for (const domain of domainsData) {
-          if (domain.zone_id) {
-            try {
-              const { data: analyticsData, error: analyticsError } = await supabase.functions.invoke(
-                "cloudflare-analytics",
-                {
-                  body: { zoneId: domain.zone_id }
-                }
-              );
+      // Load analytics data from database
+      const { data: analyticsData, error: analyticsError } = await supabase
+        .from("domain_analytics")
+        .select("*");
 
-              if (!analyticsError && analyticsData?.requests) {
-                cloudflareVisits += analyticsData.requests;
-              } else if (analyticsError) {
-                console.error(`Analytics error for ${domain.domain_name}:`, analyticsError);
-              }
-            } catch (err) {
-              console.error(`Error loading analytics for ${domain.domain_name}:`, err);
+      if (!analyticsError && analyticsData) {
+        // Calculate total visits from database
+        const totalVisitsFromDB = analyticsData.reduce((sum, record) => sum + (record.visits || 0), 0);
+        setTotalVisits(totalVisitsFromDB);
+
+        // Generate monthly visits data
+        const monthlyVisitsMap = new Map<string, number>();
+        const today = new Date();
+        
+        // Initialize last 12 months with 0
+        for (let i = 11; i >= 0; i--) {
+          const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          monthlyVisitsMap.set(monthKey, 0);
+        }
+
+        // Aggregate visits by month
+        analyticsData.forEach(record => {
+          if (record.date) {
+            const recordDate = new Date(record.date);
+            const monthKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
+            if (monthlyVisitsMap.has(monthKey)) {
+              monthlyVisitsMap.set(monthKey, (monthlyVisitsMap.get(monthKey) || 0) + (record.visits || 0));
             }
           }
-        }
-      }
-      setTotalVisits(cloudflareVisits);
-
-      // Generate last 12 months data
-      const last12Months: Array<{ mes: string; visitas: number }> = [];
-      const today = new Date();
-      
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        const monthLabel = `${date.toLocaleString('pt-BR', { month: 'short' })}/${date.getFullYear()}`;
-        
-        // Distribute total visits across months (simulation based on real data)
-        const monthlyAverage = cloudflareVisits / 12;
-        const randomVariation = (Math.random() - 0.5) * 0.3; // ±15% variation
-        const monthlyVisits = Math.round(monthlyAverage * (1 + randomVariation));
-        
-        last12Months.push({
-          mes: monthLabel,
-          visitas: monthlyVisits
-        });
-      }
-      
-      setMonthlyVisitsData(last12Months);
-
-      // Load Namecheap balance and set integration status
-      try {
-        const { data: balanceData, error: balanceError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "balance" }
         });
 
-        if (balanceError) {
-          console.error("Balance error:", balanceError);
-          setIntegrationStatus(prev => ({ ...prev, namecheap: false }));
-        } else if (balanceData?.balance) {
-          setBalance(balanceData.balance);
-          setIntegrationStatus(prev => ({ ...prev, namecheap: true }));
+        // Convert to array format for chart
+        const last12Months: Array<{ mes: string; visitas: number }> = [];
+        for (let i = 11; i >= 0; i--) {
+          const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          const monthLabel = `${date.toLocaleString('pt-BR', { month: 'short' })}/${date.getFullYear()}`;
+          
+          last12Months.push({
+            mes: monthLabel,
+            visitas: monthlyVisitsMap.get(monthKey) || 0
+          });
         }
-      } catch (balanceErr) {
-        console.error("Error loading balance:", balanceErr);
+        
+        setMonthlyVisitsData(last12Months);
+      }
+
+      // Load Namecheap balance from database
+      const { data: balanceData, error: balanceError } = await supabase
+        .from("namecheap_balance")
+        .select("*")
+        .order("last_synced_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!balanceError && balanceData) {
+        setBalance({
+          usd: balanceData.balance_usd,
+          brl: balanceData.balance_brl
+        });
+        setIntegrationStatus(prev => ({ ...prev, namecheap: true }));
+      } else {
         setIntegrationStatus(prev => ({ ...prev, namecheap: false }));
       }
 
