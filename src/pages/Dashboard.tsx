@@ -314,7 +314,7 @@ export default function Dashboard() {
             <XCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{expiredDomains}</div>
+            <div className="text-2xl font-bold">{stats.expired}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Domínios expirados
             </p>
@@ -327,7 +327,7 @@ export default function Dashboard() {
             <Clock className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{expiringDomains}</div>
+            <div className="text-2xl font-bold">{stats.expiring}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Próximos 30 dias
             </p>
@@ -340,7 +340,7 @@ export default function Dashboard() {
             <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{criticalDomains}</div>
+            <div className="text-2xl font-bold">{stats.critical}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Próximos 15 dias
             </p>
@@ -353,7 +353,7 @@ export default function Dashboard() {
             <AlertTriangle className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{suspendedDomains}</div>
+            <div className="text-2xl font-bold">{stats.suspended}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Verificar pendências
             </p>
