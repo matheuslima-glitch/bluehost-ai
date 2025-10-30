@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      custom_filters: {
+        Row: {
+          created_at: string | null
+          filter_type: string
+          filter_value: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          filter_type: string
+          filter_value: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          filter_type?: string
+          filter_value?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       dashboard_widgets: {
         Row: {
           config: Json | null
@@ -193,6 +217,36 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_settings: {
+        Row: {
+          alert_expired: boolean | null
+          alert_expiring_soon: boolean | null
+          alert_suspended: boolean | null
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          alert_expired?: boolean | null
+          alert_expiring_soon?: boolean | null
+          alert_suspended?: boolean | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          alert_expired?: boolean | null
+          alert_expiring_soon?: boolean | null
+          alert_suspended?: boolean | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -200,6 +254,7 @@ export type Database = {
           full_name: string | null
           id: string
           updated_at: string | null
+          whatsapp_number: string | null
         }
         Insert: {
           created_at?: string | null
@@ -207,6 +262,7 @@ export type Database = {
           full_name?: string | null
           id: string
           updated_at?: string | null
+          whatsapp_number?: string | null
         }
         Update: {
           created_at?: string | null
@@ -214,6 +270,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string | null
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
