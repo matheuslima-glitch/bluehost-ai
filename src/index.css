@@ -19,7 +19,7 @@ All colors MUST be HSL.
 
     --primary: 214 100% 46%;
     --primary-foreground: 0 0% 100%;
-    
+
     --primary-hover: 214 100% 40%;
     --primary-light: 214 100% 95%;
 
@@ -40,7 +40,7 @@ All colors MUST be HSL.
     --ring: 214 100% 46%;
 
     --radius: 0.75rem;
-    
+
     --success: 142 76% 36%;
     --warning: 38 92% 50%;
     --info: 199 89% 48%;
@@ -56,7 +56,7 @@ All colors MUST be HSL.
 
     --gradient-primary: linear-gradient(135deg, hsl(214 100% 46%) 0%, hsl(220 100% 60%) 100%);
     --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(210 16% 98%) 100%);
-    
+
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
@@ -75,7 +75,7 @@ All colors MUST be HSL.
 
     --primary: 214 100% 60%;
     --primary-foreground: 222 47% 11%;
-    
+
     --primary-hover: 214 100% 65%;
     --primary-light: 214 95% 20%;
 
@@ -102,7 +102,7 @@ All colors MUST be HSL.
     --sidebar-background: 224 38% 15%;
     --sidebar-foreground: 213 31% 91%;
     --sidebar-primary: 214 100% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-primary-foreground: 222 0% 100%;
     --sidebar-accent: 214 95% 20%;
     --sidebar-accent-foreground: 214 100% 60%;
     --sidebar-border: 222 47% 22%;
@@ -110,7 +110,7 @@ All colors MUST be HSL.
 
     --gradient-primary: linear-gradient(135deg, hsl(214 100% 60%) 0%, hsl(220 100% 70%) 100%);
     --gradient-subtle: linear-gradient(180deg, hsl(222 47% 11%) 0%, hsl(222 47% 15%) 100%);
-    
+
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
