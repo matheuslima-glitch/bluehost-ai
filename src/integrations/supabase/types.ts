@@ -89,6 +89,7 @@ export type Database = {
           dns_configured: boolean | null
           domain_name: string
           expiration_date: string | null
+          funnel_id: string | null
           id: string
           integration_source:
             | Database["public"]["Enums"]["integration_type"]
@@ -115,6 +116,7 @@ export type Database = {
           dns_configured?: boolean | null
           domain_name: string
           expiration_date?: string | null
+          funnel_id?: string | null
           id?: string
           integration_source?:
             | Database["public"]["Enums"]["integration_type"]
@@ -141,6 +143,7 @@ export type Database = {
           dns_configured?: boolean | null
           domain_name?: string
           expiration_date?: string | null
+          funnel_id?: string | null
           id?: string
           integration_source?:
             | Database["public"]["Enums"]["integration_type"]

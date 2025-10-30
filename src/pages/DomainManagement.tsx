@@ -40,6 +40,7 @@ interface Domain {
   platform: string | null;
   traffic_source: string | null;
   purchase_date: string | null;
+  funnel_id: string | null;
 }
 
 interface Filters {
@@ -48,6 +49,7 @@ interface Filters {
   traffic_source: string;
   purchase_date_start: string;
   purchase_date_end: string;
+  funnel_id: string;
 }
 
 export default function DomainManagement() {
@@ -64,6 +66,7 @@ export default function DomainManagement() {
     traffic_source: "",
     purchase_date_start: "",
     purchase_date_end: "",
+    funnel_id: "",
   });
 
   const ITEMS_PER_PAGE = 20;
@@ -120,6 +123,10 @@ export default function DomainManagement() {
       );
     }
 
+    if (filters.funnel_id) {
+      filtered = filtered.filter((d) => d.funnel_id === filters.funnel_id);
+    }
+
     setFilteredDomains(filtered);
     setCurrentPage(1);
   };
@@ -136,6 +143,7 @@ export default function DomainManagement() {
       traffic_source: "",
       purchase_date_start: "",
       purchase_date_end: "",
+      funnel_id: "",
     });
     setFilteredDomains(domains);
     setCurrentPage(1);
@@ -267,6 +275,17 @@ export default function DomainManagement() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="filter-funnel">ID Funil</Label>
+                <Input
+                  id="filter-funnel"
+                  type="text"
+                  placeholder="Digite o ID do funil"
+                  value={filters.funnel_id}
+                  onChange={(e) => handleFilterChange("funnel_id", e.target.value)}
+                />
+              </div>
+
               <div className="flex items-end">
                 <Button variant="outline" onClick={clearFilters} className="w-full">
                   Limpar Filtros
@@ -316,6 +335,7 @@ export default function DomainManagement() {
                     <TableHead>Status</TableHead>
                     <TableHead>Plataforma</TableHead>
                     <TableHead>Fonte de Tráfego</TableHead>
+                    <TableHead>ID Funil</TableHead>
                     <TableHead>Expiração</TableHead>
                     <TableHead>Visitas/Mês</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
@@ -341,6 +361,13 @@ export default function DomainManagement() {
                       <TableCell>
                         {domain.traffic_source ? (
                           <Badge variant="secondary">{domain.traffic_source}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {domain.funnel_id ? (
+                          <Badge variant="outline">{domain.funnel_id}</Badge>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}

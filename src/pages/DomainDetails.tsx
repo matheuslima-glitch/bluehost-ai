@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, RefreshCw } from "lucide-react";
+import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, RefreshCw, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, subMonths } from "date-fns";
@@ -22,6 +23,7 @@ interface Domain {
   expiration_date: string | null;
   monthly_visits: number;
   registrar: string | null;
+  funnel_id: string | null;
 }
 
 export default function DomainDetails() {
@@ -31,6 +33,8 @@ export default function DomainDetails() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fetchingNamecheap, setFetchingNamecheap] = useState(false);
+  const [funnelIdInput, setFunnelIdInput] = useState("");
+  const [funnelIdTags, setFunnelIdTags] = useState<string[]>([]);
 
   // Generate mock monthly visits data
   const generateMonthlyData = (monthlyVisits: number) => {
@@ -55,6 +59,12 @@ export default function DomainDetails() {
   useEffect(() => {
     loadDomain();
   }, [id]);
+
+  useEffect(() => {
+    if (domain?.funnel_id) {
+      setFunnelIdTags(domain.funnel_id.split(',').filter(tag => tag.trim() !== ''));
+    }
+  }, [domain]);
 
   const loadDomain = async () => {
     try {
@@ -136,6 +146,22 @@ export default function DomainDetails() {
     }
   };
 
+  const handleFunnelIdKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && funnelIdInput.trim() !== '') {
+      e.preventDefault();
+      const newTags = [...funnelIdTags, funnelIdInput.trim()];
+      setFunnelIdTags(newTags);
+      setFunnelIdInput("");
+      await updateDomain("funnel_id", newTags.join(','));
+    }
+  };
+
+  const removeFunnelIdTag = async (tagToRemove: string) => {
+    const newTags = funnelIdTags.filter(tag => tag !== tagToRemove);
+    setFunnelIdTags(newTags);
+    await updateDomain("funnel_id", newTags.join(','));
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
       active: { label: "Ativo", variant: "default" },
@@ -183,46 +209,6 @@ export default function DomainDetails() {
           <p className="text-muted-foreground">Detalhes do domínio</p>
         </div>
       </div>
-
-      <Card className="md:col-span-2">
-        <CardHeader>
-          <CardTitle>Dashboard de Visitas Mensais</CardTitle>
-          <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={generateMonthlyData(domain.monthly_visits)}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="month" 
-                className="text-xs"
-                tick={{ fill: 'hsl(var(--foreground))' }}
-              />
-              <YAxis 
-                className="text-xs"
-                tick={{ fill: 'hsl(var(--foreground))' }}
-                tickFormatter={(value) => value.toLocaleString()}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px'
-                }}
-                labelStyle={{ color: 'hsl(var(--foreground))' }}
-                formatter={(value: number) => [value.toLocaleString() + ' visitas', 'Visitas']}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="visits" 
-                stroke="hsl(var(--primary))" 
-                strokeWidth={2}
-                dot={{ fill: 'hsl(var(--primary))' }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -338,9 +324,78 @@ export default function DomainDetails() {
                 </p>
               )}
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="funnel_id">ID do Funil</Label>
+              <Input
+                id="funnel_id"
+                type="text"
+                placeholder="Digite o ID e pressione Enter"
+                value={funnelIdInput}
+                onChange={(e) => setFunnelIdInput(e.target.value)}
+                onKeyPress={handleFunnelIdKeyPress}
+                disabled={saving}
+              />
+              {funnelIdTags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {funnelIdTags.map((tag, index) => (
+                    <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                      {tag}
+                      <X
+                        className="h-3 w-3 cursor-pointer"
+                        onClick={() => removeFunnelIdTag(tag)}
+                      />
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Pressione Enter para adicionar uma tag
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Dashboard de Visitas Mensais</CardTitle>
+          <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={generateMonthlyData(domain.monthly_visits)}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis 
+                dataKey="month" 
+                className="text-xs"
+                tick={{ fill: 'hsl(var(--foreground))' }}
+              />
+              <YAxis 
+                className="text-xs"
+                tick={{ fill: 'hsl(var(--foreground))' }}
+                tickFormatter={(value) => value.toLocaleString()}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px'
+                }}
+                labelStyle={{ color: 'hsl(var(--foreground))' }}
+                formatter={(value: number) => [value.toLocaleString() + ' visitas', 'Visitas']}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="visits" 
+                stroke="hsl(var(--primary))" 
+                strokeWidth={2}
+                dot={{ fill: 'hsl(var(--primary))' }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     </div>
   );
 }
