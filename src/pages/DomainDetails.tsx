@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface Domain {
   id: string;
@@ -29,12 +31,46 @@ interface Domain {
 export default function DomainDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [domain, setDomain] = useState<Domain | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fetchingNamecheap, setFetchingNamecheap] = useState(false);
   const [funnelIdInput, setFunnelIdInput] = useState("");
   const [funnelIdTags, setFunnelIdTags] = useState<string[]>([]);
+
+  // Fetch custom filters from database
+  const { data: customFilters = [] } = useQuery({
+    queryKey: ["custom-filters", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("custom_filters")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Combine default and custom filters
+  const platformOptions = [
+    "wordpress",
+    "atomicat",
+    ...customFilters.filter(f => f.filter_type === "platform").map(f => f.filter_value)
+  ];
+
+  const trafficSourceOptions = [
+    "facebook",
+    "google",
+    "native",
+    "outbrain",
+    "taboola",
+    "revcontent",
+    ...customFilters.filter(f => f.filter_type === "traffic_source").map(f => f.filter_value)
+  ];
 
   // Generate mock monthly visits data
   const generateMonthlyData = (monthlyVisits: number) => {
@@ -294,8 +330,11 @@ export default function DomainDetails() {
                   <SelectValue placeholder="Selecione uma plataforma" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="wordpress">WordPress</SelectItem>
-                  <SelectItem value="atomicat">AtomiCat</SelectItem>
+                  {platformOptions.map((platform) => (
+                    <SelectItem key={platform} value={platform}>
+                      {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
@@ -317,12 +356,11 @@ export default function DomainDetails() {
                   <SelectValue placeholder="Selecione uma fonte" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="facebook">Facebook</SelectItem>
-                  <SelectItem value="google">Google</SelectItem>
-                  <SelectItem value="native">Native</SelectItem>
-                  <SelectItem value="outbrain">Outbrain</SelectItem>
-                  <SelectItem value="taboola">Taboola</SelectItem>
-                  <SelectItem value="revcontent">RevContent</SelectItem>
+                  {trafficSourceOptions.map((source) => (
+                    <SelectItem key={source} value={source}>
+                      {source.charAt(0).toUpperCase() + source.slice(1)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
