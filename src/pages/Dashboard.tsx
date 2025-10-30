@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Globe, TrendingUp, AlertCircle, Clock, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { Globe, TrendingUp, AlertCircle, Clock, CheckCircle2, AlertTriangle, XCircle, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -430,44 +430,73 @@ export default function Dashboard() {
         </Card>
 
         {/* Namecheap Balance */}
-        <Card>
+        <Card className="shadow-md border-2">
           <CardHeader>
-            <CardTitle>Saldo Namecheap</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5" />
+              Saldo Namecheap
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-5">
             {balance ? (
-              <div className="space-y-4">
-                <div className="text-4xl font-bold text-blue-500">
-                  {balanceCurrency === "usd" 
-                    ? `$${balance.usd.toFixed(2)}`
-                    : `R$ ${balance.brl.toFixed(2)}`
-                  }
+              <>
+                <div>
+                  {(balance.usd === 0 && balance.brl === 0) ? (
+                    <>
+                      <div className="text-3xl font-bold text-muted-foreground">
+                        {balanceCurrency === "usd" ? "$0.00" : "R$ 0,00"}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Adicione créditos para começar
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-4xl font-bold text-blue-500">
+                        {balanceCurrency === "usd" 
+                          ? `$${balance.usd.toFixed(2)}`
+                          : `R$ ${balance.brl.toFixed(2)}`
+                        }
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Saldo disponível para compras
+                      </p>
+                    </>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button
-                    variant={balanceCurrency === "usd" ? "default" : "outline"}
+                    variant={balanceCurrency === "usd" ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setBalanceCurrency("usd")}
-                    className="flex items-center gap-2"
+                    className={`flex items-center gap-2 ${
+                      balanceCurrency === "usd" 
+                        ? "bg-primary text-primary-foreground" 
+                        : ""
+                    }`}
                   >
-                    <span className="text-lg">🇺🇸</span>
+                    <span className="text-base">🇺🇸</span>
                     USD
                   </Button>
                   <Button
-                    variant={balanceCurrency === "brl" ? "default" : "outline"}
+                    variant={balanceCurrency === "brl" ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setBalanceCurrency("brl")}
-                    className="flex items-center gap-2"
+                    className={`flex items-center gap-2 ${
+                      balanceCurrency === "brl" 
+                        ? "bg-primary text-primary-foreground" 
+                        : ""
+                    }`}
                   >
-                    <span className="text-lg">🇧🇷</span>
+                    <span className="text-base">🇧🇷</span>
                     BRL
                   </Button>
                 </div>
-              </div>
+              </>
             ) : (
-              <div>
+              <div className="py-4">
                 <p className="text-lg font-semibold text-muted-foreground">Indisponível</p>
-                <p className="text-xs text-muted-foreground">Verifique as credenciais</p>
+                <p className="text-sm text-muted-foreground mt-1">Verifique as credenciais</p>
               </div>
             )}
           </CardContent>
