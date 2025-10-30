@@ -163,15 +163,15 @@ export default function DomainDetails() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-      active: { label: "Ativo", variant: "default" },
-      expired: { label: "Expirado", variant: "destructive" },
-      pending: { label: "Pendente", variant: "secondary" },
-      suspended: { label: "Suspenso", variant: "outline" },
+    const statusConfig: Record<string, { label: string; className: string }> = {
+      active: { label: "Ativo", className: "bg-green-500 hover:bg-green-600 text-white" },
+      expired: { label: "Expirado", className: "bg-red-500 hover:bg-red-600 text-white" },
+      pending: { label: "Pendente", className: "bg-blue-500 hover:bg-blue-600 text-white" },
+      suspended: { label: "Suspenso", className: "bg-yellow-500 hover:bg-yellow-600 text-white" },
     };
 
-    const config = variants[status] || variants.active;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    const config = statusConfig[status] || statusConfig.active;
+    return <Badge className={config.className}>{config.label}</Badge>;
   };
 
   if (loading) {
@@ -237,14 +237,6 @@ export default function DomainDetails() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Visitas Mensais (Média)</Label>
-              <div className="flex items-center gap-2 text-sm">
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                {domain.monthly_visits.toLocaleString()}
-              </div>
-            </div>
-
             <div className="space-y-2 pt-4 border-t">
               <Label>Acesso Rápido</Label>
               <div className="flex gap-3">
@@ -270,7 +262,7 @@ export default function DomainDetails() {
                     window.open(atomicatUrl, '_blank');
                     toast.info("Abrindo painel Atomicat. Faça login com as credenciais fornecidas.");
                   }}
-                  className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white flex-1"
+                  className="flex items-center gap-2 bg-gradient-to-r from-gray-900 to-gray-600 hover:from-gray-800 hover:to-gray-500 text-white flex-1"
                 >
                   <img 
                     src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png" 
@@ -280,9 +272,6 @@ export default function DomainDetails() {
                   <span className="text-sm">Login Atomicat</span>
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                WordPress: love9365 / DiyEMn^7q4az#&lt;22 | Atomicat: lerricke.nunes@institutoexperience.com.br / KyOs@49742667
-              </p>
             </div>
           </CardContent>
         </Card>
@@ -339,33 +328,6 @@ export default function DomainDetails() {
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Data e Hora da Compra</Label>
-                {domain.registrar === 'Namecheap' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={fetchNamecheapInfo}
-                    disabled={fetchingNamecheap}
-                  >
-                    <RefreshCw className={`h-4 w-4 ${fetchingNamecheap ? 'animate-spin' : ''}`} />
-                  </Button>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                {domain.purchase_date
-                  ? format(new Date(domain.purchase_date), "dd/MM/yyyy HH:mm", { locale: ptBR })
-                  : "Domínio não foi comprado no sistema"}
-              </div>
-              {domain.registrar === 'Namecheap' && !domain.purchase_date && (
-                <p className="text-xs text-muted-foreground">
-                  Clique no botão de atualizar para buscar data da Namecheap
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="funnel_id">ID do Funil</Label>
               <Input
                 id="funnel_id"
@@ -392,6 +354,33 @@ export default function DomainDetails() {
               <p className="text-xs text-muted-foreground">
                 Pressione Enter para adicionar uma tag
               </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Data e Hora da Compra</Label>
+                {domain.registrar === 'Namecheap' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={fetchNamecheapInfo}
+                    disabled={fetchingNamecheap}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${fetchingNamecheap ? 'animate-spin' : ''}`} />
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                {domain.purchase_date
+                  ? format(new Date(domain.purchase_date), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                  : "Domínio não foi comprado no sistema"}
+              </div>
+              {domain.registrar === 'Namecheap' && !domain.purchase_date && (
+                <p className="text-xs text-muted-foreground">
+                  Clique no botão de atualizar para buscar data da Namecheap
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
