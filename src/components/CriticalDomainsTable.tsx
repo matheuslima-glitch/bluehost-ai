@@ -6,12 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Trash2, RefreshCw, AlertTriangle, AlertCircle } from "lucide-react";
+import { Trash2, RefreshCw, AlertTriangle, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 interface CriticalDomainsTableProps {
   domains: any[];
@@ -26,6 +25,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
   const [currentAlertMessage, setCurrentAlertMessage] = useState("");
   const [namecheapAlerts, setNamecheapAlerts] = useState<Record<string, string>>({});
+  const [currentPage, setCurrentPage] = useState(0);
 
   // Load alert domains from Namecheap
   useEffect(() => {
@@ -96,44 +96,20 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     setAlertDialogOpen(true);
   };
 
-  // Calculate pie chart data for inactive domains
-  const inactivePieData = [
-    { 
-      name: "Suspensos", 
-      value: criticalDomains.filter(d => d.status === "suspended").length, 
-      color: "#f97316" 
-    },
-    { 
-      name: "Críticos (15 dias)", 
-      value: criticalDomains.filter(d => {
-        if (!d.expiration_date) return false;
-        const expDate = new Date(d.expiration_date);
-        return expDate > now && expDate < fifteenDaysFromNow;
-      }).length, 
-      color: "#ef4444" 
-    },
-    { 
-      name: "Expirando (30 dias)", 
-      value: criticalDomains.filter(d => {
-        if (!d.expiration_date) return false;
-        const expDate = new Date(d.expiration_date);
-        return expDate > now && expDate < thirtyDaysFromNow && expDate >= fifteenDaysFromNow;
-      }).length, 
-      color: "#eab308" 
-    },
-    { 
-      name: "Expirados", 
-      value: criticalDomains.filter(d => d.status === "expired").length, 
-      color: "#dc2626" 
-    },
-    { 
-      name: "Alerta", 
-      value: Object.keys(namecheapAlerts).filter(domainName => 
-        criticalDomains.some(d => d.domain_name === domainName)
-      ).length, 
-      color: "#facc15" 
-    }
-  ].filter(item => item.value > 0);
+  // Paginação
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(criticalDomains.length / itemsPerPage);
+  const startIndex = currentPage * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedDomains = criticalDomains.slice(startIndex, endIndex);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(0, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(totalPages - 1, prev + 1));
+  };
 
   const handleDeleteClick = (domain: any) => {
     setDomainToDelete(domain);
@@ -232,98 +208,94 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Gráfico */}
-            <div>
-              <h3 className="text-sm font-medium mb-4">Status dos Domínios Não Ativos</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={inactivePieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    style={{ outline: 'none' }}
-                  >
-                    {inactivePieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} style={{ outline: 'none' }} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Tabela com scroll */}
-            <div>
-              <ScrollArea className="h-[300px] rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Domínio</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Expiração</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {criticalDomains.slice(0, 6).map((domain) => (
-                      <TableRow key={domain.id}>
-                        <TableCell className="font-medium text-sm">{domain.domain_name}</TableCell>
-                        <TableCell>{getStatusBadge(domain)}</TableCell>
-                        <TableCell className="text-sm">
-                          {domain.expiration_date
-                            ? format(new Date(domain.expiration_date), "dd/MM/yy", { locale: ptBR })
-                            : "N/A"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {(namecheapAlerts[domain.domain_name] || domain.status === "suspended") && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleAlertClick(domain)}
-                                className="text-yellow-500 hover:text-yellow-600 h-8 w-8 p-0"
-                              >
-                                <AlertCircle className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {domain.registrar === "Namecheap" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRenewClick(domain)}
-                                disabled={renewLoading === domain.id}
-                                className="h-8 px-2"
-                              >
-                                <RefreshCw className={`h-3 w-3 ${renewLoading === domain.id ? 'animate-spin' : ''}`} />
-                              </Button>
-                            )}
+          <div className="space-y-4">
+            <ScrollArea className="h-[500px] rounded-md border">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background z-10">
+                  <TableRow>
+                    <TableHead>Domínio</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Expiração</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedDomains.map((domain) => (
+                    <TableRow key={domain.id}>
+                      <TableCell className="font-medium text-sm">{domain.domain_name}</TableCell>
+                      <TableCell>{getStatusBadge(domain)}</TableCell>
+                      <TableCell className="text-sm">
+                        {domain.expiration_date
+                          ? format(new Date(domain.expiration_date), "dd/MM/yy", { locale: ptBR })
+                          : "N/A"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {(namecheapAlerts[domain.domain_name] || domain.status === "suspended") && (
                             <Button
-                              variant="destructive"
+                              variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteClick(domain)}
-                              className="h-8 w-8 p-0"
+                              onClick={() => handleAlertClick(domain)}
+                              className="text-yellow-500 hover:text-yellow-600 h-8 w-8 p-0"
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <AlertCircle className="h-4 w-4" />
                             </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-              {criticalDomains.length > 6 && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Mostrando 6 de {criticalDomains.length} domínios críticos
+                          )}
+                          {domain.registrar === "Namecheap" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRenewClick(domain)}
+                              disabled={renewLoading === domain.id}
+                              className="h-8 px-2"
+                            >
+                              <RefreshCw className={`h-3 w-3 ${renewLoading === domain.id ? 'animate-spin' : ''}`} />
+                            </Button>
+                          )}
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteClick(domain)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+            
+            {criticalDomains.length > itemsPerPage && (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Mostrando {startIndex + 1}-{Math.min(endIndex, criticalDomains.length)} de {criticalDomains.length} domínios críticos
                 </p>
-              )}
-            </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 0}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Página {currentPage + 1} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages - 1}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
