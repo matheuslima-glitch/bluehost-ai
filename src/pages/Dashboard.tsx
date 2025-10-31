@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { CriticalDomainsTable } from "@/components/CriticalDomainsTable";
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -496,6 +497,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Critical Domains Management Table */}
+      <CriticalDomainsTable domains={domains} onDomainsChange={loadDashboardData} />
 
       {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">

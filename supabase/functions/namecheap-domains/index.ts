@@ -369,6 +369,36 @@ serve(async (req) => {
       );
     }
 
+    // Get renewal price
+    if (action === 'get_renewal_price') {
+      const { domainName } = body;
+      
+      if (!domainName) {
+        throw new Error('domainName is required');
+      }
+
+      // Extract extension from domain name
+      const ext = domainName.split('.').pop();
+      let renewalPrice = 0;
+      
+      // Set renewal price based on extension
+      if (ext === 'online' || ext === 'site') {
+        renewalPrice = 1.00;
+      } else if (ext === 'com') {
+        renewalPrice = 12.00;
+      } else {
+        // Default price for other extensions
+        renewalPrice = 15.00;
+      }
+
+      console.log(`Renewal price for ${domainName}: $${renewalPrice}`);
+
+      return new Response(
+        JSON.stringify({ price: renewalPrice, domain: domainName }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // List domains
     if (action === 'list') {
       const params = new URLSearchParams({
@@ -418,7 +448,7 @@ serve(async (req) => {
     }
 
     console.error('Invalid action received:', action);
-    throw new Error(`Invalid action: ${action}. Valid actions are: balance, check, purchase, purchase_with_ai, list, get_domain_info`);
+    throw new Error(`Invalid action: ${action}. Valid actions are: balance, check, purchase, purchase_with_ai, list, get_domain_info, get_renewal_price`);
   } catch (error) {
     console.error('Error in namecheap-domains function:', error);
     return new Response(
