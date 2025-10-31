@@ -472,7 +472,16 @@ export default function DomainManagement() {
                         <ArrowUpDown className="h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead>Visitas/Mês</TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('monthly_visits')}
+                        className="flex items-center gap-1 p-0 h-auto font-semibold"
+                      >
+                        Visitas/Mês
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                    </TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>

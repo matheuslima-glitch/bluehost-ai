@@ -102,6 +102,9 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const startIndex = currentPage * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedDomains = criticalDomains.slice(startIndex, endIndex);
+  
+  // Altura dinâmica baseada no número de domínios (max 10 por página)
+  const dynamicHeight = Math.min(paginatedDomains.length, 10) * 60 + 45; // 60px por linha + 45px do header
 
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(0, prev - 1));
@@ -209,7 +212,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <ScrollArea className="h-[500px] rounded-md border">
+            <ScrollArea className="rounded-md border" style={{ height: `${dynamicHeight}px` }}>
               <Table>
                 <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow>
