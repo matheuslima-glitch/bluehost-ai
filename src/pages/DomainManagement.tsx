@@ -25,7 +25,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Globe, Calendar, TrendingUp, RefreshCw, LayoutDashboard, Filter } from "lucide-react";
+import { Globe, Calendar, TrendingUp, RefreshCw, LayoutDashboard, Filter, Search, ArrowUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -64,6 +64,8 @@ export default function DomainManagement() {
   const [refreshing, setRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [filters, setFilters] = useState<Filters>({
     status: "",
     platform: "",
@@ -136,6 +138,13 @@ export default function DomainManagement() {
   const applyFilters = (domainsToFilter: Domain[] = domains) => {
     let filtered = [...domainsToFilter];
 
+    // Apply search filter
+    if (searchQuery) {
+      filtered = filtered.filter((d) =>
+        d.domain_name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
     if (filters.status) {
       filtered = filtered.filter((d) => d.status === filters.status);
     }
@@ -164,8 +173,39 @@ export default function DomainManagement() {
       filtered = filtered.filter((d) => d.funnel_id === filters.funnel_id);
     }
 
+    // Apply sorting
+    if (sortConfig) {
+      filtered.sort((a, b) => {
+        let aValue: any = a[sortConfig.key as keyof Domain];
+        let bValue: any = b[sortConfig.key as keyof Domain];
+
+        // Handle null values
+        if (aValue === null) return 1;
+        if (bValue === null) return -1;
+
+        // Sort by date
+        if (sortConfig.key === 'expiration_date') {
+          aValue = new Date(aValue).getTime();
+          bValue = new Date(bValue).getTime();
+        }
+
+        // Sort alphabetically or numerically
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
     setFilteredDomains(filtered);
     setCurrentPage(1);
+  };
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
   };
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
@@ -188,7 +228,7 @@ export default function DomainManagement() {
 
   useEffect(() => {
     applyFilters();
-  }, [filters, domains]);
+  }, [filters, domains, searchQuery, sortConfig]);
 
   const totalPages = Math.ceil(filteredDomains.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -213,20 +253,32 @@ export default function DomainManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Gerenciamento de Domínios</h1>
-          <p className="text-muted-foreground">Visualize e gerencie todos os seus domínios</p>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Gerenciamento de Domínios</h1>
+            <p className="text-muted-foreground">Visualize e gerencie todos os seus domínios</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+              <Filter className="h-4 w-4 mr-2" />
+              Filtros
+            </Button>
+            <Button onClick={loadDomains} disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
-            <Filter className="h-4 w-4 mr-2" />
-            Filtros
-          </Button>
-          <Button onClick={loadDomains} disabled={refreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-            Atualizar
-          </Button>
+        
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Pesquisar domínio..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
         </div>
       </div>
 
@@ -366,12 +418,57 @@ export default function DomainManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Domínio</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Plataforma</TableHead>
-                    <TableHead>Fonte de Tráfego</TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('domain_name')}
+                        className="flex items-center gap-1 p-0 h-auto font-semibold"
+                      >
+                        Domínio
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('status')}
+                        className="flex items-center gap-1 p-0 h-auto font-semibold"
+                      >
+                        Status
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('platform')}
+                        className="flex items-center gap-1 p-0 h-auto font-semibold"
+                      >
+                        Plataforma
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('traffic_source')}
+                        className="flex items-center gap-1 p-0 h-auto font-semibold"
+                      >
+                        Fonte de Tráfego
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                    </TableHead>
                     <TableHead>ID Funil</TableHead>
-                    <TableHead>Expiração</TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort('expiration_date')}
+                        className="flex items-center gap-1 p-0 h-auto font-semibold"
+                      >
+                        Expiração
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                    </TableHead>
                     <TableHead>Visitas/Mês</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>

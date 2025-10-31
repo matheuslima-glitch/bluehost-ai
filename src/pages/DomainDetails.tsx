@@ -6,7 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, RefreshCw, X } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, RefreshCw, X, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, subMonths } from "date-fns";
@@ -27,6 +35,7 @@ interface Domain {
   monthly_visits: number;
   registrar: string | null;
   funnel_id: string | null;
+  zone_id: string | null;
 }
 
 export default function DomainDetails() {
@@ -39,6 +48,9 @@ export default function DomainDetails() {
   const [fetchingNamecheap, setFetchingNamecheap] = useState(false);
   const [funnelIdInput, setFunnelIdInput] = useState("");
   const [funnelIdTags, setFunnelIdTags] = useState<string[]>([]);
+  const [dnsRecords, setDnsRecords] = useState<Array<{ type: string; name: string; content: string; ttl: number }>>([]);
+  const [loadingDns, setLoadingDns] = useState(false);
+  const [newDnsRecord, setNewDnsRecord] = useState({ type: 'A', name: '', content: '', ttl: 3600 });
 
   // Fetch custom filters from database
   const { data: customFilters = [] } = useQuery({
@@ -102,6 +114,87 @@ export default function DomainDetails() {
       setFunnelIdTags(domain.funnel_id.split(',').filter(tag => tag.trim() !== ''));
     }
   }, [domain]);
+
+  useEffect(() => {
+    if (domain?.zone_id) {
+      loadDnsRecords();
+    }
+  }, [domain?.zone_id]);
+
+  const loadDnsRecords = async () => {
+    if (!domain?.zone_id) return;
+
+    setLoadingDns(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('cloudflare-integration', {
+        body: {
+          action: 'list_dns_records',
+          zoneId: domain.zone_id
+        }
+      });
+
+      if (error) throw error;
+      if (data?.records) {
+        setDnsRecords(data.records);
+      }
+    } catch (error: any) {
+      console.error("Error loading DNS records:", error);
+      toast.error("Erro ao carregar registros DNS");
+    } finally {
+      setLoadingDns(false);
+    }
+  };
+
+  const addDnsRecord = async () => {
+    if (!domain?.zone_id || !newDnsRecord.name || !newDnsRecord.content) {
+      toast.error("Preencha todos os campos");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('cloudflare-integration', {
+        body: {
+          action: 'create_dns_record',
+          zoneId: domain.zone_id,
+          type: newDnsRecord.type,
+          name: newDnsRecord.name,
+          content: newDnsRecord.content,
+          ttl: newDnsRecord.ttl
+        }
+      });
+
+      if (error) throw error;
+      
+      toast.success("Registro DNS adicionado com sucesso");
+      setNewDnsRecord({ type: 'A', name: '', content: '', ttl: 3600 });
+      loadDnsRecords();
+    } catch (error: any) {
+      console.error("Error adding DNS record:", error);
+      toast.error("Erro ao adicionar registro DNS");
+    }
+  };
+
+  const deleteDnsRecord = async (recordId: string) => {
+    if (!domain?.zone_id) return;
+
+    try {
+      const { error } = await supabase.functions.invoke('cloudflare-integration', {
+        body: {
+          action: 'delete_dns_record',
+          zoneId: domain.zone_id,
+          recordId
+        }
+      });
+
+      if (error) throw error;
+      
+      toast.success("Registro DNS removido com sucesso");
+      loadDnsRecords();
+    } catch (error: any) {
+      console.error("Error deleting DNS record:", error);
+      toast.error("Erro ao remover registro DNS");
+    }
+  };
 
   const loadDomain = async () => {
     try {
@@ -457,6 +550,117 @@ export default function DomainDetails() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {domain.zone_id && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Zonas DNS</CardTitle>
+            <CardDescription>Gerencie os registros DNS do seu domínio</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="space-y-2">
+                <Label htmlFor="dns-type">Tipo</Label>
+                <Select
+                  value={newDnsRecord.type}
+                  onValueChange={(value) => setNewDnsRecord({ ...newDnsRecord, type: value })}
+                >
+                  <SelectTrigger id="dns-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">A</SelectItem>
+                    <SelectItem value="AAAA">AAAA</SelectItem>
+                    <SelectItem value="CNAME">CNAME</SelectItem>
+                    <SelectItem value="TXT">TXT</SelectItem>
+                    <SelectItem value="MX">MX</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dns-name">Nome</Label>
+                <Input
+                  id="dns-name"
+                  placeholder="@, www, etc"
+                  value={newDnsRecord.name}
+                  onChange={(e) => setNewDnsRecord({ ...newDnsRecord, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dns-content">Conteúdo</Label>
+                <Input
+                  id="dns-content"
+                  placeholder="IP ou valor"
+                  value={newDnsRecord.content}
+                  onChange={(e) => setNewDnsRecord({ ...newDnsRecord, content: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dns-ttl">TTL</Label>
+                <Input
+                  id="dns-ttl"
+                  type="number"
+                  value={newDnsRecord.ttl}
+                  onChange={(e) => setNewDnsRecord({ ...newDnsRecord, ttl: parseInt(e.target.value) })}
+                />
+              </div>
+            </div>
+            <Button onClick={addDnsRecord} className="w-full">
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Registro DNS
+            </Button>
+
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Conteúdo</TableHead>
+                    <TableHead>TTL</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingDns ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center">
+                        <LoadingSpinner />
+                      </TableCell>
+                    </TableRow>
+                  ) : dnsRecords.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        Nenhum registro DNS encontrado
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    dnsRecords.map((record: any) => (
+                      <TableRow key={record.id}>
+                        <TableCell>
+                          <Badge variant="outline">{record.type}</Badge>
+                        </TableCell>
+                        <TableCell className="font-mono">{record.name}</TableCell>
+                        <TableCell className="font-mono text-sm">{record.content}</TableCell>
+                        <TableCell>{record.ttl}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteDnsRecord(record.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
