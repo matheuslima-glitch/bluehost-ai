@@ -39,6 +39,7 @@ export default function Dashboard() {
     cloudflare: false,
   });
   const [domains, setDomains] = useState<any[]>([]);
+  const [alertDomains, setAlertDomains] = useState(0);
 
   useEffect(() => {
     loadDashboardData();
@@ -215,6 +216,22 @@ export default function Dashboard() {
         setSuspendedDomains(suspendedCount);
       }
 
+      // Load alert domains from Namecheap API
+      try {
+        const { data: alertData, error: alertError } = await supabase.functions.invoke("namecheap-domains", {
+          body: { action: "list_domains", listType: "ALERT" }
+        });
+
+        if (!alertError && alertData?.domains) {
+          console.log("Domínios com alerta:", alertData.domains);
+          setAlertDomains(alertData.domains.length);
+        } else {
+          console.error("Erro ao carregar domínios com alerta:", alertError);
+        }
+      } catch (alertErr) {
+        console.error("Error loading alert domains:", alertErr);
+      }
+
       // Set cPanel and Cloudflare integration status
       setIntegrationStatus(prev => ({
         ...prev,
@@ -353,6 +370,22 @@ export default function Dashboard() {
             <div className="text-2xl font-bold">{stats.suspended}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Verificar pendências
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Alert Card */}
+      <div className="grid gap-4 md:grid-cols-1">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Alerta</CardTitle>
+            <AlertCircle className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{alertDomains}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Domínios com alertas da Namecheap
             </p>
           </CardContent>
         </Card>

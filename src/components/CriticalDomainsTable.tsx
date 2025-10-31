@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Trash2, RefreshCw, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Trash2, RefreshCw, AlertTriangle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 interface CriticalDomainsTableProps {
   domains: any[];
@@ -20,6 +22,32 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const [domainToDelete, setDomainToDelete] = useState<any>(null);
   const [renewLoading, setRenewLoading] = useState<string | null>(null);
   const [renewalPrices, setRenewalPrices] = useState<Record<string, number>>({});
+  const [alertDialogOpen, setAlertDialogOpen] = useState(false);
+  const [currentAlertMessage, setCurrentAlertMessage] = useState("");
+  const [namecheapAlerts, setNamecheapAlerts] = useState<Record<string, string>>({});
+
+  // Load alert domains from Namecheap
+  useEffect(() => {
+    const loadAlertDomains = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("namecheap-domains", {
+          body: { action: "list_domains", listType: "ALERT" }
+        });
+
+        if (!error && data?.domains) {
+          const alertMap: Record<string, string> = {};
+          data.domains.forEach((domain: any) => {
+            alertMap[domain.name] = domain.alertMessage;
+          });
+          setNamecheapAlerts(alertMap);
+        }
+      } catch (err) {
+        console.error("Error loading alert domains:", err);
+      }
+    };
+
+    loadAlertDomains();
+  }, []);
 
   // Filtrar apenas domínios com status críticos
   const now = new Date();
@@ -30,14 +58,19 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     if (d.status === "expired" || d.status === "suspended") return true;
     if (!d.expiration_date) return false;
     const expDate = new Date(d.expiration_date);
+    const hasAlert = namecheapAlerts[d.domain_name];
     return (
       d.status !== "expired" &&
-      ((expDate > now && expDate < thirtyDaysFromNow) || // Expirando em breve
-      (expDate > now && expDate < fifteenDaysFromNow)) // Críticos
+      (hasAlert || (expDate > now && expDate < thirtyDaysFromNow) || (expDate > now && expDate < fifteenDaysFromNow))
     );
   });
 
   const getStatusBadge = (domain: any) => {
+    const hasAlert = namecheapAlerts[domain.domain_name];
+    
+    if (hasAlert) {
+      return <Badge className="bg-yellow-500">Alerta</Badge>;
+    }
     if (domain.status === "expired") {
       return <Badge variant="destructive">Expirado</Badge>;
     }
@@ -55,6 +88,51 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     }
     return <Badge>Ativo</Badge>;
   };
+
+  const handleAlertClick = (domain: any) => {
+    const alertMessage = namecheapAlerts[domain.domain_name] || "Status suspenso no registrador.";
+    setCurrentAlertMessage(alertMessage);
+    setAlertDialogOpen(true);
+  };
+
+  // Calculate pie chart data for inactive domains
+  const inactivePieData = [
+    { 
+      name: "Suspensos", 
+      value: criticalDomains.filter(d => d.status === "suspended").length, 
+      color: "#f97316" 
+    },
+    { 
+      name: "Críticos (15 dias)", 
+      value: criticalDomains.filter(d => {
+        if (!d.expiration_date) return false;
+        const expDate = new Date(d.expiration_date);
+        return expDate > now && expDate < fifteenDaysFromNow;
+      }).length, 
+      color: "#ef4444" 
+    },
+    { 
+      name: "Expirando (30 dias)", 
+      value: criticalDomains.filter(d => {
+        if (!d.expiration_date) return false;
+        const expDate = new Date(d.expiration_date);
+        return expDate > now && expDate < thirtyDaysFromNow && expDate >= fifteenDaysFromNow;
+      }).length, 
+      color: "#eab308" 
+    },
+    { 
+      name: "Expirados", 
+      value: criticalDomains.filter(d => d.status === "expired").length, 
+      color: "#dc2626" 
+    },
+    { 
+      name: "Alerta", 
+      value: Object.keys(namecheapAlerts).filter(domainName => 
+        criticalDomains.some(d => d.domain_name === domainName)
+      ).length, 
+      color: "#facc15" 
+    }
+  ].filter(item => item.value > 0);
 
   const handleDeleteClick = (domain: any) => {
     setDomainToDelete(domain);
@@ -153,6 +231,31 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 mb-6">
+            <div>
+              <h3 className="text-sm font-medium mb-4">Status dos Domínios Não Ativos</h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={inactivePieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {inactivePieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow>
@@ -176,6 +279,16 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                   <TableCell>{domain.registrar || "N/A"}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {(namecheapAlerts[domain.domain_name] || domain.status === "suspended") && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleAlertClick(domain)}
+                          className="text-yellow-500 hover:text-yellow-600"
+                        >
+                          <AlertCircle className="h-5 w-5" />
+                        </Button>
+                      )}
                       {domain.registrar === "Namecheap" && (
                         <Button
                           variant="outline"
@@ -234,6 +347,20 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={alertDialogOpen} onOpenChange={setAlertDialogOpen}>
+        <DialogContent className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
+              <AlertCircle className="h-5 w-5" />
+              Alerta do Domínio
+            </DialogTitle>
+            <DialogDescription className="text-yellow-600 dark:text-yellow-400 text-base pt-4">
+              {currentAlertMessage}
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

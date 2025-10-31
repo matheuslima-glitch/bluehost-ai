@@ -44,7 +44,7 @@ serve(async (req) => {
 
     const baseURL = 'https://api.namecheap.com/xml.response';
     
-    // Get account balance
+    // Get account balance with correct parsing
     if (action === 'balance') {
       const params = new URLSearchParams({
         ApiUser: NAMECHEAP_API_USER,
@@ -58,10 +58,21 @@ serve(async (req) => {
       const xmlText = await response.text();
       console.log('Namecheap balance response:', xmlText);
       
-      // Parse balance from XML
-      const balanceMatch = xmlText.match(/AccountBalance="([^"]+)"/);
-      const balance = balanceMatch ? parseFloat(balanceMatch[1]) : 0;
+      // Parse balance from XML - use AvailableBalance instead of AccountBalance
+      const availableBalanceMatch = xmlText.match(/AvailableBalance="([^"]+)"/);
+      const accountBalanceMatch = xmlText.match(/AccountBalance="([^"]+)"/);
+      
+      // Try both fields, prefer AvailableBalance
+      let balance = 0;
+      if (availableBalanceMatch) {
+        balance = parseFloat(availableBalanceMatch[1]);
+      } else if (accountBalanceMatch) {
+        balance = parseFloat(accountBalanceMatch[1]);
+      }
+      
       const balanceBRL = balance * 5.70; // Approximate conversion
+
+      console.log('Parsed balance:', balance, 'USD');
 
       // Store in database
       await supabaseClient.from('namecheap_balance').upsert({
@@ -77,32 +88,88 @@ serve(async (req) => {
       );
     }
 
-    // List domains with filters
+    // List domains with filters (with pagination)
     if (action === 'list_domains') {
-      const { listType } = body; // EXPIRED or EXPIRING
+      const { listType } = body; // EXPIRED, EXPIRING, or ALERT
       
-      const params = new URLSearchParams({
-        ApiUser: NAMECHEAP_API_USER,
-        ApiKey: NAMECHEAP_API_KEY,
-        UserName: NAMECHEAP_API_USER,
-        Command: 'namecheap.domains.getList',
-        ClientIp: CLIENT_IP,
-        ...(listType && { ListType: listType })
-      });
+      // Function to fetch all pages
+      const fetchAllDomains = async () => {
+        let allDomains: any[] = [];
+        let currentPage = 1;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const params = new URLSearchParams({
+            ApiUser: NAMECHEAP_API_USER,
+            ApiKey: NAMECHEAP_API_KEY,
+            UserName: NAMECHEAP_API_USER,
+            Command: 'namecheap.domains.getList',
+            ClientIp: CLIENT_IP,
+            PageSize: '100',
+            Page: currentPage.toString(),
+            ...(listType && listType !== 'ALERT' && { ListType: listType })
+          });
 
-      const response = await fetch(`${baseURL}?${params}`);
-      const xmlText = await response.text();
-      console.log(`Namecheap list domains (${listType}) response:`, xmlText);
+          const response = await fetch(`${baseURL}?${params}`);
+          const xmlText = await response.text();
+          console.log(`Namecheap list domains (${listType}) page ${currentPage} response:`, xmlText);
 
-      // Parse domain list from XML
-      const domainMatches = [...xmlText.matchAll(/<Domain[^>]*Name="([^"]+)"[^>]*Expires="([^"]+)"/g)];
-      const domains = domainMatches.map(match => ({
-        name: match[1],
-        expirationDate: match[2]
-      }));
+          // Parse domain list from XML
+          const domainMatches = [...xmlText.matchAll(/<Domain[^>]*Name="([^"]+)"[^>]*Expires="([^"]+)"[^>]*IsLocked="([^"]*)"[^>]*AutoRenew="([^"]*)"[^>]*IsExpired="([^"]*)"[^>]*IsPremium="([^"]*)"[^>]*>/g)];
+          const domains = domainMatches.map(match => ({
+            name: match[1],
+            expirationDate: match[2],
+            isLocked: match[3] === 'true',
+            autoRenew: match[4] === 'true',
+            isExpired: match[5] === 'true',
+            isPremium: match[6] === 'true'
+          }));
+
+          // Check for alerts in domain details
+          if (listType === 'ALERT') {
+            const domainsWithAlerts = [];
+            for (const domain of domains) {
+              // Check if domain has any alert status
+              // In Namecheap, domains without auto-renew and expiring soon are considered alerts
+              if (!domain.autoRenew && !domain.isExpired) {
+                const expDate = new Date(domain.expirationDate);
+                const now = new Date();
+                const daysUntilExpiry = Math.floor((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                
+                if (daysUntilExpiry <= 30 && daysUntilExpiry > 0) {
+                  domainsWithAlerts.push({
+                    ...domain,
+                    alertMessage: `Atenção: Domínio sem renovação automática. Expira em ${daysUntilExpiry} dias.`
+                  });
+                }
+              }
+            }
+            allDomains.push(...domainsWithAlerts);
+          } else {
+            allDomains.push(...domains);
+          }
+
+          // Check if there are more pages
+          const totalItemsMatch = xmlText.match(/TotalItems="(\d+)"/);
+          const totalItems = totalItemsMatch ? parseInt(totalItemsMatch[1]) : 0;
+          const loadedItems = currentPage * 100;
+          
+          hasMore = loadedItems < totalItems;
+          currentPage++;
+          
+          // Add a small delay to avoid rate limiting
+          if (hasMore) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+        
+        return allDomains;
+      };
+
+      const domains = await fetchAllDomains();
 
       return new Response(
-        JSON.stringify({ domains }),
+        JSON.stringify({ domains, count: domains.length }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -399,31 +466,56 @@ serve(async (req) => {
       );
     }
 
-    // List domains
+    // List all domains with pagination
     if (action === 'list') {
-      const params = new URLSearchParams({
-        ApiUser: NAMECHEAP_API_USER,
-        ApiKey: NAMECHEAP_API_KEY,
-        UserName: NAMECHEAP_API_USER,
-        Command: 'namecheap.domains.getList',
-        ClientIp: CLIENT_IP,
-        PageSize: '100'
-      });
+      const fetchAllDomains = async () => {
+        let allDomains: any[] = [];
+        let currentPage = 1;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const params = new URLSearchParams({
+            ApiUser: NAMECHEAP_API_USER,
+            ApiKey: NAMECHEAP_API_KEY,
+            UserName: NAMECHEAP_API_USER,
+            Command: 'namecheap.domains.getList',
+            ClientIp: CLIENT_IP,
+            PageSize: '100',
+            Page: currentPage.toString()
+          });
 
-      const response = await fetch(`${baseURL}?${params}`);
-      const xmlText = await response.text();
-      
-      const domainMatches = xmlText.matchAll(/<Domain[^>]*Name="([^"]+)"[^>]*Expires="([^"]+)"[^>]*>/g);
-      const domains = [];
-      
-      for (const match of domainMatches) {
-        domains.push({
-          domain_name: match[1],
-          expiration_date: match[2],
-          registrar: 'Namecheap',
-          integration_source: 'namecheap'
-        });
-      }
+          const response = await fetch(`${baseURL}?${params}`);
+          const xmlText = await response.text();
+          console.log(`Fetching page ${currentPage} of domains...`);
+          
+          const domainMatches = [...xmlText.matchAll(/<Domain[^>]*Name="([^"]+)"[^>]*Expires="([^"]+)"[^>]*>/g)];
+          const domains = domainMatches.map(match => ({
+            domain_name: match[1],
+            expiration_date: match[2],
+            registrar: 'Namecheap',
+            integration_source: 'namecheap'
+          }));
+          
+          allDomains.push(...domains);
+
+          // Check if there are more pages
+          const totalItemsMatch = xmlText.match(/TotalItems="(\d+)"/);
+          const totalItems = totalItemsMatch ? parseInt(totalItemsMatch[1]) : 0;
+          const loadedItems = currentPage * 100;
+          
+          hasMore = loadedItems < totalItems;
+          currentPage++;
+          
+          // Add delay to avoid rate limiting
+          if (hasMore) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+        
+        return allDomains;
+      };
+
+      const domains = await fetchAllDomains();
 
       // Sync with database
       for (const domainData of domains) {
