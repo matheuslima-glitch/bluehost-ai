@@ -106,8 +106,14 @@ export default function DomainSearch() {
   return (
     <>
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 relative overflow-hidden">
-        {/* Background gradient with blur overlay */}
-        <div className="absolute inset-0 bg-gradient-domain-hero opacity-5 blur-3xl"></div>
+        {/* Background gradient with floating glows */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0EA5E9] via-[#3B82F6] to-[#1E40AF] opacity-[0.08]"></div>
+        
+        {/* Floating blue glows */}
+        <div className="absolute top-20 left-20 w-64 h-64 bg-[#0EA5E9] rounded-full blur-[100px] opacity-20 animate-float"></div>
+        <div className="absolute bottom-40 right-32 w-80 h-80 bg-[#3B82F6] rounded-full blur-[120px] opacity-15 animate-float-slow"></div>
+        <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-[#22D3EE] rounded-full blur-[110px] opacity-10 animate-float-slower"></div>
+        <div className="absolute bottom-20 left-1/4 w-56 h-56 bg-[#1E40AF] rounded-full blur-[90px] opacity-25 animate-float"></div>
         
         {/* Centered content */}
         <div className="relative z-10 w-full max-w-2xl space-y-8 animate-fade-slide-up">
