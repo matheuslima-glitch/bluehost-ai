@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, RefreshCw, AlertTriangle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -231,10 +232,11 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 mb-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Gráfico */}
             <div>
               <h3 className="text-sm font-medium mb-4">Status dos Domínios Não Ativos</h3>
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
                     data={inactivePieData}
@@ -244,9 +246,10 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
+                    style={{ outline: 'none' }}
                   >
                     {inactivePieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`cell-${index}`} fill={entry.color} style={{ outline: 'none' }} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -254,67 +257,74 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                 </PieChart>
               </ResponsiveContainer>
             </div>
-          </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Domínio</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Data de Expiração</TableHead>
-                <TableHead>Registrador</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {criticalDomains.map((domain) => (
-                <TableRow key={domain.id}>
-                  <TableCell className="font-medium">{domain.domain_name}</TableCell>
-                  <TableCell>{getStatusBadge(domain)}</TableCell>
-                  <TableCell>
-                    {domain.expiration_date
-                      ? format(new Date(domain.expiration_date), "dd/MM/yyyy", { locale: ptBR })
-                      : "N/A"}
-                  </TableCell>
-                  <TableCell>{domain.registrar || "N/A"}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {(namecheapAlerts[domain.domain_name] || domain.status === "suspended") && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleAlertClick(domain)}
-                          className="text-yellow-500 hover:text-yellow-600"
-                        >
-                          <AlertCircle className="h-5 w-5" />
-                        </Button>
-                      )}
-                      {domain.registrar === "Namecheap" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRenewClick(domain)}
-                          disabled={renewLoading === domain.id}
-                        >
-                          <RefreshCw className={`h-4 w-4 mr-1 ${renewLoading === domain.id ? 'animate-spin' : ''}`} />
-                          {renewalPrices[domain.id] 
-                            ? `$${renewalPrices[domain.id].toFixed(2)}`
-                            : "Renovar"}
-                        </Button>
-                      )}
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteClick(domain)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+            {/* Tabela com scroll */}
+            <div>
+              <ScrollArea className="h-[300px] rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Domínio</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Expiração</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {criticalDomains.slice(0, 6).map((domain) => (
+                      <TableRow key={domain.id}>
+                        <TableCell className="font-medium text-sm">{domain.domain_name}</TableCell>
+                        <TableCell>{getStatusBadge(domain)}</TableCell>
+                        <TableCell className="text-sm">
+                          {domain.expiration_date
+                            ? format(new Date(domain.expiration_date), "dd/MM/yy", { locale: ptBR })
+                            : "N/A"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {(namecheapAlerts[domain.domain_name] || domain.status === "suspended") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleAlertClick(domain)}
+                                className="text-yellow-500 hover:text-yellow-600 h-8 w-8 p-0"
+                              >
+                                <AlertCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {domain.registrar === "Namecheap" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRenewClick(domain)}
+                                disabled={renewLoading === domain.id}
+                                className="h-8 px-2"
+                              >
+                                <RefreshCw className={`h-3 w-3 ${renewLoading === domain.id ? 'animate-spin' : ''}`} />
+                              </Button>
+                            )}
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteClick(domain)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+              {criticalDomains.length > 6 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Mostrando 6 de {criticalDomains.length} domínios críticos
+                </p>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
