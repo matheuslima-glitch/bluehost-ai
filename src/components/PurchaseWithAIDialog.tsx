@@ -282,16 +282,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
             <div className="grid gap-2">
               <Label htmlFor="language">Idioma</Label>
-              <Select value={language} onValueChange={setLanguage}>
-                <SelectTrigger id="language">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="portuguese">Português</SelectItem>
-                  <SelectItem value="english">Inglês</SelectItem>
-                  <SelectItem value="spanish">Espanhol</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                id="language"
+                placeholder="Ex: português, inglês, espanhol..."
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+              />
             </div>
           </div>
 
