@@ -55,7 +55,7 @@ export default function Auth() {
     if (error) {
       toast.error(error.message || "Erro ao criar conta");
     } else {
-      toast.success("Conta criada com sucesso!");
+      toast.success("Conta criada com sucesso! Verifique seu email para confirmar o cadastro.");
     }
 
     setLoading(false);
