@@ -105,104 +105,110 @@ export default function DomainSearch() {
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Compra de Domínios</h1>
-            <p className="text-muted-foreground">Pesquise e registre novos domínios</p>
-          </div>
-          {balance && (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Saldo Namecheap</p>
-                    <p className="text-2xl font-bold flex items-center gap-1">
-                      <DollarSign className="h-5 w-5" />
-                      {balance.usd.toFixed(2)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">R$ {balance.brl.toFixed(2)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Pesquisar Domínio</CardTitle>
-          <CardDescription>
-            Digite o nome do domínio que deseja verificar ou palavras-chave para sugestões
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="exemplo.com ou palavras-chave"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-              className="flex-1"
-            />
-            <Button onClick={handleSearch} disabled={searching}>
-              {searching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setAiDialogOpen(true)}
-            >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Compra com IA
-            </Button>
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 relative overflow-hidden">
+        {/* Background gradient with blur overlay */}
+        <div className="absolute inset-0 bg-gradient-domain-hero opacity-5 blur-3xl"></div>
+        
+        {/* Centered content */}
+        <div className="relative z-10 w-full max-w-2xl space-y-8 animate-fade-slide-up">
+          {/* Header */}
+          <div className="text-center space-y-3">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-[hsl(199,89%,48%)] via-[hsl(217,91%,60%)] to-[hsl(224,76%,48%)] bg-clip-text text-transparent">
+              Compra de Domínios
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Pesquise e registre novos domínios com inteligência artificial
+            </p>
           </div>
 
-          {searchResult && (
-            <Card className={searchResult.available ? "border-success" : "border-destructive"}>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {searchResult.available ? (
-                      <CheckCircle2 className="h-8 w-8 text-success" />
-                    ) : (
-                      <XCircle className="h-8 w-8 text-destructive" />
-                    )}
-                    <div>
-                      <p className="font-bold text-lg">{searchResult.domain}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {searchResult.message}
-                      </p>
-                    </div>
-                  </div>
-                  {searchResult.available && (
-                    <div className="flex gap-2">
-                      <div className="text-right">
-                        <p className="text-lg font-bold">${searchResult.price}</p>
-                        <p className="text-xs text-muted-foreground">preço anual</p>
-                      </div>
-                      <Button onClick={handlePurchaseDomain} disabled={purchasing}>
-                        {purchasing ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Comprando...
-                          </>
-                        ) : (
-                          "Comprar Domínio"
-                        )}
-                      </Button>
-                    </div>
+          {/* Main Card */}
+          <Card className="border-[hsl(var(--accent-cyan)_/_0.2)] shadow-xl backdrop-blur-sm">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-2xl">Pesquisar Domínio</CardTitle>
+              <CardDescription className="text-base">
+                Digite o nome do domínio que deseja verificar ou palavras-chave para sugestões
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex gap-3">
+                <Input
+                  placeholder="exemplo.com ou palavras-chave"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                  className="flex-1 h-12 text-base border-[hsl(var(--accent-cyan)_/_0.3)] focus-visible:border-[hsl(var(--accent-cyan))] transition-all duration-300"
+                />
+                <Button 
+                  onClick={handleSearch} 
+                  disabled={searching}
+                  size="lg"
+                  className="px-6 transition-all duration-300 hover:scale-105"
+                >
+                  {searching ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Search className="h-5 w-5" />
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={() => setAiDialogOpen(true)}
+                  className="px-6 bg-gradient-to-r from-[hsl(199,89%,48%)] to-[hsl(217,91%,60%)] text-white hover:opacity-90 animate-pulse-glow transition-all duration-300 hover:scale-105 border-none"
+                >
+                  <ShoppingCart className="h-5 w-5 mr-2 animate-pulse" />
+                  Compra com IA
+                </Button>
+              </div>
+
+              {searchResult && (
+                <Card className={`border-2 transition-all duration-300 animate-fade-slide-up ${searchResult.available ? "border-success bg-success/5" : "border-destructive bg-destructive/5"}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        {searchResult.available ? (
+                          <CheckCircle2 className="h-10 w-10 text-success" />
+                        ) : (
+                          <XCircle className="h-10 w-10 text-destructive" />
+                        )}
+                        <div>
+                          <p className="font-bold text-xl">{searchResult.domain}</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {searchResult.message}
+                          </p>
+                        </div>
+                      </div>
+                      {searchResult.available && (
+                        <div className="flex gap-3">
+                          <div className="text-right">
+                            <p className="text-2xl font-bold">${searchResult.price}</p>
+                            <p className="text-xs text-muted-foreground">preço anual</p>
+                          </div>
+                          <Button 
+                            onClick={handlePurchaseDomain} 
+                            disabled={purchasing}
+                            size="lg"
+                            className="transition-all duration-300 hover:scale-105"
+                          >
+                            {purchasing ? (
+                              <>
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                Comprando...
+                              </>
+                            ) : (
+                              "Comprar Domínio"
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <PurchaseWithAIDialog
         open={aiDialogOpen}

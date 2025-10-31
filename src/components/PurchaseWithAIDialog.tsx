@@ -252,7 +252,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   if (!showProgress && !showStructureSelection && !showClassification) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] shadow-[0_0_40px_hsl(var(--glow-blue)_/_0.25)] border-[hsl(var(--accent-cyan)_/_0.3)]">
           <DialogHeader>
             <DialogTitle>Compra com IA</DialogTitle>
             <DialogDescription>Configure os parâmetros para buscar domínios disponíveis</DialogDescription>
@@ -319,7 +319,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   if (showStructureSelection) {
     return (
       <Dialog open={true} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] shadow-[0_0_40px_hsl(var(--glow-blue)_/_0.25)] border-[hsl(var(--accent-cyan)_/_0.3)]">
           <DialogHeader>
             <DialogTitle>🎉 Domínios Encontrados!</DialogTitle>
             <DialogDescription>
@@ -375,7 +375,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   if (showProgress) {
     return (
       <Dialog open={true} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto shadow-[0_0_40px_hsl(var(--glow-blue)_/_0.25)] border-[hsl(var(--accent-cyan)_/_0.3)]">
           <DialogHeader>
             <DialogTitle>Processando</DialogTitle>
             <DialogDescription>Acompanhe o progresso da busca e compra dos domínios</DialogDescription>
@@ -410,7 +410,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   // Dialog de classificação
   return (
     <Dialog open={showClassification} onOpenChange={setShowClassification}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto shadow-[0_0_40px_hsl(var(--glow-blue)_/_0.25)] border-[hsl(var(--accent-cyan)_/_0.3)]">
         <DialogHeader>
           <DialogTitle>Classificar Domínios</DialogTitle>
           <DialogDescription>Selecione a fonte de tráfego para cada domínio comprado</DialogDescription>
