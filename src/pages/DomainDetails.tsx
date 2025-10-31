@@ -14,14 +14,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, RefreshCw, X, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, X, Plus, Trash2, Edit2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 interface Domain {
@@ -36,12 +36,14 @@ interface Domain {
   registrar: string | null;
   funnel_id: string | null;
   zone_id: string | null;
+  nameservers: string[] | null;
 }
 
 export default function DomainDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [domain, setDomain] = useState<Domain | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -51,6 +53,8 @@ export default function DomainDetails() {
   const [dnsRecords, setDnsRecords] = useState<Array<{ type: string; name: string; content: string; ttl: number }>>([]);
   const [loadingDns, setLoadingDns] = useState(false);
   const [newDnsRecord, setNewDnsRecord] = useState({ type: 'A', name: '', content: '', ttl: 3600 });
+  const [isEditingNameservers, setIsEditingNameservers] = useState(false);
+  const [nameserversInput, setNameserversInput] = useState("");
 
   // Fetch custom filters from database
   const { data: customFilters = [] } = useQuery({
@@ -207,12 +211,50 @@ export default function DomainDetails() {
       if (error) throw error;
 
       setDomain(data);
+      
+      // Inicializar nameservers input quando carregar o domínio
+      if (data?.nameservers) {
+        setNameserversInput(data.nameservers.join("\n"));
+      }
     } catch (error: any) {
       toast.error("Erro ao carregar domínio");
       console.error("Error loading domain:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const updateNameservers = useMutation({
+    mutationFn: async (nameservers: string[]) => {
+      const { error } = await supabase
+        .from("domains")
+        .update({ nameservers })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      loadDomain();
+      toast.success("Nameservers atualizados com sucesso!");
+      setIsEditingNameservers(false);
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar nameservers: " + error.message);
+    },
+  });
+
+  const handleSaveNameservers = () => {
+    const nameservers = nameserversInput
+      .split("\n")
+      .map(ns => ns.trim())
+      .filter(ns => ns.length > 0);
+    
+    if (nameservers.length === 0) {
+      toast.error("Adicione pelo menos um nameserver");
+      return;
+    }
+    
+    updateNameservers.mutate(nameservers);
   };
 
   const fetchNamecheapInfo = async () => {
@@ -323,7 +365,7 @@ export default function DomainDetails() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={() => navigate("/domains")}>
+        <Button variant="outline" onClick={() => navigate("/domains")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>
@@ -363,42 +405,100 @@ export default function DomainDetails() {
               </div>
             </div>
 
-            <div className="space-y-2 pt-4 border-t">
-              <Label>Acesso Rápido</Label>
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => {
-                    const wordpressUrl = `https://${domain.domain_name}/wordpanel124`;
-                    window.open(wordpressUrl, '_blank');
-                    toast.info("Abrindo painel WordPress. Faça login com as credenciais fornecidas.");
-                  }}
-                  className="flex items-center gap-2 bg-[#21759b] hover:bg-[#1e6a8d] text-white flex-1"
-                >
-                  <img 
-                    src="https://upload.wikimedia.org/wikipedia/commons/9/93/Wordpress_Blue_logo.png" 
-                    alt="WordPress" 
-                    className="h-5 w-5 object-contain"
-                  />
-                  <span className="text-sm">Login WordPress</span>
-                </Button>
-
-                <Button
-                  onClick={() => {
-                    const atomicatUrl = "https://app.atomicat.com.br/login";
-                    window.open(atomicatUrl, '_blank');
-                    toast.info("Abrindo painel Atomicat. Faça login com as credenciais fornecidas.");
-                  }}
-                  className="flex items-center gap-2 bg-gradient-to-r from-gray-900 to-gray-600 hover:from-gray-800 hover:to-gray-500 text-white flex-1"
-                >
-                  <img 
-                    src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png" 
-                    alt="Atomicat" 
-                    className="h-5 w-5 object-contain rounded"
-                  />
-                  <span className="text-sm">Login Atomicat</span>
-                </Button>
+              <div className="space-y-2 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Server className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Nameservers:</span>
+                  </div>
+                  {!isEditingNameservers ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditingNameservers(true)}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setIsEditingNameservers(false);
+                          setNameserversInput(domain.nameservers?.join("\n") || "");
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveNameservers}
+                        disabled={updateNameservers.isPending}
+                      >
+                        Salvar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className="ml-6">
+                  {!isEditingNameservers ? (
+                    domain.nameservers && domain.nameservers.length > 0 ? (
+                      <ul className="list-disc list-inside text-sm text-muted-foreground">
+                        {domain.nameservers.map((ns, index) => (
+                          <li key={index}>{ns}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Não configurado</p>
+                    )
+                  ) : (
+                    <textarea
+                      value={nameserversInput}
+                      onChange={(e) => setNameserversInput(e.target.value)}
+                      placeholder="Digite um nameserver por linha&#10;Exemplo:&#10;ns1.example.com&#10;ns2.example.com"
+                      className="w-full min-h-[120px] p-2 text-sm border rounded-md bg-background"
+                    />
+                  )}
+                </div>
               </div>
-            </div>
+
+              <div className="space-y-2 pt-4 border-t">
+                <Label>Acesso Rápido</Label>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => {
+                      const wordpressUrl = `https://${domain.domain_name}/wordpanel124`;
+                      window.open(wordpressUrl, '_blank');
+                      toast.info("Abrindo painel WordPress. Faça login com as credenciais fornecidas.");
+                    }}
+                    className="flex items-center gap-2 bg-[#21759b] hover:bg-[#1e6a8d] text-white flex-1"
+                  >
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/commons/9/93/Wordpress_Blue_logo.png" 
+                      alt="WordPress" 
+                      className="h-5 w-5 object-contain"
+                    />
+                    <span className="text-sm">Login WordPress</span>
+                  </Button>
+
+                  <Button
+                    onClick={() => {
+                      const atomicatUrl = "https://app.atomicat.com.br/login";
+                      window.open(atomicatUrl, '_blank');
+                      toast.info("Abrindo painel Atomicat. Faça login com as credenciais fornecidas.");
+                    }}
+                    className="flex items-center gap-2 bg-gradient-to-r from-gray-900 to-gray-600 hover:from-gray-800 hover:to-gray-500 text-white flex-1"
+                  >
+                    <img 
+                      src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png" 
+                      alt="Atomicat" 
+                      className="h-5 w-5 object-contain rounded"
+                    />
+                    <span className="text-sm">Login Atomicat</span>
+                  </Button>
+                </div>
+              </div>
           </CardContent>
         </Card>
 
@@ -482,30 +582,13 @@ export default function DomainDetails() {
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Data e Hora da Compra</Label>
-                {domain.registrar === 'Namecheap' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={fetchNamecheapInfo}
-                    disabled={fetchingNamecheap}
-                  >
-                    <RefreshCw className={`h-4 w-4 ${fetchingNamecheap ? 'animate-spin' : ''}`} />
-                  </Button>
-                )}
-              </div>
+              <Label>Data e Hora da Compra</Label>
               <div className="flex items-center gap-2 text-sm">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 {domain.purchase_date
                   ? format(new Date(domain.purchase_date), "dd/MM/yyyy HH:mm", { locale: ptBR })
                   : "Domínio não foi comprado no sistema"}
               </div>
-              {domain.registrar === 'Namecheap' && !domain.purchase_date && (
-                <p className="text-xs text-muted-foreground">
-                  Clique no botão de atualizar para buscar data da Namecheap
-                </p>
-              )}
             </div>
           </CardContent>
         </Card>
