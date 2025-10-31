@@ -390,7 +390,7 @@ export default function DomainManagement() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Globe className="h-5 w-5" />
-            Seus Domínios ({filteredDomains.length} de {domains.length})
+            Seus Domínios
           </CardTitle>
           <CardDescription>
             {filteredDomains.length === domains.length
@@ -588,6 +588,10 @@ export default function DomainManagement() {
               </Pagination>
             </div>
           )}
+
+          <div className="mt-4 text-xs text-muted-foreground">
+            Total: {domains.length} domínios
+          </div>
         </CardContent>
       </Card>
     </div>
