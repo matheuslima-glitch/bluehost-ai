@@ -465,26 +465,24 @@ export default function Dashboard() {
                     variant={balanceCurrency === "usd" ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setBalanceCurrency("usd")}
-                    className={`flex items-center gap-2 ${
+                    className={`${
                       balanceCurrency === "usd" 
                         ? "bg-primary text-primary-foreground" 
                         : ""
                     }`}
                   >
-                    <span className="text-base">🇺🇸</span>
                     USD
                   </Button>
                   <Button
                     variant={balanceCurrency === "brl" ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setBalanceCurrency("brl")}
-                    className={`flex items-center gap-2 ${
+                    className={`${
                       balanceCurrency === "brl" 
                         ? "bg-primary text-primary-foreground" 
                         : ""
                     }`}
                   >
-                    <span className="text-base">🇧🇷</span>
                     BRL
                   </Button>
                 </div>
