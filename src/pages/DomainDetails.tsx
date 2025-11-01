@@ -14,7 +14,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, X, Plus, Trash2, Edit2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, X, Plus, Trash2, Edit2, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, subMonths } from "date-fns";
@@ -39,6 +48,19 @@ interface Domain {
   nameservers: string[] | null;
 }
 
+interface ActivityLog {
+  id: string;
+  action_type: string;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: string;
+  user_id: string;
+  profiles?: {
+    full_name: string | null;
+    email: string | null;
+  };
+}
+
 export default function DomainDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -55,6 +77,8 @@ export default function DomainDetails() {
   const [newDnsRecord, setNewDnsRecord] = useState({ type: 'A', name: '', content: '', ttl: 3600 });
   const [isEditingNameservers, setIsEditingNameservers] = useState(false);
   const [nameserversInput, setNameserversInput] = useState("");
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   // Fetch custom filters from database
   const { data: customFilters = [] } = useQuery({
@@ -124,6 +148,76 @@ export default function DomainDetails() {
       loadDnsRecords();
     }
   }, [domain?.zone_id]);
+
+  const loadActivityLogs = async () => {
+    if (!id) return;
+
+    setLoadingLogs(true);
+    try {
+      // Buscar logs primeiro
+      const { data: logsData, error: logsError } = await supabase
+        .from("domain_activity_logs")
+        .select("*")
+        .eq("domain_id", id)
+        .order("created_at", { ascending: false });
+
+      if (logsError) throw logsError;
+
+      // Buscar informações dos usuários
+      const userIds = [...new Set(logsData?.map(log => log.user_id) || [])];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Combinar dados
+      const logsWithProfiles = logsData?.map(log => ({
+        ...log,
+        profiles: profilesData?.find(p => p.id === log.user_id) || null
+      })) || [];
+
+      setActivityLogs(logsWithProfiles);
+    } catch (error: any) {
+      console.error("Error loading activity logs:", error);
+      toast.error("Erro ao carregar logs de atividade");
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const logActivity = async (actionType: string, oldValue: string | null, newValue: string | null) => {
+    if (!id || !user?.id) return;
+
+    try {
+      const { error } = await supabase
+        .from("domain_activity_logs")
+        .insert({
+          domain_id: id,
+          user_id: user.id,
+          action_type: actionType,
+          old_value: oldValue,
+          new_value: newValue
+        });
+
+      if (error) throw error;
+    } catch (error: any) {
+      console.error("Error logging activity:", error);
+    }
+  };
+
+  const getActionLabel = (actionType: string) => {
+    const labels: Record<string, string> = {
+      nameservers_updated: "Nameservers atualizados",
+      platform_updated: "Plataforma alterada",
+      traffic_source_updated: "Fonte de tráfego alterada",
+      funnel_id_added: "ID do funil adicionado",
+      funnel_id_removed: "ID do funil removido",
+      status_changed: "Status alterado",
+    };
+    return labels[actionType] || actionType;
+  };
 
   const loadDnsRecords = async () => {
     if (!domain?.zone_id) return;
@@ -226,12 +320,18 @@ export default function DomainDetails() {
 
   const updateNameservers = useMutation({
     mutationFn: async (nameservers: string[]) => {
+      const oldNameservers = domain?.nameservers?.join(", ") || null;
+      const newNameservers = nameservers.join(", ");
+
       const { error } = await supabase
         .from("domains")
         .update({ nameservers })
         .eq("id", id);
 
       if (error) throw error;
+
+      // Log da atividade
+      await logActivity("nameservers_updated", oldNameservers, newNameservers);
     },
     onSuccess: () => {
       loadDomain();
@@ -299,6 +399,8 @@ export default function DomainDetails() {
   const updateDomain = async (field: string, value: string) => {
     if (!domain) return;
 
+    const oldValue = domain[field as keyof Domain] as string | null;
+
     setSaving(true);
     try {
       const { error } = await supabase
@@ -310,6 +412,16 @@ export default function DomainDetails() {
 
       setDomain({ ...domain, [field]: value });
       toast.success("Informação atualizada com sucesso");
+
+      // Log da atividade
+      let actionType = "";
+      if (field === "platform") actionType = "platform_updated";
+      else if (field === "traffic_source") actionType = "traffic_source_updated";
+      else if (field === "status") actionType = "status_changed";
+
+      if (actionType) {
+        await logActivity(actionType, oldValue, value);
+      }
     } catch (error: any) {
       toast.error("Erro ao atualizar informação");
       console.error("Error updating domain:", error);
@@ -321,10 +433,14 @@ export default function DomainDetails() {
   const handleFunnelIdKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && funnelIdInput.trim() !== '') {
       e.preventDefault();
-      const newTags = [...funnelIdTags, funnelIdInput.trim()];
+      const newTag = funnelIdInput.trim();
+      const newTags = [...funnelIdTags, newTag];
       setFunnelIdTags(newTags);
       setFunnelIdInput("");
       await updateDomain("funnel_id", newTags.join(','));
+      
+      // Log da atividade
+      await logActivity("funnel_id_added", null, newTag);
     }
   };
 
@@ -332,6 +448,9 @@ export default function DomainDetails() {
     const newTags = funnelIdTags.filter(tag => tag !== tagToRemove);
     setFunnelIdTags(newTags);
     await updateDomain("funnel_id", newTags.join(','));
+    
+    // Log da atividade
+    await logActivity("funnel_id_removed", tagToRemove, null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -364,18 +483,91 @@ export default function DomainDetails() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={() => navigate("/domains")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Voltar
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Globe className="h-8 w-8" />
-            {domain.domain_name}
-          </h1>
-          <p className="text-muted-foreground">Detalhes do domínio</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={() => navigate("/domains")}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Globe className="h-8 w-8" />
+              {domain.domain_name}
+            </h1>
+            <p className="text-muted-foreground">Detalhes do domínio</p>
+          </div>
         </div>
+
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="h-10 w-10"
+              onClick={loadActivityLogs}
+            >
+              <Info className="h-5 w-5 text-blue-500" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Logs de Atividade</DialogTitle>
+              <DialogDescription>
+                Histórico de alterações realizadas neste domínio
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="h-[500px] pr-4">
+              {loadingLogs ? (
+                <div className="flex justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : activityLogs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhuma atividade registrada para este domínio
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {activityLogs.map((log) => (
+                    <div 
+                      key={log.id} 
+                      className="border rounded-lg p-4 space-y-2 bg-card hover:bg-accent/5 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <p className="font-medium text-sm">
+                            {getActionLabel(log.action_type)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {log.profiles?.full_name || log.profiles?.email || "Usuário desconhecido"}
+                        </Badge>
+                      </div>
+                      {(log.old_value || log.new_value) && (
+                        <div className="grid grid-cols-2 gap-4 pt-2 border-t text-xs">
+                          {log.old_value && (
+                            <div>
+                              <p className="text-muted-foreground mb-1">Valor anterior:</p>
+                              <p className="font-mono bg-muted p-2 rounded">{log.old_value}</p>
+                            </div>
+                          )}
+                          {log.new_value && (
+                            <div>
+                              <p className="text-muted-foreground mb-1">Novo valor:</p>
+                              <p className="font-mono bg-muted p-2 rounded">{log.new_value}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

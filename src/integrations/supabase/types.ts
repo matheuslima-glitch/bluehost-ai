@@ -68,6 +68,44 @@ export type Database = {
         }
         Relationships: []
       }
+      domain_activity_logs: {
+        Row: {
+          action_type: string
+          created_at: string
+          domain_id: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          domain_id: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          domain_id?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "domain_activity_logs_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "domains"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       domain_analytics: {
         Row: {
           bandwidth_gb: number | null
