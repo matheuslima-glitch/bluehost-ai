@@ -6,15 +6,103 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ==========================================
-// CORREÇÃO: Usar variáveis de ambiente
-// ==========================================
 const NAMECHEAP_API_KEY = Deno.env.get("NAMECHEAP_API_KEY") || "";
 const NAMECHEAP_API_USER = Deno.env.get("NAMECHEAP_API_USER") || "";
-const CLIENT_IP = Deno.env.get("NAMECHEAP_CLIENT_IP") || "0.0.0.0";
+const NAMECHEAP_BASE_URL = "https://api.namecheap.com/xml.response";
+const WHITELIST_NAME = "DomainHub";
 
 console.log("[Namecheap Sync] Function started");
-console.log("[Namecheap Sync] Using CLIENT_IP:", CLIENT_IP);
+
+/**
+ * Detecta o IP atual do servidor Supabase
+ */
+async function detectCurrentIP(): Promise<string> {
+  try {
+    const response = await fetch("https://api.ipify.org?format=json");
+    const data = await response.json();
+    console.log("[Namecheap Sync] Detected IP:", data.ip);
+    return data.ip;
+  } catch (error) {
+    console.error("[Namecheap Sync] Error detecting IP:", error);
+    throw new Error("Failed to detect current IP");
+  }
+}
+
+/**
+ * Gerencia a whitelist do Namecheap: adiciona ou atualiza o IP atual
+ */
+async function ensureIPWhitelisted(currentIP: string): Promise<void> {
+  try {
+    console.log("[Namecheap Sync] Ensuring IP is whitelisted:", currentIP);
+
+    // Listar IPs na whitelist
+    const listParams = new URLSearchParams({
+      ApiUser: NAMECHEAP_API_USER,
+      ApiKey: NAMECHEAP_API_KEY,
+      UserName: NAMECHEAP_API_USER,
+      Command: "namecheap.users.address.getList",
+      ClientIp: currentIP,
+    });
+
+    const listResponse = await fetch(`${NAMECHEAP_BASE_URL}?${listParams}`);
+    const listXml = await listResponse.text();
+    console.log("[Namecheap Sync] Whitelist response:", listXml.substring(0, 500));
+
+    // Verificar se já existe um IP com o nome DomainHub
+    const addressIdMatch = listXml.match(new RegExp(`<List[^>]*AddressId="(\\d+)"[^>]*AddressName="${WHITELIST_NAME}"`));
+    
+    if (addressIdMatch) {
+      // Atualizar IP existente
+      const addressId = addressIdMatch[1];
+      console.log("[Namecheap Sync] Updating existing whitelist entry:", addressId);
+
+      const updateParams = new URLSearchParams({
+        ApiUser: NAMECHEAP_API_USER,
+        ApiKey: NAMECHEAP_API_KEY,
+        UserName: NAMECHEAP_API_USER,
+        Command: "namecheap.users.address.update",
+        ClientIp: currentIP,
+        AddressId: addressId,
+        AddressName: WHITELIST_NAME,
+        IpAddress: currentIP,
+      });
+
+      const updateResponse = await fetch(`${NAMECHEAP_BASE_URL}?${updateParams}`);
+      const updateXml = await updateResponse.text();
+      
+      if (updateXml.includes('Status="OK"')) {
+        console.log("[Namecheap Sync] IP whitelist updated successfully");
+      } else {
+        console.error("[Namecheap Sync] Failed to update whitelist:", updateXml);
+      }
+    } else {
+      // Criar novo registro na whitelist
+      console.log("[Namecheap Sync] Creating new whitelist entry");
+
+      const createParams = new URLSearchParams({
+        ApiUser: NAMECHEAP_API_USER,
+        ApiKey: NAMECHEAP_API_KEY,
+        UserName: NAMECHEAP_API_USER,
+        Command: "namecheap.users.address.create",
+        ClientIp: currentIP,
+        AddressName: WHITELIST_NAME,
+        IpAddress: currentIP,
+      });
+
+      const createResponse = await fetch(`${NAMECHEAP_BASE_URL}?${createParams}`);
+      const createXml = await createResponse.text();
+      
+      if (createXml.includes('Status="OK"')) {
+        console.log("[Namecheap Sync] IP whitelist created successfully");
+      } else {
+        console.error("[Namecheap Sync] Failed to create whitelist:", createXml);
+      }
+    }
+  } catch (error) {
+    console.error("[Namecheap Sync] Error managing whitelist:", error);
+    throw error;
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -34,7 +122,11 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const baseURL = "https://api.namecheap.com/xml.response";
+    // PASSO 1: Detectar IP atual
+    const currentIP = await detectCurrentIP();
+
+    // PASSO 2: Garantir que o IP está na whitelist
+    await ensureIPWhitelisted(currentIP);
     const syncResults = {
       balanceUpdated: false,
       domainsInserted: 0,
@@ -47,19 +139,19 @@ serve(async (req) => {
     };
 
     // ==========================================
-    // 1. SINCRONIZAR SALDO DA CONTA NAMECHEAP
+    // 3. SINCRONIZAR SALDO DA CONTA NAMECHEAP
     // ==========================================
-    console.log("[Namecheap Sync] Step 1: Fetching account balance...");
+    console.log("[Namecheap Sync] Step 3: Fetching account balance...");
     try {
       const balanceParams = new URLSearchParams({
         ApiUser: NAMECHEAP_API_USER,
         ApiKey: NAMECHEAP_API_KEY,
         UserName: NAMECHEAP_API_USER,
         Command: "namecheap.users.getBalances",
-        ClientIp: CLIENT_IP,
+        ClientIp: currentIP,
       });
 
-      const balanceResponse = await fetch(`${baseURL}?${balanceParams}`, {
+      const balanceResponse = await fetch(`${NAMECHEAP_BASE_URL}?${balanceParams}`, {
         method: "GET",
         headers: { "Content-Type": "application/xml" },
       });
@@ -153,9 +245,9 @@ serve(async (req) => {
     }
 
     // ==========================================
-    // 2. SINCRONIZAR DOMÍNIOS - PAGINAÇÃO COMPLETA
+    // 4. SINCRONIZAR DOMÍNIOS - PAGINAÇÃO COMPLETA
     // ==========================================
-    console.log("[Namecheap Sync] Step 2: Fetching domains from Namecheap...");
+    console.log("[Namecheap Sync] Step 4: Fetching domains from Namecheap...");
     try {
       const allNamecheapDomains: Array<{
         name: string;
@@ -177,12 +269,12 @@ serve(async (req) => {
         ApiKey: NAMECHEAP_API_KEY,
         UserName: NAMECHEAP_API_USER,
         Command: "namecheap.domains.getList",
-        ClientIp: CLIENT_IP,
+        ClientIp: currentIP,
         PageSize: pageSize.toString(),
         Page: "1",
       });
 
-      const firstResponse = await fetch(`${baseURL}?${firstParams}`, {
+      const firstResponse = await fetch(`${NAMECHEAP_BASE_URL}?${firstParams}`, {
         method: "GET",
         headers: { "Content-Type": "application/xml" },
       });
@@ -236,13 +328,13 @@ serve(async (req) => {
           ApiKey: NAMECHEAP_API_KEY,
           UserName: NAMECHEAP_API_USER,
           Command: "namecheap.domains.getList",
-          ClientIp: CLIENT_IP,
+          ClientIp: currentIP,
           PageSize: pageSize.toString(),
           Page: currentPage.toString(),
         });
 
         try {
-          const domainsResponse = await fetch(`${baseURL}?${domainsParams}`, {
+          const domainsResponse = await fetch(`${NAMECHEAP_BASE_URL}?${domainsParams}`, {
             method: "GET",
             headers: { "Content-Type": "application/xml" },
           });
@@ -294,9 +386,9 @@ serve(async (req) => {
       );
 
       // ==========================================
-      // 3. SINCRONIZAR COM BANCO DE DADOS
+      // 5. SINCRONIZAR COM BANCO DE DADOS
       // ==========================================
-      console.log("[Namecheap Sync] Step 3: Syncing domains with database...");
+      console.log("[Namecheap Sync] Step 5: Syncing domains with database...");
 
       // Buscar domínios existentes
       const { data: existingDomains, error: existingError } = await supabaseClient
