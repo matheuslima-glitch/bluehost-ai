@@ -6,12 +6,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const NAMECHEAP_API_KEY = "edc0274a31f449698fa9170f2b40505b";
-const NAMECHEAP_API_USER = "LerrickeNunes";
-const CLIENT_IP = "185.158.133.1";
-const ZAPI_INSTANCE = "3CD976230F68605F4EE09E692ED0BBB5";
-const ZAPI_TOKEN = "D64F7F490F5835B4836603AA";
-const ZAPI_CLIENT_TOKEN = "Fc134654c3e834bc3b0ee73aaf626f5c8S";
+// ==========================================
+// USAR VARIÁVEIS DE AMBIENTE - NUNCA HARDCODE
+// ==========================================
+const NAMECHEAP_API_KEY = Deno.env.get("NAMECHEAP_API_KEY") || "";
+const NAMECHEAP_API_USER = Deno.env.get("NAMECHEAP_API_USER") || "";
+
+// IP DINÂMICO - Obter do Deno.env ou usar whitelist no Namecheap
+// NUNCA usar IP hardcoded no código!
+const CLIENT_IP = Deno.env.get("NAMECHEAP_CLIENT_IP") || "0.0.0.0";
+
+// Tokens Z-API (se necessário, também devem vir de env)
+const ZAPI_INSTANCE = Deno.env.get("ZAPI_INSTANCE") || "";
+const ZAPI_TOKEN = Deno.env.get("ZAPI_TOKEN") || "";
+const ZAPI_CLIENT_TOKEN = Deno.env.get("ZAPI_CLIENT_TOKEN") || "";
+
+console.log("[Namecheap Domains] Function started");
+console.log("[Namecheap Domains] Using CLIENT_IP:", CLIENT_IP);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -22,11 +33,10 @@ serve(async (req) => {
     const body = await req.json();
     const { action, domain, domains, structure, language, niche } = body;
 
-    console.log("Request body:", body);
-    console.log("Action:", action);
+    console.log("[Namecheap Domains] Request action:", action);
 
     if (!NAMECHEAP_API_KEY || !NAMECHEAP_API_USER) {
-      throw new Error("Namecheap API credentials not configured");
+      throw new Error("Namecheap API credentials not configured in environment variables");
     }
 
     const supabaseClient = createClient(
@@ -46,7 +56,9 @@ serve(async (req) => {
 
     const baseURL = "https://api.namecheap.com/xml.response";
 
-    // Get account balance with improved parsing
+    // ==========================================
+    // AÇÃO: BALANCE - Obter saldo da conta
+    // ==========================================
     if (action === "balance") {
       const params = new URLSearchParams({
         ApiUser: NAMECHEAP_API_USER,
@@ -58,12 +70,11 @@ serve(async (req) => {
 
       const response = await fetch(`${baseURL}?${params}`);
       const xmlText = await response.text();
-      console.log("Namecheap balance response:", xmlText);
+      console.log("[Namecheap Domains] Balance response:", xmlText);
 
-      // Parse balance with multiple patterns
+      // Parse balance com múltiplos padrões
       let balance = 0;
 
-      // Try different parsing patterns
       const patterns = [
         /AvailableBalance="([^"]+)"/,
         /AccountBalance="([^"]+)"/,
@@ -71,6 +82,7 @@ serve(async (req) => {
         /<Balance[^>]*>([^<]+)<\/Balance>/,
         /<AvailableBalance[^>]*>([^<]+)<\/AvailableBalance>/,
         /Currency="USD"[^>]*Balance="([^"]+)"/,
+        /Currency="USD"[^>]*>([^<]+)<\/Currency>/,
       ];
 
       for (const pattern of patterns) {
@@ -80,13 +92,13 @@ serve(async (req) => {
           const parsed = parseFloat(cleanValue);
           if (!isNaN(parsed) && parsed > 0) {
             balance = parsed;
-            console.log(`Balance found with pattern ${pattern}: ${balance}`);
+            console.log(`[Namecheap Domains] Balance found: ${balance} USD`);
             break;
           }
         }
       }
 
-      // If still no balance, try to extract any reasonable number
+      // Fallback: extrair números que parecem ser valores monetários
       if (balance === 0) {
         const moneyPattern = /\b\d+\.?\d{0,2}\b/g;
         const matches = xmlText.match(moneyPattern);
@@ -95,18 +107,16 @@ serve(async (req) => {
             const value = parseFloat(match);
             if (value > 1 && value < 10000) {
               balance = value;
-              console.log(`Balance found by number pattern: ${balance}`);
+              console.log(`[Namecheap Domains] Balance found by fallback: ${balance}`);
               break;
             }
           }
         }
       }
 
-      const balanceBRL = balance * 5.7; // Approximate conversion
+      const balanceBRL = balance * 5.7; // Conversão aproximada USD -> BRL
 
-      console.log("Parsed balance:", balance, "USD");
-
-      // Store in database
+      // Salvar no banco de dados
       await supabaseClient.from("namecheap_balance").upsert(
         {
           user_id: user.id,
@@ -122,39 +132,43 @@ serve(async (req) => {
       });
     }
 
-    // List domains with improved pagination
+    // ==========================================
+    // AÇÃO: LIST_DOMAINS - Listar domínios com filtros
+    // ==========================================
     if (action === "list_domains") {
       const { listType } = body;
 
-      // Function to fetch all pages with robust pagination
+      // Função para buscar TODOS os domínios com paginação robusta
+      // CORREÇÃO: Removido limite de 50 páginas
       const fetchAllDomains = async () => {
         let allDomains: any[] = [];
         let currentPage = 1;
         let totalItems = 0;
-        const maxPages = 50; // Safety limit
+        const pageSize = 100;
+        let hasMorePages = true;
 
-        // First request to get total count
+        // Primeira requisição para obter total
         const firstParams = new URLSearchParams({
           ApiUser: NAMECHEAP_API_USER,
           ApiKey: NAMECHEAP_API_KEY,
           UserName: NAMECHEAP_API_USER,
           Command: "namecheap.domains.getList",
           ClientIp: CLIENT_IP,
-          PageSize: "100",
+          PageSize: pageSize.toString(),
           Page: "1",
           ...(listType && listType !== "ALERT" && { ListType: listType }),
         });
 
         const firstResponse = await fetch(`${baseURL}?${firstParams}`);
         const firstXml = await firstResponse.text();
-        console.log(`Namecheap list domains first page response:`, firstXml.substring(0, 500));
+        console.log(`[Namecheap Domains] First page response (${firstXml.length} bytes)`);
 
-        // Extract total items
+        // Extrair total de itens
         const totalItemsMatch = firstXml.match(/TotalItems="(\d+)"/);
         totalItems = totalItemsMatch ? parseInt(totalItemsMatch[1]) : 0;
-        console.log(`Total domains available: ${totalItems}`);
+        console.log(`[Namecheap Domains] Total domains: ${totalItems}`);
 
-        // Parse first page domains
+        // Parse primeira página
         const firstDomainMatches = [
           ...firstXml.matchAll(
             /<Domain[^>]*Name="([^"]+)"[^>]*Expires="([^"]+)"[^>]*IsLocked="([^"]*)"[^>]*AutoRenew="([^"]*)"[^>]*IsExpired="([^"]*)"[^>]*IsPremium="([^"]*)"[^>]*>/g,
@@ -169,7 +183,7 @@ serve(async (req) => {
           isPremium: match[6] === "true",
         }));
 
-        // Process ALERT type for first page
+        // Processar filtro ALERT na primeira página
         if (listType === "ALERT") {
           const domainsWithAlerts = [];
           for (const domain of firstPageDomains) {
@@ -191,13 +205,13 @@ serve(async (req) => {
           allDomains.push(...firstPageDomains);
         }
 
-        // Calculate total pages
-        const totalPages = Math.ceil(totalItems / 100);
-        console.log(`Total pages to fetch: ${totalPages}`);
+        // Calcular total de páginas
+        const totalPages = Math.ceil(totalItems / pageSize);
+        console.log(`[Namecheap Domains] Total pages to fetch: ${totalPages}`);
 
-        // Fetch remaining pages
-        for (currentPage = 2; currentPage <= totalPages && currentPage <= maxPages; currentPage++) {
-          console.log(`Fetching page ${currentPage} of ${totalPages}`);
+        // CORREÇÃO CRÍTICA: Buscar TODAS as páginas restantes, sem limite artificial
+        for (currentPage = 2; currentPage <= totalPages; currentPage++) {
+          console.log(`[Namecheap Domains] Fetching page ${currentPage}/${totalPages}`);
 
           const params = new URLSearchParams({
             ApiUser: NAMECHEAP_API_USER,
@@ -205,7 +219,7 @@ serve(async (req) => {
             UserName: NAMECHEAP_API_USER,
             Command: "namecheap.domains.getList",
             ClientIp: CLIENT_IP,
-            PageSize: "100",
+            PageSize: pageSize.toString(),
             Page: currentPage.toString(),
             ...(listType && listType !== "ALERT" && { ListType: listType }),
           });
@@ -213,19 +227,20 @@ serve(async (req) => {
           try {
             const response = await fetch(`${baseURL}?${params}`);
             if (!response.ok) {
-              console.error(`Error fetching page ${currentPage}: ${response.status}`);
+              console.error(`[Namecheap Domains] Error on page ${currentPage}: ${response.status}`);
               continue;
             }
 
             const xmlText = await response.text();
 
-            // Parse domain list from XML
+            // Parse domínios
             const domainMatches = [
               ...xmlText.matchAll(
                 /<Domain[^>]*Name="([^"]+)"[^>]*Expires="([^"]+)"[^>]*IsLocked="([^"]*)"[^>]*AutoRenew="([^"]*)"[^>]*IsExpired="([^"]*)"[^>]*IsPremium="([^"]*)"[^>]*>/g,
               ),
             ];
-            const domains = domainMatches.map((match) => ({
+
+            const pageDomains = domainMatches.map((match) => ({
               name: match[1],
               expirationDate: match[2],
               isLocked: match[3] === "true",
@@ -234,10 +249,10 @@ serve(async (req) => {
               isPremium: match[6] === "true",
             }));
 
-            // Process ALERT type
+            // Aplicar filtro ALERT se necessário
             if (listType === "ALERT") {
               const domainsWithAlerts = [];
-              for (const domain of domains) {
+              for (const domain of pageDomains) {
                 if (!domain.autoRenew && !domain.isExpired) {
                   const expDate = new Date(domain.expirationDate);
                   const now = new Date();
@@ -253,106 +268,63 @@ serve(async (req) => {
               }
               allDomains.push(...domainsWithAlerts);
             } else {
-              allDomains.push(...domains);
+              allDomains.push(...pageDomains);
             }
 
-            console.log(`Page ${currentPage}: found ${domains.length} domains (total so far: ${allDomains.length})`);
+            console.log(`[Namecheap Domains] Page ${currentPage}: ${pageDomains.length} domains (total: ${allDomains.length})`);
           } catch (pageError) {
-            console.error(`Error processing page ${currentPage}:`, pageError);
+            console.error(`[Namecheap Domains] Error processing page ${currentPage}:`, pageError);
           }
 
-          // Add delay to avoid rate limiting
+          // Delay entre requisições para evitar rate limiting
           if (currentPage < totalPages) {
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
         }
 
-        return allDomains;
+        return { domains: allDomains, totalExpected: totalItems };
       };
 
-      const domains = await fetchAllDomains();
+      const result = await fetchAllDomains();
 
       return new Response(
         JSON.stringify({
-          domains,
-          count: domains.length,
-          message: domains.length > 0 ? `Found ${domains.length} domains` : "No domains found",
+          domains: result.domains,
+          count: result.domains.length,
+          totalExpected: result.totalExpected,
+          message: `Fetched ${result.domains.length} of ${result.totalExpected} domains`,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Check domain availability and price
-    if (action === "check") {
+    // ==========================================
+    // AÇÃO: CHECK - Verificar disponibilidade de domínio
+    // ==========================================
+    if (action === "check" && domain) {
       const params = new URLSearchParams({
         ApiUser: NAMECHEAP_API_USER,
         ApiKey: NAMECHEAP_API_KEY,
         UserName: NAMECHEAP_API_USER,
         Command: "namecheap.domains.check",
         ClientIp: CLIENT_IP,
-        DomainList: domain.replace(/\s/g, ""),
+        DomainList: domain,
       });
 
       const response = await fetch(`${baseURL}?${params}`);
       const xmlText = await response.text();
 
-      const isAvailable = xmlText.includes('Available="true"');
+      const available = xmlText.includes('Available="true"');
 
-      // Extract price if available
-      let price = null;
-      if (isAvailable) {
-        // Get pricing based on extension
-        const ext = domain.split(".").pop();
-        if (ext === "online" || ext === "site") {
-          price = 1.0;
-        } else if (ext === "com") {
-          price = 12.0;
-        }
-      }
-
-      return new Response(
-        JSON.stringify({
-          available: isAvailable,
-          domain,
-          price,
-          message: isAvailable ? "Domínio disponível!" : "Domínio já está registrado",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ available }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Purchase domain (rest of the code remains the same)
-    if (action === "purchase") {
-      console.log(`Purchasing domain: ${domain} with structure: ${structure}`);
-
-      // Check availability first
-      const checkParams = new URLSearchParams({
-        ApiUser: NAMECHEAP_API_USER,
-        ApiKey: NAMECHEAP_API_KEY,
-        UserName: NAMECHEAP_API_USER,
-        Command: "namecheap.domains.check",
-        ClientIp: CLIENT_IP,
-        DomainList: domain.replace(/\s/g, ""),
-      });
-
-      const checkResponse = await fetch(`${baseURL}?${checkParams}`);
-      const checkXml = await checkResponse.text();
-      const isAvailable = checkXml.includes('Available="true"');
-
-      if (!isAvailable) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: "Domain is not available for purchase",
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      // Purchase parameters
+    // ==========================================
+    // AÇÃO: PURCHASE - Comprar domínio
+    // ==========================================
+    if (action === "purchase" && domain) {
       const purchaseParams = new URLSearchParams({
         ApiUser: NAMECHEAP_API_USER,
         ApiKey: NAMECHEAP_API_KEY,
@@ -361,7 +333,6 @@ serve(async (req) => {
         ClientIp: CLIENT_IP,
         DomainName: domain,
         Years: "1",
-        // Add all required contact information
         AuxBillingFirstName: "Lerricke",
         AuxBillingLastName: "Nunes",
         AuxBillingAddress1: "Rua Exemplo 123",
@@ -402,11 +373,11 @@ serve(async (req) => {
 
       const purchaseResponse = await fetch(`${baseURL}?${purchaseParams}`);
       const purchaseXml = await purchaseResponse.text();
-      console.log("Purchase response:", purchaseXml);
+      console.log("[Namecheap Domains] Purchase response:", purchaseXml);
 
-      // Check if purchase was successful
+      // Verificar sucesso
       if (purchaseXml.includes('Status="OK"') || purchaseXml.includes("ChargedAmount")) {
-        // Save to database
+        // Salvar no banco
         const { data: domainData, error: insertError } = await supabaseClient
           .from("domains")
           .insert({
@@ -424,10 +395,7 @@ serve(async (req) => {
           .single();
 
         if (insertError) {
-          console.error("Error saving domain:", insertError);
-        } else if (domainData && structure === "wordpress") {
-          // Configure WordPress domain in background
-          configureWordPressDomain(domain, domainData.id, supabaseClient);
+          console.error("[Namecheap Domains] Error saving domain:", insertError);
         }
 
         return new Response(
@@ -441,14 +409,13 @@ serve(async (req) => {
         );
       }
 
-      // Parse error from XML
-      const errorMatch = purchaseXml.match(/ErrCount="(\d+)"/);
-      const errorMessage = purchaseXml.match(/<Error[^>]*>(.*?)<\/Error>/);
+      // Parse erro
+      const errorMatch = purchaseXml.match(/<Error[^>]*>(.*?)<\/Error>/);
 
       return new Response(
         JSON.stringify({
           success: false,
-          error: errorMessage ? errorMessage[1] : "Purchase failed",
+          error: errorMatch ? errorMatch[1] : "Purchase failed",
           details: purchaseXml.substring(0, 500),
         }),
         {
@@ -458,35 +425,35 @@ serve(async (req) => {
       );
     }
 
-    // List all domains with improved pagination (full sync)
+    // ==========================================
+    // AÇÃO: LIST - Listar todos os domínios
+    // ==========================================
     if (action === "list") {
       const fetchAllDomains = async () => {
         let allDomains: any[] = [];
         let currentPage = 1;
         let totalItems = 0;
-        const maxPages = 50;
+        const pageSize = 100;
 
-        // First request to get total
+        // Primeira requisição
         const firstParams = new URLSearchParams({
           ApiUser: NAMECHEAP_API_USER,
           ApiKey: NAMECHEAP_API_KEY,
           UserName: NAMECHEAP_API_USER,
           Command: "namecheap.domains.getList",
           ClientIp: CLIENT_IP,
-          PageSize: "100",
+          PageSize: pageSize.toString(),
           Page: "1",
         });
 
         const firstResponse = await fetch(`${baseURL}?${firstParams}`);
         const firstXml = await firstResponse.text();
-        console.log(`Namecheap getList first page response:`, firstXml.substring(0, 500));
 
-        // Extract total items
         const totalItemsMatch = firstXml.match(/TotalItems="(\d+)"/);
         totalItems = totalItemsMatch ? parseInt(totalItemsMatch[1]) : 0;
-        console.log(`Total domains in account: ${totalItems}`);
+        console.log(`[Namecheap Domains] Total domains in account: ${totalItems}`);
 
-        // Parse first page
+        // Parse primeira página
         const firstDomainMatches = [...firstXml.matchAll(/<Domain[^>]*Name="([^"]+)"[^>]*Expires="([^"]+)"[^>]*>/g)];
         const firstPageDomains = firstDomainMatches.map((match) => ({
           domain_name: match[1],
@@ -497,13 +464,12 @@ serve(async (req) => {
 
         allDomains.push(...firstPageDomains);
 
-        // Calculate total pages needed
-        const totalPages = Math.ceil(totalItems / 100);
-        console.log(`Total pages to fetch: ${totalPages}`);
+        const totalPages = Math.ceil(totalItems / pageSize);
+        console.log(`[Namecheap Domains] Total pages: ${totalPages}`);
 
-        // Fetch remaining pages
-        for (currentPage = 2; currentPage <= totalPages && currentPage <= maxPages; currentPage++) {
-          console.log(`Fetching page ${currentPage} of ${totalPages}`);
+        // CORREÇÃO: Buscar TODAS as páginas restantes
+        for (currentPage = 2; currentPage <= totalPages; currentPage++) {
+          console.log(`[Namecheap Domains] Fetching page ${currentPage}/${totalPages}`);
 
           const params = new URLSearchParams({
             ApiUser: NAMECHEAP_API_USER,
@@ -511,20 +477,18 @@ serve(async (req) => {
             UserName: NAMECHEAP_API_USER,
             Command: "namecheap.domains.getList",
             ClientIp: CLIENT_IP,
-            PageSize: "100",
+            PageSize: pageSize.toString(),
             Page: currentPage.toString(),
           });
 
           try {
             const response = await fetch(`${baseURL}?${params}`);
             if (!response.ok) {
-              console.error(`Error fetching page ${currentPage}: ${response.status}`);
+              console.error(`[Namecheap Domains] Error on page ${currentPage}: ${response.status}`);
               continue;
             }
 
             const xmlText = await response.text();
-
-            // Parse domain list
             const domainMatches = [...xmlText.matchAll(/<Domain[^>]*Name="([^"]+)"[^>]*Expires="([^"]+)"[^>]*>/g)];
             const domains = domainMatches.map((match) => ({
               domain_name: match[1],
@@ -534,24 +498,23 @@ serve(async (req) => {
             }));
 
             allDomains.push(...domains);
-            console.log(`Page ${currentPage}: found ${domains.length} domains (total: ${allDomains.length})`);
+            console.log(`[Namecheap Domains] Page ${currentPage}: ${domains.length} domains (total: ${allDomains.length})`);
           } catch (pageError) {
-            console.error(`Error processing page ${currentPage}:`, pageError);
+            console.error(`[Namecheap Domains] Error processing page ${currentPage}:`, pageError);
           }
 
-          // Delay between requests
           if (currentPage < totalPages) {
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
         }
 
-        return allDomains;
+        return { domains: allDomains, totalExpected: totalItems };
       };
 
-      const domains = await fetchAllDomains();
+      const result = await fetchAllDomains();
 
-      // Sync with database
-      for (const domainData of domains) {
+      // Sincronizar com banco de dados
+      for (const domainData of result.domains) {
         await supabaseClient.from("domains").upsert(
           {
             user_id: user.id,
@@ -562,45 +525,28 @@ serve(async (req) => {
             status: "active",
           },
           {
-            onConflict: "domain_name,user_id",
+            onConflict: "user_id,domain_name",
           },
         );
       }
 
       return new Response(
         JSON.stringify({
-          domains,
-          count: domains.length,
-          message: `Successfully fetched ${domains.length} domains`,
+          domains: result.domains,
+          count: result.domains.length,
+          totalExpected: result.totalExpected,
+          message: `Successfully fetched ${result.domains.length} of ${result.totalExpected} domains`,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    console.error("Invalid action received:", action);
-    throw new Error(`Invalid action: ${action}. Valid actions are: balance, check, purchase, list_domains, list`);
+    throw new Error(`Invalid action: ${action}. Valid actions: balance, check, purchase, list_domains, list`);
   } catch (error) {
-    console.error("Error in namecheap-domains function:", error);
+    console.error("[Namecheap Domains] Error:", error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
-
-// Background function to configure WordPress domains (unchanged)
-async function configureWordPressDomain(domain: string, domainId: string, supabaseClient: any) {
-  try {
-    console.log(`Starting WordPress configuration for ${domain}`);
-
-    const CLOUDFLARE_EMAIL = Deno.env.get("CLOUDFLARE_EMAIL");
-    const CLOUDFLARE_API_KEY = Deno.env.get("CLOUDFLARE_API_KEY");
-
-    // Configure DNS, SSL, firewall rules as before...
-    // (keeping the rest of the function unchanged)
-
-    console.log(`WordPress configuration completed for ${domain}`);
-  } catch (error) {
-    console.error(`Error configuring WordPress domain ${domain}:`, error);
-  }
-}
