@@ -6,10 +6,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Usar variáveis diretas ao invés de env vars para garantir funcionamento
-const NAMECHEAP_API_KEY = "edc0274a31f449698fa9170f2b40505b";
-const NAMECHEAP_API_USER = "LerrickeNunes";
-const CLIENT_IP = "185.158.133.1";
+// Usar variáveis de ambiente para credenciais
+const NAMECHEAP_API_KEY = Deno.env.get("NAMECHEAP_API_KEY") || "";
+const NAMECHEAP_API_USER = Deno.env.get("NAMECHEAP_API_USER") || "";
+// Usar IP público genérico ou obter dinamicamente
+const CLIENT_IP = "0.0.0.0"; // Namecheap aceita qualquer IP se configurado corretamente
 
 console.log("[Namecheap Sync] Function started");
 
