@@ -5,21 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { CriticalDomainsTable } from "@/components/CriticalDomainsTable";
 
@@ -59,49 +45,15 @@ export default function Dashboard() {
     loadDashboardData();
   }, []);
 
-  // NOVA FUNÇÃO: Sincronização do saldo via webhook n8n
-  const syncNamecheapBalance = async () => {
-    try {
-      console.log("Iniciando sincronização do saldo Namecheap...");
-
-      const response = await fetch(
-        "https://webhook.institutoexperience.com/webhook/c7e64a34-5304-46fe-940f-0028ce48d81b",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: "sync_balance",
-            timestamp: new Date().toISOString(),
-          }),
-        },
-      );
-
-      if (response.ok) {
-        console.log("Webhook chamado com sucesso. Aguardando atualização do banco...");
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        return true;
-      } else {
-        console.error("Erro ao chamar webhook:", response.statusText);
-        return false;
-      }
-    } catch (error) {
-      console.error("Erro ao sincronizar saldo Namecheap:", error);
-      return false;
-    }
-  };
-
   const loadDashboardData = async () => {
     try {
-      // NOVA LINHA: Sincronizar saldo antes de carregar os dados
-      await syncNamecheapBalance();
-
       // Load domains
-      const { data: domainsData, error } = await supabase.from("domains").select("*");
+      const { data: domainsData, error } = await supabase
+        .from("domains")
+        .select("*");
 
       if (error) throw error;
-
+      
       setDomains(domainsData || []);
 
       const now = new Date();
@@ -110,34 +62,34 @@ export default function Dashboard() {
 
       const stats = {
         total: domainsData?.length || 0,
-        active: domainsData?.filter((d) => d.status === "active").length || 0,
-        expiring:
-          domainsData?.filter((d) => {
-            if (!d.expiration_date) return false;
-            const expDate = new Date(d.expiration_date);
-            return expDate > now && expDate < thirtyDaysFromNow;
-          }).length || 0,
-        expired: domainsData?.filter((d) => d.status === "expired").length || 0,
-        suspended: domainsData?.filter((d) => d.status === "suspended").length || 0,
-        critical:
-          domainsData?.filter((d) => {
-            if (!d.expiration_date) return false;
-            const expDate = new Date(d.expiration_date);
-            return expDate > now && expDate < fifteenDaysFromNow;
-          }).length || 0,
+        active: domainsData?.filter(d => d.status === "active").length || 0,
+        expiring: domainsData?.filter(d => {
+          if (!d.expiration_date) return false;
+          const expDate = new Date(d.expiration_date);
+          return expDate > now && expDate < thirtyDaysFromNow;
+        }).length || 0,
+        expired: domainsData?.filter(d => d.status === "expired").length || 0,
+        suspended: domainsData?.filter(d => d.status === "suspended").length || 0,
+        critical: domainsData?.filter(d => {
+          if (!d.expiration_date) return false;
+          const expDate = new Date(d.expiration_date);
+          return expDate > now && expDate < fifteenDaysFromNow;
+        }).length || 0,
       };
 
       const integrationCounts = {
-        namecheap: domainsData?.filter((d) => d.integration_source === "namecheap").length || 0,
-        cloudflare: domainsData?.filter((d) => d.integration_source === "cloudflare").length || 0,
-        cpanel: domainsData?.filter((d) => d.integration_source === "cpanel").length || 0,
+        namecheap: domainsData?.filter(d => d.integration_source === "namecheap").length || 0,
+        cloudflare: domainsData?.filter(d => d.integration_source === "cloudflare").length || 0,
+        cpanel: domainsData?.filter(d => d.integration_source === "cpanel").length || 0,
       };
 
       setStats(stats);
       setIntegrations(integrationCounts);
 
       // Load analytics data from database
-      const { data: analyticsData, error: analyticsError } = await supabase.from("domain_analytics").select("*");
+      const { data: analyticsData, error: analyticsError } = await supabase
+        .from("domain_analytics")
+        .select("*");
 
       if (!analyticsError && analyticsData) {
         // Calculate total visits from database
@@ -147,19 +99,19 @@ export default function Dashboard() {
         // Generate monthly visits data
         const monthlyVisitsMap = new Map<string, number>();
         const today = new Date();
-
+        
         // Initialize last 12 months with 0
         for (let i = 11; i >= 0; i--) {
           const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
           monthlyVisitsMap.set(monthKey, 0);
         }
 
         // Aggregate visits by month
-        analyticsData.forEach((record) => {
+        analyticsData.forEach(record => {
           if (record.date) {
             const recordDate = new Date(record.date);
-            const monthKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, "0")}`;
+            const monthKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
             if (monthlyVisitsMap.has(monthKey)) {
               monthlyVisitsMap.set(monthKey, (monthlyVisitsMap.get(monthKey) || 0) + (record.visits || 0));
             }
@@ -170,15 +122,15 @@ export default function Dashboard() {
         const last12Months: Array<{ mes: string; visitas: number }> = [];
         for (let i = 11; i >= 0; i--) {
           const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-          const monthLabel = `${date.toLocaleString("pt-BR", { month: "short" })}/${date.getFullYear()}`;
-
+          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          const monthLabel = `${date.toLocaleString('pt-BR', { month: 'short' })}/${date.getFullYear()}`;
+          
           last12Months.push({
             mes: monthLabel,
-            visitas: monthlyVisitsMap.get(monthKey) || 0,
+            visitas: monthlyVisitsMap.get(monthKey) || 0
           });
         }
-
+        
         setMonthlyVisitsData(last12Months);
       }
 
@@ -191,21 +143,19 @@ export default function Dashboard() {
         .maybeSingle();
 
       if (!balanceError && balanceData) {
-        console.log("Saldo Namecheap carregado:", balanceData); // NOVO LOG
         setBalance({
           usd: balanceData.balance_usd,
-          brl: balanceData.balance_brl,
+          brl: balanceData.balance_brl
         });
-        setIntegrationStatus((prev) => ({ ...prev, namecheap: true }));
+        setIntegrationStatus(prev => ({ ...prev, namecheap: true }));
       } else {
-        console.error("Erro ao carregar saldo:", balanceError); // NOVO LOG
-        setIntegrationStatus((prev) => ({ ...prev, namecheap: false }));
+        setIntegrationStatus(prev => ({ ...prev, namecheap: false }));
       }
 
       // Load expired domains from Namecheap API
       try {
         const { data: expiredData, error: expiredError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "EXPIRED" },
+          body: { action: "list_domains", listType: "EXPIRED" }
         });
 
         if (!expiredError && expiredData?.domains) {
@@ -221,22 +171,22 @@ export default function Dashboard() {
       // Load expiring domains from Namecheap API
       try {
         const { data: expiringData, error: expiringError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "EXPIRING" },
+          body: { action: "list_domains", listType: "EXPIRING" }
         });
 
         if (!expiringError && expiringData?.domains) {
           console.log("Domínios expirando:", expiringData.domains);
           setExpiringDomains(expiringData.domains.length);
-
+          
           // Filter critical domains (expiring in 15 days)
           const now = new Date();
           const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
-
+          
           const critical = expiringData.domains.filter((d: any) => {
             const expDate = new Date(d.expirationDate);
             return expDate <= fifteenDaysFromNow;
           });
-
+          
           console.log("Domínios críticos (15 dias):", critical);
           setCriticalDomains(critical.length);
         } else {
@@ -249,27 +199,27 @@ export default function Dashboard() {
       // Load suspended domains from Namecheap API (they might be in the all domains list)
       try {
         const { data: allDomainsData, error: allDomainsError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list" },
+          body: { action: "list" }
         });
 
         if (!allDomainsError && allDomainsData?.domains) {
           // Namecheap doesn't have a direct "suspended" status
           // We need to check the domains in the database that have suspended status
-          const suspendedCount = domainsData?.filter((d) => d.status === "suspended").length || 0;
+          const suspendedCount = domainsData?.filter(d => d.status === "suspended").length || 0;
           console.log("Domínios suspensos:", suspendedCount);
           setSuspendedDomains(suspendedCount);
         }
       } catch (suspendedErr) {
         console.error("Error loading suspended domains:", suspendedErr);
         // Fallback to database count
-        const suspendedCount = domainsData?.filter((d) => d.status === "suspended").length || 0;
+        const suspendedCount = domainsData?.filter(d => d.status === "suspended").length || 0;
         setSuspendedDomains(suspendedCount);
       }
 
       // Load alert domains from Namecheap API
       try {
         const { data: alertData, error: alertError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "ALERT" },
+          body: { action: "list_domains", listType: "ALERT" }
         });
 
         if (!alertError && alertData?.domains) {
@@ -283,7 +233,7 @@ export default function Dashboard() {
       }
 
       // Set cPanel and Cloudflare integration status
-      setIntegrationStatus((prev) => ({
+      setIntegrationStatus(prev => ({
         ...prev,
         cpanel: integrationCounts.cpanel > 0,
         cloudflare: integrationCounts.cloudflare > 0,
@@ -303,17 +253,17 @@ export default function Dashboard() {
     try {
       // Sync Namecheap
       const { error: ncError } = await supabase.functions.invoke("namecheap-domains", {
-        body: { action: "list" },
+        body: { action: "list" }
       });
 
       // Sync Cloudflare
       const { error: cfError } = await supabase.functions.invoke("cloudflare-integration", {
-        body: { action: "zones" },
+        body: { action: "zones" }
       });
 
       // Sync cPanel
       const { error: cpError } = await supabase.functions.invoke("cpanel-integration", {
-        body: { action: "domains" },
+        body: { action: "domains" }
       });
 
       if (!ncError && !cfError && !cpError) {
@@ -337,8 +287,8 @@ export default function Dashboard() {
   ];
 
   const barData = [
-    { name: "Atomicat", dominios: domains?.filter((d) => d.platform === "atomicat").length || 0 },
-    { name: "Wordpress", dominios: domains?.filter((d) => d.platform === "wordpress").length || 0 },
+    { name: "Atomicat", dominios: domains?.filter(d => d.platform === "atomicat").length || 0 },
+    { name: "Wordpress", dominios: domains?.filter(d => d.platform === "wordpress").length || 0 },
   ];
 
   if (loading) {
@@ -366,7 +316,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">{stats.active} ativos</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.active} ativos
+            </p>
           </CardContent>
         </Card>
 
@@ -377,7 +329,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.expired}</div>
-            <p className="text-xs text-muted-foreground mt-1">Domínios expirados</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Domínios expirados
+            </p>
           </CardContent>
         </Card>
 
@@ -388,7 +342,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.expiring}</div>
-            <p className="text-xs text-muted-foreground mt-1">Próximos 30 dias</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Próximos 30 dias
+            </p>
           </CardContent>
         </Card>
 
@@ -399,7 +355,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.critical}</div>
-            <p className="text-xs text-muted-foreground mt-1">Próximos 15 dias</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Próximos 15 dias
+            </p>
           </CardContent>
         </Card>
 
@@ -410,7 +368,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.suspended}</div>
-            <p className="text-xs text-muted-foreground mt-1">Verificar pendências</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Verificar pendências
+            </p>
           </CardContent>
         </Card>
 
@@ -421,7 +381,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{alertDomains}</div>
-            <p className="text-xs text-muted-foreground mt-1">Domínios com alertas da Namecheap</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Domínios com alertas da Namecheap
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -462,7 +424,9 @@ export default function Dashboard() {
                   )}
                   <div>
                     <p className="text-sm font-medium">cPanel</p>
-                    <p className="text-xs text-muted-foreground">{integrations.cpanel} domínios</p>
+                    <p className="text-xs text-muted-foreground">
+                      {integrations.cpanel} domínios
+                    </p>
                   </div>
                 </div>
                 <Badge variant={integrationStatus.cpanel ? "default" : "destructive"}>
@@ -479,7 +443,9 @@ export default function Dashboard() {
                   )}
                   <div>
                     <p className="text-sm font-medium">Cloudflare</p>
-                    <p className="text-xs text-muted-foreground">{integrations.cloudflare} zonas</p>
+                    <p className="text-xs text-muted-foreground">
+                      {integrations.cloudflare} zonas
+                    </p>
                   </div>
                 </div>
                 <Badge variant={integrationStatus.cloudflare ? "default" : "destructive"}>
@@ -502,19 +468,26 @@ export default function Dashboard() {
             {balance ? (
               <>
                 <div>
-                  {balance.usd === 0 && balance.brl === 0 ? (
+                  {(balance.usd === 0 && balance.brl === 0) ? (
                     <>
                       <div className="text-3xl font-bold text-muted-foreground">
                         {balanceCurrency === "usd" ? "$0.00" : "R$ 0,00"}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-2">Adicione créditos para começar</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Adicione créditos para começar
+                      </p>
                     </>
                   ) : (
                     <>
                       <div className="text-4xl font-bold text-blue-500">
-                        {balanceCurrency === "usd" ? `$${balance.usd.toFixed(2)}` : `R$ ${balance.brl.toFixed(2)}`}
+                        {balanceCurrency === "usd" 
+                          ? `$${balance.usd.toFixed(2)}`
+                          : `R$ ${balance.brl.toFixed(2)}`
+                        }
                       </div>
-                      <p className="text-sm text-muted-foreground mt-2">Saldo disponível para compras</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Saldo disponível para compras
+                      </p>
                     </>
                   )}
                 </div>
@@ -523,7 +496,11 @@ export default function Dashboard() {
                     variant={balanceCurrency === "usd" ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setBalanceCurrency("usd")}
-                    className={`${balanceCurrency === "usd" ? "bg-primary text-primary-foreground" : ""}`}
+                    className={`${
+                      balanceCurrency === "usd" 
+                        ? "bg-primary text-primary-foreground" 
+                        : ""
+                    }`}
                   >
                     USD
                   </Button>
@@ -531,7 +508,11 @@ export default function Dashboard() {
                     variant={balanceCurrency === "brl" ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setBalanceCurrency("brl")}
-                    className={`${balanceCurrency === "brl" ? "bg-primary text-primary-foreground" : ""}`}
+                    className={`${
+                      balanceCurrency === "brl" 
+                        ? "bg-primary text-primary-foreground" 
+                        : ""
+                    }`}
                   >
                     BRL
                   </Button>
@@ -560,7 +541,15 @@ export default function Dashboard() {
           <CardContent className="[&_*]:!outline-none">
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="value">
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
                   {pieData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
