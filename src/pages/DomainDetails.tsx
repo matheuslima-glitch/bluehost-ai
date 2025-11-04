@@ -6,14 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -74,7 +67,7 @@ export default function DomainDetails() {
   const [funnelIdTags, setFunnelIdTags] = useState<string[]>([]);
   const [dnsRecords, setDnsRecords] = useState<Array<{ type: string; name: string; content: string; ttl: number }>>([]);
   const [loadingDns, setLoadingDns] = useState(false);
-  const [newDnsRecord, setNewDnsRecord] = useState({ type: 'A', name: '', content: '', ttl: 3600 });
+  const [newDnsRecord, setNewDnsRecord] = useState({ type: "A", name: "", content: "", ttl: 3600 });
   const [isEditingNameservers, setIsEditingNameservers] = useState(false);
   const [nameserversInput, setNameserversInput] = useState("");
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -89,7 +82,7 @@ export default function DomainDetails() {
         .select("*")
         .eq("user_id", user?.id)
         .order("created_at", { ascending: false });
-      
+
       if (error) throw error;
       return data;
     },
@@ -100,7 +93,7 @@ export default function DomainDetails() {
   const platformOptions = [
     "wordpress",
     "atomicat",
-    ...customFilters.filter(f => f.filter_type === "platform").map(f => f.filter_value)
+    ...customFilters.filter((f) => f.filter_type === "platform").map((f) => f.filter_value),
   ];
 
   const trafficSourceOptions = [
@@ -110,26 +103,26 @@ export default function DomainDetails() {
     "outbrain",
     "taboola",
     "revcontent",
-    ...customFilters.filter(f => f.filter_type === "traffic_source").map(f => f.filter_value)
+    ...customFilters.filter((f) => f.filter_type === "traffic_source").map((f) => f.filter_value),
   ];
 
   // Generate mock monthly visits data
   const generateMonthlyData = (monthlyVisits: number) => {
     const data = [];
     const currentDate = new Date();
-    
+
     for (let i = 11; i >= 0; i--) {
       const date = subMonths(currentDate, i);
       const monthName = format(date, "MMM/yy", { locale: ptBR });
       const variation = 0.7 + Math.random() * 0.6; // 70% to 130% variation
       const visits = Math.round(monthlyVisits * variation);
-      
+
       data.push({
         month: monthName,
         visits: visits,
       });
     }
-    
+
     return data;
   };
 
@@ -139,7 +132,7 @@ export default function DomainDetails() {
 
   useEffect(() => {
     if (domain?.funnel_id) {
-      setFunnelIdTags(domain.funnel_id.split(',').filter(tag => tag.trim() !== ''));
+      setFunnelIdTags(domain.funnel_id.split(",").filter((tag) => tag.trim() !== ""));
     }
   }, [domain]);
 
@@ -164,7 +157,7 @@ export default function DomainDetails() {
       if (logsError) throw logsError;
 
       // Buscar informações dos usuários
-      const userIds = [...new Set(logsData?.map(log => log.user_id) || [])];
+      const userIds = [...new Set(logsData?.map((log) => log.user_id) || [])];
       const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
         .select("id, full_name, email")
@@ -173,10 +166,11 @@ export default function DomainDetails() {
       if (profilesError) throw profilesError;
 
       // Combinar dados
-      const logsWithProfiles = logsData?.map(log => ({
-        ...log,
-        profiles: profilesData?.find(p => p.id === log.user_id) || null
-      })) || [];
+      const logsWithProfiles =
+        logsData?.map((log) => ({
+          ...log,
+          profiles: profilesData?.find((p) => p.id === log.user_id) || null,
+        })) || [];
 
       setActivityLogs(logsWithProfiles);
     } catch (error: any) {
@@ -191,15 +185,13 @@ export default function DomainDetails() {
     if (!id || !user?.id) return;
 
     try {
-      const { error } = await supabase
-        .from("domain_activity_logs")
-        .insert({
-          domain_id: id,
-          user_id: user.id,
-          action_type: actionType,
-          old_value: oldValue,
-          new_value: newValue
-        });
+      const { error } = await supabase.from("domain_activity_logs").insert({
+        domain_id: id,
+        user_id: user.id,
+        action_type: actionType,
+        old_value: oldValue,
+        new_value: newValue,
+      });
 
       if (error) throw error;
     } catch (error: any) {
@@ -224,11 +216,11 @@ export default function DomainDetails() {
 
     setLoadingDns(true);
     try {
-      const { data, error } = await supabase.functions.invoke('cloudflare-integration', {
+      const { data, error } = await supabase.functions.invoke("cloudflare-integration", {
         body: {
-          action: 'list_dns_records',
-          zoneId: domain.zone_id
-        }
+          action: "list_dns_records",
+          zoneId: domain.zone_id,
+        },
       });
 
       if (error) throw error;
@@ -250,21 +242,21 @@ export default function DomainDetails() {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('cloudflare-integration', {
+      const { data, error } = await supabase.functions.invoke("cloudflare-integration", {
         body: {
-          action: 'create_dns_record',
+          action: "create_dns_record",
           zoneId: domain.zone_id,
           type: newDnsRecord.type,
           name: newDnsRecord.name,
           content: newDnsRecord.content,
-          ttl: newDnsRecord.ttl
-        }
+          ttl: newDnsRecord.ttl,
+        },
       });
 
       if (error) throw error;
-      
+
       toast.success("Registro DNS adicionado com sucesso");
-      setNewDnsRecord({ type: 'A', name: '', content: '', ttl: 3600 });
+      setNewDnsRecord({ type: "A", name: "", content: "", ttl: 3600 });
       loadDnsRecords();
     } catch (error: any) {
       console.error("Error adding DNS record:", error);
@@ -276,16 +268,16 @@ export default function DomainDetails() {
     if (!domain?.zone_id) return;
 
     try {
-      const { error } = await supabase.functions.invoke('cloudflare-integration', {
+      const { error } = await supabase.functions.invoke("cloudflare-integration", {
         body: {
-          action: 'delete_dns_record',
+          action: "delete_dns_record",
           zoneId: domain.zone_id,
-          recordId
-        }
+          recordId,
+        },
       });
 
       if (error) throw error;
-      
+
       toast.success("Registro DNS removido com sucesso");
       loadDnsRecords();
     } catch (error: any) {
@@ -296,16 +288,12 @@ export default function DomainDetails() {
 
   const loadDomain = async () => {
     try {
-      const { data, error } = await supabase
-        .from("domains")
-        .select("*")
-        .eq("id", id)
-        .single();
+      const { data, error } = await supabase.from("domains").select("*").eq("id", id).single();
 
       if (error) throw error;
 
       setDomain(data);
-      
+
       // Inicializar nameservers input quando carregar o domínio
       if (data?.nameservers) {
         setNameserversInput(data.nameservers.join("\n"));
@@ -323,10 +311,7 @@ export default function DomainDetails() {
       const oldNameservers = domain?.nameservers?.join(", ") || null;
       const newNameservers = nameservers.join(", ");
 
-      const { error } = await supabase
-        .from("domains")
-        .update({ nameservers })
-        .eq("id", id);
+      const { error } = await supabase.from("domains").update({ nameservers }).eq("id", id);
 
       if (error) throw error;
 
@@ -346,14 +331,14 @@ export default function DomainDetails() {
   const handleSaveNameservers = () => {
     const nameservers = nameserversInput
       .split("\n")
-      .map(ns => ns.trim())
-      .filter(ns => ns.length > 0);
-    
+      .map((ns) => ns.trim())
+      .filter((ns) => ns.length > 0);
+
     if (nameservers.length === 0) {
       toast.error("Adicione pelo menos um nameserver");
       return;
     }
-    
+
     updateNameservers.mutate(nameservers);
   };
 
@@ -362,14 +347,16 @@ export default function DomainDetails() {
 
     setFetchingNamecheap(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
-      const { data, error } = await supabase.functions.invoke('namecheap-domains', {
-        body: { 
-          action: 'get_domain_info',
-          domainName: domain.domain_name
-        }
+      const { data, error } = await supabase.functions.invoke("namecheap-domains", {
+        body: {
+          action: "get_domain_info",
+          domainName: domain.domain_name,
+        },
       });
 
       if (error) throw error;
@@ -431,24 +418,24 @@ export default function DomainDetails() {
   };
 
   const handleFunnelIdKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && funnelIdInput.trim() !== '') {
+    if (e.key === "Enter" && funnelIdInput.trim() !== "") {
       e.preventDefault();
       const newTag = funnelIdInput.trim();
       const newTags = [...funnelIdTags, newTag];
       setFunnelIdTags(newTags);
       setFunnelIdInput("");
-      await updateDomain("funnel_id", newTags.join(','));
-      
+      await updateDomain("funnel_id", newTags.join(","));
+
       // Log da atividade
       await logActivity("funnel_id_added", null, newTag);
     }
   };
 
   const removeFunnelIdTag = async (tagToRemove: string) => {
-    const newTags = funnelIdTags.filter(tag => tag !== tagToRemove);
+    const newTags = funnelIdTags.filter((tag) => tag !== tagToRemove);
     setFunnelIdTags(newTags);
-    await updateDomain("funnel_id", newTags.join(','));
-    
+    await updateDomain("funnel_id", newTags.join(","));
+
     // Log da atividade
     await logActivity("funnel_id_removed", tagToRemove, null);
   };
@@ -500,21 +487,14 @@ export default function DomainDetails() {
 
         <Dialog>
           <DialogTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="icon"
-              className="h-10 w-10"
-              onClick={loadActivityLogs}
-            >
+            <Button variant="outline" size="icon" className="h-10 w-10" onClick={loadActivityLogs}>
               <Info className="h-5 w-5 text-blue-500" />
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle>Logs de Atividade</DialogTitle>
-              <DialogDescription>
-                Histórico de alterações realizadas neste domínio
-              </DialogDescription>
+              <DialogDescription>Histórico de alterações realizadas neste domínio</DialogDescription>
             </DialogHeader>
             <ScrollArea className="h-[500px] pr-4">
               {loadingLogs ? (
@@ -528,21 +508,19 @@ export default function DomainDetails() {
               ) : (
                 <div className="space-y-4">
                   {activityLogs.map((log) => (
-                    <div 
-                      key={log.id} 
+                    <div
+                      key={log.id}
                       className="border rounded-lg p-4 space-y-2 bg-card hover:bg-accent/5 transition-colors"
                     >
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
-                          <p className="font-medium text-sm">
-                            {getActionLabel(log.action_type)}
-                          </p>
+                          <p className="font-medium text-sm">{getActionLabel(log.action_type)}</p>
                           <p className="text-xs text-muted-foreground">
                             {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                           </p>
                         </div>
                         <Badge variant="outline" className="text-xs">
-                          {log.profiles?.full_name || log.profiles?.email || "Usuário desconhecido"}
+                          {log.profiles?.full_name || "Usuário desconhecido"}
                         </Badge>
                       </div>
                       {(log.old_value || log.new_value) && (
@@ -597,100 +575,92 @@ export default function DomainDetails() {
               </div>
             </div>
 
-              <div className="space-y-2 pt-4 border-t">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Server className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Nameservers:</span>
-                  </div>
-                  {!isEditingNameservers ? (
+            <div className="space-y-2 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Server className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Nameservers:</span>
+                </div>
+                {!isEditingNameservers ? (
+                  <Button variant="ghost" size="sm" onClick={() => setIsEditingNameservers(true)}>
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setIsEditingNameservers(true)}
+                      onClick={() => {
+                        setIsEditingNameservers(false);
+                        setNameserversInput(domain.nameservers?.join("\n") || "");
+                      }}
                     >
-                      <Edit2 className="h-4 w-4" />
+                      Cancelar
                     </Button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setIsEditingNameservers(false);
-                          setNameserversInput(domain.nameservers?.join("\n") || "");
-                        }}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSaveNameservers}
-                        disabled={updateNameservers.isPending}
-                      >
-                        Salvar
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                <div className="ml-6">
-                  {!isEditingNameservers ? (
-                    domain.nameservers && domain.nameservers.length > 0 ? (
-                      <ul className="list-disc list-inside text-sm text-muted-foreground">
-                        {domain.nameservers.map((ns, index) => (
-                          <li key={index}>{ns}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Não configurado</p>
-                    )
-                  ) : (
-                    <textarea
-                      value={nameserversInput}
-                      onChange={(e) => setNameserversInput(e.target.value)}
-                      placeholder="Digite um nameserver por linha&#10;Exemplo:&#10;ns1.example.com&#10;ns2.example.com"
-                      className="w-full min-h-[120px] p-2 text-sm border rounded-md bg-background"
-                    />
-                  )}
-                </div>
+                    <Button size="sm" onClick={handleSaveNameservers} disabled={updateNameservers.isPending}>
+                      Salvar
+                    </Button>
+                  </div>
+                )}
               </div>
-
-              <div className="space-y-2 pt-4 border-t">
-                <Label>Acesso Rápido</Label>
-                <div className="flex gap-3">
-                  <Button
-                    onClick={() => {
-                      const wordpressUrl = `https://${domain.domain_name}/wordpanel124`;
-                      window.open(wordpressUrl, '_blank');
-                      toast.info("Abrindo painel WordPress. Faça login com as credenciais fornecidas.");
-                    }}
-                    className="flex items-center gap-2 bg-[#21759b] hover:bg-[#1e6a8d] text-white flex-1"
-                  >
-                    <img 
-                      src="https://upload.wikimedia.org/wikipedia/commons/9/93/Wordpress_Blue_logo.png" 
-                      alt="WordPress" 
-                      className="h-5 w-5 object-contain"
-                    />
-                    <span className="text-sm">Login WordPress</span>
-                  </Button>
-
-                  <Button
-                    onClick={() => {
-                      const atomicatUrl = "https://app.atomicat.com.br/login";
-                      window.open(atomicatUrl, '_blank');
-                      toast.info("Abrindo painel Atomicat. Faça login com as credenciais fornecidas.");
-                    }}
-                    className="flex items-center gap-2 bg-gradient-to-r from-gray-900 to-gray-600 hover:from-gray-800 hover:to-gray-500 text-white flex-1"
-                  >
-                    <img 
-                      src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png" 
-                      alt="Atomicat" 
-                      className="h-5 w-5 object-contain rounded"
-                    />
-                    <span className="text-sm">Login Atomicat</span>
-                  </Button>
-                </div>
+              <div className="ml-6">
+                {!isEditingNameservers ? (
+                  domain.nameservers && domain.nameservers.length > 0 ? (
+                    <ul className="list-disc list-inside text-sm text-muted-foreground">
+                      {domain.nameservers.map((ns, index) => (
+                        <li key={index}>{ns}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Não configurado</p>
+                  )
+                ) : (
+                  <textarea
+                    value={nameserversInput}
+                    onChange={(e) => setNameserversInput(e.target.value)}
+                    placeholder="Digite um nameserver por linha&#10;Exemplo:&#10;ns1.example.com&#10;ns2.example.com"
+                    className="w-full min-h-[120px] p-2 text-sm border rounded-md bg-background"
+                  />
+                )}
               </div>
+            </div>
+
+            <div className="space-y-2 pt-4 border-t">
+              <Label>Acesso Rápido</Label>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => {
+                    const wordpressUrl = `https://${domain.domain_name}/wordpanel124`;
+                    window.open(wordpressUrl, "_blank");
+                    toast.info("Abrindo painel WordPress. Faça login com as credenciais fornecidas.");
+                  }}
+                  className="flex items-center gap-2 bg-[#21759b] hover:bg-[#1e6a8d] text-white flex-1"
+                >
+                  <img
+                    src="https://upload.wikimedia.org/wikipedia/commons/9/93/Wordpress_Blue_logo.png"
+                    alt="WordPress"
+                    className="h-5 w-5 object-contain"
+                  />
+                  <span className="text-sm">Login WordPress</span>
+                </Button>
+
+                <Button
+                  onClick={() => {
+                    const atomicatUrl = "https://app.atomicat.com.br/login";
+                    window.open(atomicatUrl, "_blank");
+                    toast.info("Abrindo painel Atomicat. Faça login com as credenciais fornecidas.");
+                  }}
+                  className="flex items-center gap-2 bg-gradient-to-r from-gray-900 to-gray-600 hover:from-gray-800 hover:to-gray-500 text-white flex-1"
+                >
+                  <img
+                    src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png"
+                    alt="Atomicat"
+                    className="h-5 w-5 object-contain rounded"
+                  />
+                  <span className="text-sm">Login Atomicat</span>
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -720,9 +690,7 @@ export default function DomainDetails() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {domain.purchase_date
-                  ? "Informação preenchida automaticamente"
-                  : "Configure manualmente a plataforma"}
+                {domain.purchase_date ? "Informação preenchida automaticamente" : "Configure manualmente a plataforma"}
               </p>
             </div>
 
@@ -763,10 +731,7 @@ export default function DomainDetails() {
                   {funnelIdTags.map((tag, index) => (
                     <Badge key={index} variant="secondary" className="flex items-center gap-1">
                       {tag}
-                      <X
-                        className="h-3 w-3 cursor-pointer"
-                        onClick={() => removeFunnelIdTag(tag)}
-                      />
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => removeFunnelIdTag(tag)} />
                     </Badge>
                   ))}
                 </div>
@@ -795,31 +760,27 @@ export default function DomainDetails() {
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={generateMonthlyData(domain.monthly_visits)}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="month" 
+              <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
+              <YAxis
                 className="text-xs"
-                tick={{ fill: 'hsl(var(--foreground))' }}
-              />
-              <YAxis 
-                className="text-xs"
-                tick={{ fill: 'hsl(var(--foreground))' }}
+                tick={{ fill: "hsl(var(--foreground))" }}
                 tickFormatter={(value) => value.toLocaleString()}
               />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px'
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--background))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
                 }}
-                labelStyle={{ color: 'hsl(var(--foreground))' }}
-                formatter={(value: number) => [value.toLocaleString() + ' visitas', 'Visitas']}
+                labelStyle={{ color: "hsl(var(--foreground))" }}
+                formatter={(value: number) => [value.toLocaleString() + " visitas", "Visitas"]}
               />
-              <Line 
-                type="monotone" 
-                dataKey="visits" 
-                stroke="hsl(var(--primary))" 
+              <Line
+                type="monotone"
+                dataKey="visits"
+                stroke="hsl(var(--primary))"
                 strokeWidth={2}
-                dot={{ fill: 'hsl(var(--primary))' }}
+                dot={{ fill: "hsl(var(--primary))" }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -919,11 +880,7 @@ export default function DomainDetails() {
                         <TableCell className="font-mono text-sm">{record.content}</TableCell>
                         <TableCell>{record.ttl}</TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteDnsRecord(record.id)}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => deleteDnsRecord(record.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </TableCell>
