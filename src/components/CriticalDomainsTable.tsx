@@ -3,7 +3,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, RefreshCw, AlertTriangle, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
@@ -32,7 +41,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     const loadAlertDomains = async () => {
       try {
         const { data, error } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "ALERT" }
+          body: { action: "list_domains", listType: "ALERT" },
         });
 
         if (!error && data?.domains) {
@@ -55,7 +64,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
 
-  const criticalDomains = domains.filter(d => {
+  const criticalDomains = domains.filter((d) => {
     if (d.status === "expired" || d.status === "suspended") return true;
     if (!d.expiration_date) return false;
     const expDate = new Date(d.expiration_date);
@@ -68,7 +77,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
 
   const getStatusBadge = (domain: any) => {
     const hasAlert = namecheapAlerts[domain.domain_name];
-    
+
     if (hasAlert) {
       return <Badge className="bg-yellow-500">Alerta</Badge>;
     }
@@ -102,7 +111,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const startIndex = currentPage * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedDomains = criticalDomains.slice(startIndex, endIndex);
-  
+
   // Altura dinâmica baseada no número de domínios (max 10 por página)
   const dynamicHeight = Math.min(paginatedDomains.length, 10) * 60 + 45; // 60px por linha + 45px do header
 
@@ -123,10 +132,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     if (!domainToDelete) return;
 
     try {
-      const { error } = await supabase
-        .from("domains")
-        .delete()
-        .eq("id", domainToDelete.id);
+      const { error } = await supabase.from("domains").delete().eq("id", domainToDelete.id);
 
       if (error) throw error;
 
@@ -146,18 +152,18 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     try {
       // Buscar preço de renovação da Namecheap
       const { data, error } = await supabase.functions.invoke("namecheap-domains", {
-        body: { 
+        body: {
           action: "get_renewal_price",
-          domainName: domain.domain_name
-        }
+          domainName: domain.domain_name,
+        },
       });
 
       if (error) throw error;
 
       if (data?.price) {
-        setRenewalPrices(prev => ({
+        setRenewalPrices((prev) => ({
           ...prev,
-          [domain.id]: data.price
+          [domain.id]: data.price,
         }));
         toast.success(`Preço de renovação: $${data.price.toFixed(2)}`);
       } else {
@@ -179,19 +185,13 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
             <AlertTriangle className="h-5 w-5" />
             Gestão de Domínios Críticos
           </CardTitle>
-          <CardDescription>
-            Domínios expirados, expirando em breve, críticos e suspensos
-          </CardDescription>
+          <CardDescription>Domínios expirados, expirando em breve, críticos e suspensos</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium text-muted-foreground">
-              Nenhum domínio crítico encontrado
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Todos os seus domínios estão em boas condições
-            </p>
+            <p className="text-lg font-medium text-muted-foreground">Nenhum domínio crítico encontrado</p>
+            <p className="text-sm text-muted-foreground mt-2">Todos os seus domínios estão em boas condições</p>
           </div>
         </CardContent>
       </Card>
@@ -206,9 +206,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
             <AlertTriangle className="h-5 w-5" />
             Gestão de Domínios Críticos
           </CardTitle>
-          <CardDescription>
-            Domínios expirados, expirando em breve, críticos e suspensos
-          </CardDescription>
+          <CardDescription>Domínios expirados, expirando em breve, críticos e suspensos</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -252,7 +250,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                               disabled={renewLoading === domain.id}
                               className="h-8 px-2"
                             >
-                              <RefreshCw className={`h-3 w-3 ${renewLoading === domain.id ? 'animate-spin' : ''}`} />
+                              <RefreshCw className={`h-3 w-3 ${renewLoading === domain.id ? "animate-spin" : ""}`} />
                             </Button>
                           )}
                           <Button
@@ -270,19 +268,15 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                 </TableBody>
               </Table>
             </ScrollArea>
-            
+
             {criticalDomains.length > itemsPerPage && (
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  Mostrando {startIndex + 1}-{Math.min(endIndex, criticalDomains.length)} de {criticalDomains.length} domínios críticos
+                  Mostrando {startIndex + 1}-{Math.min(endIndex, criticalDomains.length)} de {criticalDomains.length}{" "}
+                  domínios críticos
                 </p>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePreviousPage}
-                    disabled={currentPage === 0}
-                  >
+                  <Button variant="outline" size="sm" onClick={handlePreviousPage} disabled={currentPage === 0}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <span className="text-sm text-muted-foreground">
@@ -308,15 +302,17 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              ⚠️ Mensagem de Alerta
+              Mensagem de Alerta
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 text-base">
               <p className="font-semibold">Atenção! Esta ação é irreversível.</p>
               <p>
-                Você está prestes a excluir o domínio <strong>{domainToDelete?.domain_name}</strong> da sua tabela de gerenciamento.
+                Você está prestes a excluir o domínio <strong>{domainToDelete?.domain_name}</strong> da sua tabela de
+                gerenciamento.
               </p>
               <p>
-                O domínio será removido apenas do banco de dados interno mas continuará registrado normalmente no provedor da Namecheap até que seja expirado ou renovado diretamente por lá.
+                O domínio será removido apenas do banco de dados interno mas continuará registrado normalmente no
+                provedor da Namecheap até que seja expirado ou renovado diretamente por lá.
               </p>
               <p className="font-semibold">Deseja realmente prosseguir com a exclusão?</p>
             </AlertDialogDescription>
