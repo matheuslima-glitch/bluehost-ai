@@ -59,10 +59,61 @@ export default function Dashboard() {
     loadDashboardData();
   }, []);
 
+  // CORREÇÃO 1: Função para verificar se as integrações estão configuradas
+  const checkIntegrationsStatus = async () => {
+    const status = {
+      namecheap: false,
+      cpanel: false,
+      cloudflare: false,
+    };
+
+    // Verificar Namecheap: se existe saldo, está configurado
+    try {
+      const { data: balanceData } = await supabase
+        .from("namecheap_balance")
+        .select("*")
+        .order("last_synced_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      status.namecheap = !!balanceData;
+    } catch (error) {
+      console.error("Erro ao verificar status Namecheap:", error);
+    }
+
+    // Verificar Cloudflare: fazer chamada de teste
+    try {
+      const { data, error } = await supabase.functions.invoke("cloudflare-integration", {
+        body: { action: "zones" },
+      });
+
+      // Se não houver erro de credenciais, está configurado
+      status.cloudflare = !error || (error && !error.message.includes("credentials not configured"));
+    } catch (error: any) {
+      // Se o erro não for de credenciais faltantes, considera configurado
+      status.cloudflare = !error?.message?.includes("credentials not configured");
+    }
+
+    // Verificar cPanel: fazer chamada de teste
+    try {
+      const { data, error } = await supabase.functions.invoke("cpanel-integration", {
+        body: { action: "domains" },
+      });
+
+      // Se não houver erro de credenciais, está configurado
+      status.cpanel = !error || (error && !error.message.includes("credentials not configured"));
+    } catch (error: any) {
+      // Se o erro não for de credenciais faltantes, considera configurado
+      status.cpanel = !error?.message?.includes("credentials not configured");
+    }
+
+    return status;
+  };
+
   const loadDashboardData = async () => {
     try {
-      // Load domains
-      const { data: domainsData, error } = await supabase.from("domains").select("*");
+      // CORREÇÃO 2: Load domains SEM limite para listar TODOS os domínios
+      const { data: domainsData, error } = await supabase.from("domains").select("*", { count: "exact" });
 
       if (error) throw error;
 
@@ -180,9 +231,6 @@ export default function Dashboard() {
           usd: balanceData.balance_usd,
           brl: balanceData.balance_brl,
         });
-        setIntegrationStatus((prev) => ({ ...prev, namecheap: true }));
-      } else {
-        setIntegrationStatus((prev) => ({ ...prev, namecheap: false }));
       }
 
       // Load expired domains from Namecheap API
@@ -265,12 +313,9 @@ export default function Dashboard() {
         console.error("Error loading alert domains:", alertErr);
       }
 
-      // Set cPanel and Cloudflare integration status
-      setIntegrationStatus((prev) => ({
-        ...prev,
-        cpanel: integrationCounts.cpanel > 0,
-        cloudflare: integrationCounts.cloudflare > 0,
-      }));
+      // CORREÇÃO 3: Verificar status das integrações de forma correta
+      const integrationsStatus = await checkIntegrationsStatus();
+      setIntegrationStatus(integrationsStatus);
     } catch (error: any) {
       console.error("Dashboard load error:", error);
       toast.error("Erro ao carregar dados do dashboard");
