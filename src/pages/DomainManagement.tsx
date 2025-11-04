@@ -9,14 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Pagination,
   PaginationContent,
@@ -65,7 +58,7 @@ export default function DomainManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [filters, setFilters] = useState<Filters>({
     status: "",
     platform: "",
@@ -86,7 +79,7 @@ export default function DomainManagement() {
         .select("*")
         .eq("user_id", user?.id)
         .order("created_at", { ascending: false });
-      
+
       if (error) throw error;
       return data;
     },
@@ -97,7 +90,7 @@ export default function DomainManagement() {
   const platformOptions = [
     "wordpress",
     "atomicat",
-    ...customFilters.filter(f => f.filter_type === "platform").map(f => f.filter_value)
+    ...customFilters.filter((f) => f.filter_type === "platform").map((f) => f.filter_value),
   ];
 
   const trafficSourceOptions = [
@@ -107,7 +100,7 @@ export default function DomainManagement() {
     "outbrain",
     "taboola",
     "revcontent",
-    ...customFilters.filter(f => f.filter_type === "traffic_source").map(f => f.filter_value)
+    ...customFilters.filter((f) => f.filter_type === "traffic_source").map((f) => f.filter_value),
   ];
 
   useEffect(() => {
@@ -117,9 +110,11 @@ export default function DomainManagement() {
   const loadDomains = async () => {
     try {
       setRefreshing(true);
+      // CORREÇÃO: Usando range para buscar TODOS os domínios (não apenas 1000)
       const { data, error } = await supabase
         .from("domains")
         .select("*")
+        .range(0, 999999) // Range muito grande para pegar todos os registros
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -140,9 +135,7 @@ export default function DomainManagement() {
 
     // Apply search filter
     if (searchQuery) {
-      filtered = filtered.filter((d) =>
-        d.domain_name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      filtered = filtered.filter((d) => d.domain_name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
     if (filters.status) {
@@ -159,13 +152,13 @@ export default function DomainManagement() {
 
     if (filters.purchase_date_start) {
       filtered = filtered.filter(
-        (d) => d.purchase_date && new Date(d.purchase_date) >= new Date(filters.purchase_date_start)
+        (d) => d.purchase_date && new Date(d.purchase_date) >= new Date(filters.purchase_date_start),
       );
     }
 
     if (filters.purchase_date_end) {
       filtered = filtered.filter(
-        (d) => d.purchase_date && new Date(d.purchase_date) <= new Date(filters.purchase_date_end)
+        (d) => d.purchase_date && new Date(d.purchase_date) <= new Date(filters.purchase_date_end),
       );
     }
 
@@ -184,14 +177,14 @@ export default function DomainManagement() {
         if (bValue === null) return -1;
 
         // Sort by date
-        if (sortConfig.key === 'expiration_date') {
+        if (sortConfig.key === "expiration_date") {
           aValue = new Date(aValue).getTime();
           bValue = new Date(bValue).getTime();
         }
 
         // Sort alphabetically or numerically
-        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
     }
@@ -201,9 +194,9 @@ export default function DomainManagement() {
   };
 
   const handleSort = (key: string) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+    let direction: "asc" | "desc" = "asc";
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
     }
     setSortConfig({ key, direction });
   };
@@ -270,7 +263,7 @@ export default function DomainManagement() {
             </Button>
           </div>
         </div>
-        
+
         {/* Search Bar - Centralizada */}
         <div className="flex justify-center">
           <div className="relative w-full max-w-md">
@@ -295,7 +288,10 @@ export default function DomainManagement() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="filter-status">Status</Label>
-                <Select value={filters.status || "all"} onValueChange={(value) => handleFilterChange("status", value === "all" ? "" : value)}>
+                <Select
+                  value={filters.status || "all"}
+                  onValueChange={(value) => handleFilterChange("status", value === "all" ? "" : value)}
+                >
                   <SelectTrigger id="filter-status">
                     <SelectValue placeholder="Todos os status" />
                   </SelectTrigger>
@@ -310,7 +306,10 @@ export default function DomainManagement() {
 
               <div className="space-y-2">
                 <Label htmlFor="filter-platform">Plataforma</Label>
-                <Select value={filters.platform || "all"} onValueChange={(value) => handleFilterChange("platform", value === "all" ? "" : value)}>
+                <Select
+                  value={filters.platform || "all"}
+                  onValueChange={(value) => handleFilterChange("platform", value === "all" ? "" : value)}
+                >
                   <SelectTrigger id="filter-platform">
                     <SelectValue placeholder="Todas as plataformas" />
                   </SelectTrigger>
@@ -424,7 +423,7 @@ export default function DomainManagement() {
                     <TableHead>
                       <Button
                         variant="ghost"
-                        onClick={() => handleSort('domain_name')}
+                        onClick={() => handleSort("domain_name")}
                         className="flex items-center gap-1 p-0 h-auto font-semibold"
                       >
                         Domínio
@@ -434,7 +433,7 @@ export default function DomainManagement() {
                     <TableHead>
                       <Button
                         variant="ghost"
-                        onClick={() => handleSort('status')}
+                        onClick={() => handleSort("status")}
                         className="flex items-center gap-1 p-0 h-auto font-semibold"
                       >
                         Status
@@ -444,7 +443,7 @@ export default function DomainManagement() {
                     <TableHead>
                       <Button
                         variant="ghost"
-                        onClick={() => handleSort('platform')}
+                        onClick={() => handleSort("platform")}
                         className="flex items-center gap-1 p-0 h-auto font-semibold"
                       >
                         Plataforma
@@ -454,7 +453,7 @@ export default function DomainManagement() {
                     <TableHead>
                       <Button
                         variant="ghost"
-                        onClick={() => handleSort('traffic_source')}
+                        onClick={() => handleSort("traffic_source")}
                         className="flex items-center gap-1 p-0 h-auto font-semibold"
                       >
                         Fonte de Tráfego
@@ -465,7 +464,7 @@ export default function DomainManagement() {
                     <TableHead>
                       <Button
                         variant="ghost"
-                        onClick={() => handleSort('expiration_date')}
+                        onClick={() => handleSort("expiration_date")}
                         className="flex items-center gap-1 p-0 h-auto font-semibold"
                       >
                         Expiração
@@ -475,7 +474,7 @@ export default function DomainManagement() {
                     <TableHead>
                       <Button
                         variant="ghost"
-                        onClick={() => handleSort('monthly_visits')}
+                        onClick={() => handleSort("monthly_visits")}
                         className="flex items-center gap-1 p-0 h-auto font-semibold"
                       >
                         Visitas/Mês
@@ -533,11 +532,7 @@ export default function DomainManagement() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/domains/${domain.id}`)}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => navigate(`/domains/${domain.id}`)}>
                           <LayoutDashboard className="h-4 w-4 mr-2" />
                           Ver Detalhes
                         </Button>
@@ -561,11 +556,7 @@ export default function DomainManagement() {
                   </PaginationItem>
 
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                    if (
-                      page === 1 ||
-                      page === totalPages ||
-                      (page >= currentPage - 1 && page <= currentPage + 1)
-                    ) {
+                    if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
                       return (
                         <PaginationItem key={page}>
                           <PaginationLink
@@ -598,9 +589,7 @@ export default function DomainManagement() {
             </div>
           )}
 
-          <div className="mt-4 text-xs text-muted-foreground">
-            Total: {domains.length} domínios
-          </div>
+          <div className="mt-4 text-xs text-muted-foreground">Total: {domains.length} domínios</div>
         </CardContent>
       </Card>
     </div>

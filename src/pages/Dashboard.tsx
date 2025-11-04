@@ -112,8 +112,13 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      // CORREÇÃO 2: Load domains SEM limite para listar TODOS os domínios
-      const { data: domainsData, error } = await supabase.from("domains").select("*", { count: "exact" });
+      // CORREÇÃO 2: Load domains SEM limite usando range para listar TODOS os domínios
+      // O Supabase tem limite padrão de 1000, então usamos range com valor alto
+      const {
+        data: domainsData,
+        error,
+        count,
+      } = await supabase.from("domains").select("*", { count: "exact" }).range(0, 999999); // Range muito grande para pegar todos os registros
 
       if (error) throw error;
 
