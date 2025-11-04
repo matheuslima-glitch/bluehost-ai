@@ -112,16 +112,39 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      // CORREÇÃO 2: Load domains SEM limite usando range para listar TODOS os domínios
-      // O Supabase tem limite padrão de 1000, então usamos range com valor alto
-      const {
-        data: domainsData,
-        error,
-        count,
-      } = await supabase.from("domains").select("*", { count: "exact" }).range(0, 999999); // Range muito grande para pegar todos os registros
+      // CORREÇÃO 2: Função para buscar TODOS os domínios sem limite usando paginação recursiva
+      const fetchAllDomains = async () => {
+        let allDomains: any[] = [];
+        let from = 0;
+        const pageSize = 1000;
+        let hasMore = true;
 
-      if (error) throw error;
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from("domains")
+            .select("*")
+            .range(from, from + pageSize - 1);
 
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            allDomains = [...allDomains, ...data];
+            from += pageSize;
+
+            // Se retornou menos que o pageSize, chegamos ao fim
+            if (data.length < pageSize) {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        return allDomains;
+      };
+
+      // Busca todos os domínios
+      const domainsData = await fetchAllDomains();
       setDomains(domainsData || []);
 
       const now = new Date();
@@ -495,7 +518,8 @@ export default function Dashboard() {
                   )}
                   <div>
                     <p className="text-sm font-medium">cPanel</p>
-                    <p className="text-xs text-muted-foreground">{integrations.cpanel} domínios</p>
+                    {/* LINHA REMOVIDA ABAIXO */}
+                    {/* <p className="text-xs text-muted-foreground">{integrations.cpanel} domínios</p> */}
                   </div>
                 </div>
                 <Badge variant={integrationStatus.cpanel ? "default" : "destructive"}>
@@ -512,7 +536,8 @@ export default function Dashboard() {
                   )}
                   <div>
                     <p className="text-sm font-medium">Cloudflare</p>
-                    <p className="text-xs text-muted-foreground">{integrations.cloudflare} zonas</p>
+                    {/* LINHA REMOVIDA ABAIXO */}
+                    {/* <p className="text-xs text-muted-foreground">{integrations.cloudflare} zonas</p> */}
                   </div>
                 </div>
                 <Badge variant={integrationStatus.cloudflare ? "default" : "destructive"}>
