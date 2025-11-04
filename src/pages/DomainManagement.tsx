@@ -110,15 +110,40 @@ export default function DomainManagement() {
   const loadDomains = async () => {
     try {
       setRefreshing(true);
-      // CORREÇÃO: Usando range para buscar TODOS os domínios (não apenas 1000)
-      const { data, error } = await supabase
-        .from("domains")
-        .select("*")
-        .range(0, 999999) // Range muito grande para pegar todos os registros
-        .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      // CORREÇÃO: Buscar TODOS os domínios usando paginação recursiva
+      const fetchAllDomains = async () => {
+        let allDomains: Domain[] = [];
+        let from = 0;
+        const pageSize = 1000;
+        let hasMore = true;
 
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from("domains")
+            .select("*")
+            .range(from, from + pageSize - 1)
+            .order("created_at", { ascending: false });
+
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            allDomains = [...allDomains, ...data];
+            from += pageSize;
+
+            // Se retornou menos que o pageSize, chegamos ao fim
+            if (data.length < pageSize) {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        return allDomains;
+      };
+
+      const data = await fetchAllDomains();
       setDomains(data || []);
       applyFilters(data || []);
     } catch (error: any) {
