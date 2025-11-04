@@ -5,21 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { CriticalDomainsTable } from "@/components/CriticalDomainsTable";
 
@@ -59,53 +45,15 @@ export default function Dashboard() {
     loadDashboardData();
   }, []);
 
-  /**
-   * Função para atualizar o saldo da Namecheap via webhook do n8n
-   * Esta função dispara a automação que atualiza o saldo no Supabase em tempo real
-   */
-  const updateNamecheapBalance = async () => {
-    try {
-      console.log("Disparando webhook para atualizar saldo da Namecheap...");
-
-      const response = await fetch(
-        "https://webhook.institutoexperience.com/webhook/c7e64a34-5304-46fe-940f-0028ce48d81b",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            timestamp: new Date().toISOString(),
-            source: "dashboard_reload",
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        console.warn("Webhook retornou status não-ok:", response.status);
-      } else {
-        console.log("Webhook executado com sucesso");
-      }
-
-      // Aguarda 2 segundos para garantir que o n8n processou e atualizou o Supabase
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    } catch (error) {
-      console.error("Erro ao chamar webhook de atualização do saldo:", error);
-      // Não mostra erro ao usuário pois o dashboard continuará funcionando
-      // mesmo se o webhook falhar
-    }
-  };
-
   const loadDashboardData = async () => {
     try {
-      // Primeiro, atualiza o saldo da Namecheap via webhook
-      await updateNamecheapBalance();
-
       // Load domains
-      const { data: domainsData, error } = await supabase.from("domains").select("*");
+      const { data: domainsData, error } = await supabase
+        .from("domains")
+        .select("*");
 
       if (error) throw error;
-
+      
       setDomains(domainsData || []);
 
       const now = new Date();
@@ -114,34 +62,34 @@ export default function Dashboard() {
 
       const stats = {
         total: domainsData?.length || 0,
-        active: domainsData?.filter((d) => d.status === "active").length || 0,
-        expiring:
-          domainsData?.filter((d) => {
-            if (!d.expiration_date) return false;
-            const expDate = new Date(d.expiration_date);
-            return expDate > now && expDate < thirtyDaysFromNow;
-          }).length || 0,
-        expired: domainsData?.filter((d) => d.status === "expired").length || 0,
-        suspended: domainsData?.filter((d) => d.status === "suspended").length || 0,
-        critical:
-          domainsData?.filter((d) => {
-            if (!d.expiration_date) return false;
-            const expDate = new Date(d.expiration_date);
-            return expDate > now && expDate < fifteenDaysFromNow;
-          }).length || 0,
+        active: domainsData?.filter(d => d.status === "active").length || 0,
+        expiring: domainsData?.filter(d => {
+          if (!d.expiration_date) return false;
+          const expDate = new Date(d.expiration_date);
+          return expDate > now && expDate < thirtyDaysFromNow;
+        }).length || 0,
+        expired: domainsData?.filter(d => d.status === "expired").length || 0,
+        suspended: domainsData?.filter(d => d.status === "suspended").length || 0,
+        critical: domainsData?.filter(d => {
+          if (!d.expiration_date) return false;
+          const expDate = new Date(d.expiration_date);
+          return expDate > now && expDate < fifteenDaysFromNow;
+        }).length || 0,
       };
 
       const integrationCounts = {
-        namecheap: domainsData?.filter((d) => d.integration_source === "namecheap").length || 0,
-        cloudflare: domainsData?.filter((d) => d.integration_source === "cloudflare").length || 0,
-        cpanel: domainsData?.filter((d) => d.integration_source === "cpanel").length || 0,
+        namecheap: domainsData?.filter(d => d.integration_source === "namecheap").length || 0,
+        cloudflare: domainsData?.filter(d => d.integration_source === "cloudflare").length || 0,
+        cpanel: domainsData?.filter(d => d.integration_source === "cpanel").length || 0,
       };
 
       setStats(stats);
       setIntegrations(integrationCounts);
 
       // Load analytics data from database
-      const { data: analyticsData, error: analyticsError } = await supabase.from("domain_analytics").select("*");
+      const { data: analyticsData, error: analyticsError } = await supabase
+        .from("domain_analytics")
+        .select("*");
 
       if (!analyticsError && analyticsData) {
         // Calculate total visits from database
@@ -151,19 +99,19 @@ export default function Dashboard() {
         // Generate monthly visits data
         const monthlyVisitsMap = new Map<string, number>();
         const today = new Date();
-
+        
         // Initialize last 12 months with 0
         for (let i = 11; i >= 0; i--) {
           const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
           monthlyVisitsMap.set(monthKey, 0);
         }
 
         // Aggregate visits by month
-        analyticsData.forEach((record) => {
+        analyticsData.forEach(record => {
           if (record.date) {
             const recordDate = new Date(record.date);
-            const monthKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, "0")}`;
+            const monthKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
             if (monthlyVisitsMap.has(monthKey)) {
               monthlyVisitsMap.set(monthKey, (monthlyVisitsMap.get(monthKey) || 0) + (record.visits || 0));
             }
@@ -174,19 +122,19 @@ export default function Dashboard() {
         const last12Months: Array<{ mes: string; visitas: number }> = [];
         for (let i = 11; i >= 0; i--) {
           const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-          const monthLabel = `${date.toLocaleString("pt-BR", { month: "short" })}/${date.getFullYear()}`;
-
+          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          const monthLabel = `${date.toLocaleString('pt-BR', { month: 'short' })}/${date.getFullYear()}`;
+          
           last12Months.push({
             mes: monthLabel,
-            visitas: monthlyVisitsMap.get(monthKey) || 0,
+            visitas: monthlyVisitsMap.get(monthKey) || 0
           });
         }
-
+        
         setMonthlyVisitsData(last12Months);
       }
 
-      // Load Namecheap balance from database (agora já atualizado pelo webhook)
+      // Load Namecheap balance from database
       const { data: balanceData, error: balanceError } = await supabase
         .from("namecheap_balance")
         .select("*")
@@ -197,17 +145,17 @@ export default function Dashboard() {
       if (!balanceError && balanceData) {
         setBalance({
           usd: balanceData.balance_usd,
-          brl: balanceData.balance_brl,
+          brl: balanceData.balance_brl
         });
-        setIntegrationStatus((prev) => ({ ...prev, namecheap: true }));
+        setIntegrationStatus(prev => ({ ...prev, namecheap: true }));
       } else {
-        setIntegrationStatus((prev) => ({ ...prev, namecheap: false }));
+        setIntegrationStatus(prev => ({ ...prev, namecheap: false }));
       }
 
       // Load expired domains from Namecheap API
       try {
         const { data: expiredData, error: expiredError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "EXPIRED" },
+          body: { action: "list_domains", listType: "EXPIRED" }
         });
 
         if (!expiredError && expiredData?.domains) {
@@ -223,22 +171,22 @@ export default function Dashboard() {
       // Load expiring domains from Namecheap API
       try {
         const { data: expiringData, error: expiringError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "EXPIRING" },
+          body: { action: "list_domains", listType: "EXPIRING" }
         });
 
         if (!expiringError && expiringData?.domains) {
           console.log("Domínios expirando:", expiringData.domains);
           setExpiringDomains(expiringData.domains.length);
-
+          
           // Filter critical domains (expiring in 15 days)
           const now = new Date();
           const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
-
+          
           const critical = expiringData.domains.filter((d: any) => {
             const expDate = new Date(d.expirationDate);
             return expDate <= fifteenDaysFromNow;
           });
-
+          
           console.log("Domínios críticos (15 dias):", critical);
           setCriticalDomains(critical.length);
         } else {
@@ -251,173 +199,205 @@ export default function Dashboard() {
       // Load suspended domains from Namecheap API (they might be in the all domains list)
       try {
         const { data: allDomainsData, error: allDomainsError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list" },
+          body: { action: "list" }
         });
 
         if (!allDomainsError && allDomainsData?.domains) {
-          const suspended = allDomainsData.domains.filter(
-            (d: any) => d.status && d.status.toLowerCase() === "suspended",
-          );
-          console.log("Domínios suspensos:", suspended);
-          setSuspendedDomains(suspended.length);
-        } else {
-          console.error("Erro ao carregar todos os domínios:", allDomainsError);
+          // Namecheap doesn't have a direct "suspended" status
+          // We need to check the domains in the database that have suspended status
+          const suspendedCount = domainsData?.filter(d => d.status === "suspended").length || 0;
+          console.log("Domínios suspensos:", suspendedCount);
+          setSuspendedDomains(suspendedCount);
         }
       } catch (suspendedErr) {
         console.error("Error loading suspended domains:", suspendedErr);
+        // Fallback to database count
+        const suspendedCount = domainsData?.filter(d => d.status === "suspended").length || 0;
+        setSuspendedDomains(suspendedCount);
       }
 
-      // Load alerts count
-      const { count: alertCount } = await supabase
-        .from("domain_activity_logs")
-        .select("*", { count: "exact", head: true })
-        .eq("type", "alert")
-        .eq("resolved", false);
+      // Load alert domains from Namecheap API
+      try {
+        const { data: alertData, error: alertError } = await supabase.functions.invoke("namecheap-domains", {
+          body: { action: "list_domains", listType: "ALERT" }
+        });
 
-      setAlertDomains(alertCount || 0);
-
-      // Load cPanel integration status
-      const { data: cpanelData } = await supabase
-        .from("domains")
-        .select("*")
-        .eq("integration_source", "cpanel")
-        .limit(1);
-
-      if (cpanelData && cpanelData.length > 0) {
-        setIntegrationStatus((prev) => ({ ...prev, cpanel: true }));
+        if (!alertError && alertData?.domains) {
+          console.log("Domínios com alerta:", alertData.domains);
+          setAlertDomains(alertData.domains.length);
+        } else {
+          console.error("Erro ao carregar domínios com alerta:", alertError);
+        }
+      } catch (alertErr) {
+        console.error("Error loading alert domains:", alertErr);
       }
 
-      // Load Cloudflare integration status
-      const { data: cloudflareData } = await supabase
-        .from("domains")
-        .select("*")
-        .eq("integration_source", "cloudflare")
-        .limit(1);
-
-      if (cloudflareData && cloudflareData.length > 0) {
-        setIntegrationStatus((prev) => ({ ...prev, cloudflare: true }));
-      }
-    } catch (error) {
-      console.error("Error loading dashboard:", error);
+      // Set cPanel and Cloudflare integration status
+      setIntegrationStatus(prev => ({
+        ...prev,
+        cpanel: integrationCounts.cpanel > 0,
+        cloudflare: integrationCounts.cloudflare > 0,
+      }));
+    } catch (error: any) {
+      console.error("Dashboard load error:", error);
       toast.error("Erro ao carregar dados do dashboard");
     } finally {
       setLoading(false);
     }
   };
 
-  const syncDomains = async () => {
+  const syncIntegrations = async () => {
     setSyncing(true);
+    toast.info("Sincronizando integrações...");
+
     try {
-      const { data, error } = await supabase.functions.invoke("namecheap-sync", {
-        body: { syncType: "full" },
+      // Sync Namecheap
+      const { error: ncError } = await supabase.functions.invoke("namecheap-domains", {
+        body: { action: "list" }
       });
 
-      if (error) throw error;
-      toast.success("Sincronização iniciada! Atualizando dados...");
-      await loadDashboardData();
+      // Sync Cloudflare
+      const { error: cfError } = await supabase.functions.invoke("cloudflare-integration", {
+        body: { action: "zones" }
+      });
+
+      // Sync cPanel
+      const { error: cpError } = await supabase.functions.invoke("cpanel-integration", {
+        body: { action: "domains" }
+      });
+
+      if (!ncError && !cfError && !cpError) {
+        toast.success("Integrações sincronizadas com sucesso!");
+        await loadDashboardData();
+      } else {
+        toast.warning("Algumas integrações falharam ao sincronizar");
+      }
     } catch (error: any) {
-      console.error("Error syncing domains:", error);
-      toast.error("Erro ao sincronizar domínios: " + (error.message || "Unknown error"));
+      toast.error("Erro ao sincronizar integrações");
     } finally {
       setSyncing(false);
     }
   };
 
   const pieData = [
-    { name: "Ativos", value: stats.active, color: "#10b981" },
-    { name: "Expirando", value: stats.expiring, color: "#f59e0b" },
+    { name: "Ativos", value: stats.active, color: "#22c55e" },
+    { name: "Expirando", value: stats.expiring, color: "#eab308" },
     { name: "Expirados", value: stats.expired, color: "#ef4444" },
-    { name: "Suspensos", value: stats.suspended, color: "#6b7280" },
+    { name: "Suspensos", value: stats.suspended, color: "#f97316" },
   ];
 
   const barData = [
-    { name: "Namecheap", dominios: integrations.namecheap },
-    { name: "Cloudflare", dominios: integrations.cloudflare },
-    { name: "cPanel", dominios: integrations.cpanel },
+    { name: "Atomicat", dominios: domains?.filter(d => d.platform === "atomicat").length || 0 },
+    { name: "Wordpress", dominios: domains?.filter(d => d.platform === "wordpress").length || 0 },
   ];
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Visão geral do gerenciamento de domínios</p>
+          <h1 className="text-3xl font-bold">Dashboard Geral</h1>
+          <p className="text-muted-foreground">Visão completa de todos os seus domínios</p>
         </div>
-        <Button onClick={syncDomains} disabled={syncing} className="w-full sm:w-auto">
-          {syncing ? (
-            <>
-              <LoadingSpinner className="mr-2" size="sm" />
-              Sincronizando...
-            </>
-          ) : (
-            "Sincronizar Domínios"
-          )}
+        <Button onClick={syncIntegrations} disabled={syncing}>
+          {syncing ? "Sincronizando..." : "Sincronizar"}
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total de Domínios</CardTitle>
             <Globe className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">{stats.active} ativos</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.active} ativos
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expirando</CardTitle>
-            <Clock className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-500">{expiringDomains}</div>
-            <p className="text-xs text-muted-foreground">{criticalDomains} críticos (≤15 dias)</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Expirados</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
+            <XCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">{expiredDomains}</div>
-            <p className="text-xs text-muted-foreground">Requer renovação</p>
+            <div className="text-2xl font-bold">{stats.expired}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Domínios expirados
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Visitas Totais</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Expirando em Breve</CardTitle>
+            <Clock className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">{totalVisits.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Todas as plataformas</p>
+            <div className="text-2xl font-bold">{stats.expiring}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Próximos 30 dias
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Críticos</CardTitle>
+            <AlertCircle className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.critical}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Próximos 15 dias
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Suspensos</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-warning" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.suspended}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Verificar pendências
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Alerta</CardTitle>
+            <AlertCircle className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{alertDomains}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Domínios com alertas da Namecheap
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Second row of cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {/* Integration Status Card */}
-        <Card className="shadow-md border-2">
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Integration Status */}
+        <Card>
           <CardHeader>
-            <CardTitle>Status das Integrações</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Status das Integrações
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             <div className="space-y-3">
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="flex items-center gap-3">
@@ -444,7 +424,9 @@ export default function Dashboard() {
                   )}
                   <div>
                     <p className="text-sm font-medium">cPanel</p>
-                    <p className="text-xs text-muted-foreground">{integrations.cpanel} domínios</p>
+                    <p className="text-xs text-muted-foreground">
+                      {integrations.cpanel} domínios
+                    </p>
                   </div>
                 </div>
                 <Badge variant={integrationStatus.cpanel ? "default" : "destructive"}>
@@ -461,7 +443,9 @@ export default function Dashboard() {
                   )}
                   <div>
                     <p className="text-sm font-medium">Cloudflare</p>
-                    <p className="text-xs text-muted-foreground">{integrations.cloudflare} zonas</p>
+                    <p className="text-xs text-muted-foreground">
+                      {integrations.cloudflare} zonas
+                    </p>
                   </div>
                 </div>
                 <Badge variant={integrationStatus.cloudflare ? "default" : "destructive"}>
@@ -484,19 +468,26 @@ export default function Dashboard() {
             {balance ? (
               <>
                 <div>
-                  {balance.usd === 0 && balance.brl === 0 ? (
+                  {(balance.usd === 0 && balance.brl === 0) ? (
                     <>
                       <div className="text-3xl font-bold text-muted-foreground">
                         {balanceCurrency === "usd" ? "$0.00" : "R$ 0,00"}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-2">Adicione créditos para começar</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Adicione créditos para começar
+                      </p>
                     </>
                   ) : (
                     <>
                       <div className="text-4xl font-bold text-blue-500">
-                        {balanceCurrency === "usd" ? `$${balance.usd.toFixed(2)}` : `R$ ${balance.brl.toFixed(2)}`}
+                        {balanceCurrency === "usd" 
+                          ? `$${balance.usd.toFixed(2)}`
+                          : `R$ ${balance.brl.toFixed(2)}`
+                        }
                       </div>
-                      <p className="text-sm text-muted-foreground mt-2">Saldo disponível para compras</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Saldo disponível para compras
+                      </p>
                     </>
                   )}
                 </div>
@@ -505,7 +496,11 @@ export default function Dashboard() {
                     variant={balanceCurrency === "usd" ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setBalanceCurrency("usd")}
-                    className={`${balanceCurrency === "usd" ? "bg-primary text-primary-foreground" : ""}`}
+                    className={`${
+                      balanceCurrency === "usd" 
+                        ? "bg-primary text-primary-foreground" 
+                        : ""
+                    }`}
                   >
                     USD
                   </Button>
@@ -513,7 +508,11 @@ export default function Dashboard() {
                     variant={balanceCurrency === "brl" ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setBalanceCurrency("brl")}
-                    className={`${balanceCurrency === "brl" ? "bg-primary text-primary-foreground" : ""}`}
+                    className={`${
+                      balanceCurrency === "brl" 
+                        ? "bg-primary text-primary-foreground" 
+                        : ""
+                    }`}
                   >
                     BRL
                   </Button>
@@ -542,7 +541,15 @@ export default function Dashboard() {
           <CardContent className="[&_*]:!outline-none">
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="value">
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
                   {pieData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
