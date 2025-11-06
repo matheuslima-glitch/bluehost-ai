@@ -66,7 +66,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       // Aguardar 300ms para renderizar o primeiro step
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      addProgressStep("ai_generation", "in_progress", `🤖 Gerando sugestões de domínios com IA (OpenAI GPT-3.5)...`);
+      addProgressStep("ai_generation", "in_progress", `🤖 Gerando sugestões de domínios com IA ...`);
 
       // Aguardar 300ms para renderizar
       await new Promise((resolve) => setTimeout(resolve, 300));
