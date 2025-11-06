@@ -179,8 +179,11 @@ export default function Dashboard() {
       setStats(stats);
       setIntegrations(integrationCounts);
 
-      // Load analytics data from database
-      const { data: analyticsData, error: analyticsError } = await supabase.from("domain_analytics").select("*");
+      // Load analytics data from database (apenas dados agregados globais)
+      const { data: analyticsData, error: analyticsError } = await supabase
+        .from("domain_analytics")
+        .select("*")
+        .is("domain_id", null); // Filtra apenas registros agregados (todos os domínios)
 
       if (!analyticsError && analyticsData) {
         // Calculate total visits from database
