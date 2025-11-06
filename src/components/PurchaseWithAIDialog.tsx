@@ -60,9 +60,25 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         throw new Error("Usuário não autenticado");
       }
 
-      // Step 1: Generate and verify domain availability with AI
-      addProgressStep("generation", "in_progress", `Buscando ${quantity} domínios disponíveis...`);
+      // ✅ CORREÇÃO: Adicionar feedback visual ANTES da chamada da API
+      addProgressStep("init", "in_progress", `🚀 Iniciando busca por ${quantity} domínios no nicho "${niche}"...`);
 
+      // Aguardar 300ms para renderizar o primeiro step
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      addProgressStep("ai_generation", "in_progress", `🤖 Gerando sugestões de domínios com IA (OpenAI GPT-3.5)...`);
+
+      // Aguardar 300ms para renderizar
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      addProgressStep("verification", "in_progress", `🔍 Verificando disponibilidade via Namecheap API...`);
+
+      // Aguardar 300ms para renderizar
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      addProgressStep("processing", "in_progress", `⏳ Processando resultados... Isso pode levar alguns instantes.`);
+
+      // Step 1: Generate and verify domain availability with AI
       const { data: suggestions, error: suggestionsError } = await supabase.functions.invoke("ai-domain-suggestions", {
         body: {
           keywords: niche,
@@ -74,26 +90,37 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
       if (suggestionsError) {
         console.error("AI suggestions error:", suggestionsError);
-        addProgressStep("generation", "error", `Erro ao gerar domínios: ${suggestionsError.message}`);
+        addProgressStep("generation", "error", `❌ Erro ao gerar domínios: ${suggestionsError.message}`);
         throw suggestionsError;
       }
 
       if (!suggestions?.domains || suggestions.domains.length === 0) {
-        addProgressStep("generation", "error", "Nenhum domínio disponível foi encontrado após verificação");
+        addProgressStep("generation", "error", "❌ Nenhum domínio disponível foi encontrado após verificação");
         throw new Error("Nenhum domínio disponível foi encontrado. Todos os domínios gerados estão indisponíveis.");
       }
 
       const foundCount = suggestions.domains.length;
       const attempts = suggestions.attempts || 1;
+      const totalGenerated = suggestions.total_generated || foundCount;
+      const totalChecked = suggestions.total_checked || foundCount;
 
+      // ✅ Atualizar steps com status completado
+      addProgressStep("ai_generation", "completed", `✅ ${totalGenerated} domínios criativos gerados pela IA`);
+      addProgressStep("verification", "completed", `✅ ${totalChecked} domínios verificados no Namecheap`);
       addProgressStep(
-        "generation",
+        "result",
         "completed",
-        `✅ ${foundCount} domínios verificados e disponíveis encontrados após ${attempts} tentativa(s)!`,
+        `🎉 ${foundCount} domínios disponíveis encontrados após ${attempts} tentativa(s)!`,
       );
 
       // Salvar domínios encontrados
       setFoundDomains(suggestions.domains);
+
+      // Mostrar toast de sucesso
+      toast.success(`${foundCount} domínios disponíveis encontrados!`);
+
+      // Aguardar 1.5s para o usuário ver o progresso completo
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // Fechar popup de progresso e abrir seleção de estrutura
       setShowProgress(false);
@@ -103,6 +130,9 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       console.error("Erro ao buscar domínios:", error);
       toast.error(error.message || "Erro ao processar busca de domínios");
       setLoading(false);
+
+      // Manter o progresso visível por 3s antes de fechar
+      await new Promise((resolve) => setTimeout(resolve, 3000));
       setShowProgress(false);
     }
   };
@@ -121,7 +151,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         throw new Error("Usuário não autenticado");
       }
 
-      addProgressStep("purchase", "in_progress", `Iniciando compra de ${foundDomains.length} domínios...`);
+      addProgressStep("purchase_init", "in_progress", `🛒 Iniciando compra de ${foundDomains.length} domínios...`);
+
+      // Aguardar 300ms
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      addProgressStep("purchase", "in_progress", `💳 Processando compra via Namecheap API...`);
 
       // Step 2: Purchase and configure domains
       const { data: purchaseResult, error: purchaseError } = await supabase.functions.invoke("purchase-domains", {
@@ -134,7 +169,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
       if (purchaseError) {
         console.error("Purchase error:", purchaseError);
-        addProgressStep("purchase", "error", `Erro na compra: ${purchaseError.message}`);
+        addProgressStep("purchase", "error", `❌ Erro na compra: ${purchaseError.message}`);
         throw purchaseError;
       }
 
@@ -160,8 +195,13 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         addProgressStep(
           "complete",
           "completed",
-          `Processo concluído! ${domains.length} domínios comprados e configurados.`,
+          `✅ Processo concluído! ${domains.length} domínios comprados e configurados.`,
         );
+
+        toast.success(`${domains.length} domínios comprados com sucesso!`);
+
+        // Aguardar 1s
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         // Mostrar dialog de classificação
         setShowProgress(false);
@@ -172,6 +212,10 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     } catch (error: any) {
       console.error("Erro ao comprar domínios:", error);
       toast.error(error.message || "Erro ao processar compra");
+
+      // Aguardar 3s antes de fechar
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      setShowProgress(false);
     } finally {
       setLoading(false);
     }
@@ -325,11 +369,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="rounded-lg border p-4 bg-green-50">
-              <h3 className="font-semibold text-green-900 mb-2">✅ Domínios Disponíveis:</h3>
+            <div className="rounded-lg border p-4 bg-green-50 dark:bg-green-950/20">
+              <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">✅ Domínios Disponíveis:</h3>
               <ul className="space-y-1">
                 {foundDomains.map((domain, index) => (
-                  <li key={index} className="text-sm text-green-700">
+                  <li key={index} className="text-sm text-green-700 dark:text-green-300">
                     • {domain}
                   </li>
                 ))}
@@ -388,11 +432,13 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
             <div className="space-y-3 max-h-[400px] overflow-y-auto">
               {progress.map((step, index) => (
-                <div key={index} className="flex items-start gap-3 p-3 rounded-lg border">
+                <div key={index} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
                   {getStatusIcon(step.status)}
                   <div className="flex-1">
                     <p className="font-medium text-sm">{step.message}</p>
-                    <p className="text-xs text-gray-500 mt-1">{new Date(step.timestamp).toLocaleTimeString("pt-BR")}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(step.timestamp).toLocaleTimeString("pt-BR")}
+                    </p>
                   </div>
                 </div>
               ))}
