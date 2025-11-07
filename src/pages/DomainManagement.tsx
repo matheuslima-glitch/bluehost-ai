@@ -475,17 +475,17 @@ export default function DomainManagement() {
                         <ArrowUpDown className="h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead>
+                    <TableHead className="text-center">
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("traffic_source")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto"
                       >
                         Fonte de Tráfego
                         <ArrowUpDown className="h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead>ID Funil</TableHead>
+                    <TableHead className="text-center">ID Funil</TableHead>
                     <TableHead>
                       <Button
                         variant="ghost"
@@ -506,7 +506,7 @@ export default function DomainManagement() {
                         <ArrowUpDown className="h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead>Ações</TableHead>
+                    <TableHead className="text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -547,14 +547,14 @@ export default function DomainManagement() {
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         {domain.traffic_source ? (
                           <Badge variant="secondary">{domain.traffic_source}</Badge>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         {domain.funnel_id ? (
                           <Badge variant="outline">{domain.funnel_id}</Badge>
                         ) : (
@@ -577,7 +577,7 @@ export default function DomainManagement() {
                           {domain.monthly_visits.toLocaleString()}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <Button variant="ghost" size="sm" onClick={() => navigate(`/domains/${domain.id}`)}>
                           <LayoutDashboard className="h-4 w-4 mr-2" />
                           Ver Detalhes
