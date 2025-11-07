@@ -548,7 +548,7 @@ export default function DomainDetails() {
         </Dialog>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Informações Básicas</CardTitle>
