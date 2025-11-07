@@ -35,20 +35,35 @@ interface CriticalDomainsTableProps {
   onDomainsChange: () => void;
 }
 
-// Função de tradução automática EN → PT
+// Função de tradução automática EN → PT (MELHORADA)
 function translateAlert(message: string): string {
   if (!message) return "";
 
   const translations: Record<string, string> = {
-    sorry: "desculpe",
-    "you will not be able to access": "você não poderá acessar",
-    "the domain": "o domínio",
+    // Frases completas específicas (traduzir primeiro - mais específico)
+    "sorry, you will not be able to access the domain": "desculpe, você não poderá acessar o domínio",
     "as the domain is currently locked": "pois o domínio está atualmente bloqueado",
+    "as the domain is currently": "pois o domínio está atualmente",
+    "domain locked reason:": "motivo do bloqueio:",
     "domain locked reason": "motivo do bloqueio",
     "suspended due to fraudulent activity": "suspenso devido a atividade fraudulenta",
+    "suspended by the registry": "suspenso pelo registro",
+    "please refer to the domain": "por favor, consulte o",
+    "please refer to": "por favor, consulte",
     "please contact": "por favor, entre em contato",
+    "for more information": "para mais informações",
+    "contact us at": "entre em contato em",
+    "you will not be able to access": "você não poderá acessar",
+    "unsuspension lookup tool at": "ferramenta de reativação em",
+    "unsuspension lookup tool": "ferramenta de reativação",
+
+    // Palavras individuais (traduzir depois)
+    sorry: "desculpe",
+    "the domain": "o domínio",
+    domain: "domínio",
     suspended: "suspenso",
     locked: "bloqueado",
+    blocked: "bloqueado",
     expired: "expirado",
     pending: "pendente",
     verification: "verificação",
@@ -59,18 +74,26 @@ function translateAlert(message: string): string {
     activity: "atividade",
     "domain name": "nome do domínio",
     registrar: "registrador",
-    "for more information": "para mais informações",
-    "contact us": "entre em contato conosco",
+    registry: "registro",
     "legal and abuse": "jurídico e abuso",
     legalandabuse: "jurídico e abuso",
+    "lookup tool": "ferramenta de consulta",
+    unsuspension: "reativação",
+    "refer to": "consulte",
+    please: "por favor",
+    "by the": "pelo",
+    tool: "ferramenta",
+    currently: "atualmente",
+    reason: "motivo",
   };
 
   let translated = message;
 
-  // Preservar e-mails e links
+  // Preservar e-mails e links (não traduzir)
   const emails = message.match(/[\w.-]+@[\w.-]+\.\w+/g) || [];
   const urls = message.match(/https?:\/\/[^\s]+/g) || [];
 
+  // Substituir temporariamente por placeholders
   emails.forEach((email, i) => {
     translated = translated.replace(email, `__EMAIL${i}__`);
   });
@@ -79,11 +102,13 @@ function translateAlert(message: string): string {
     translated = translated.replace(url, `__URL${i}__`);
   });
 
-  // Traduzir
-  Object.entries(translations).forEach(([eng, pt]) => {
-    const regex = new RegExp(eng, "gi");
-    translated = translated.replace(regex, pt);
-  });
+  // Traduzir (frases completas primeiro, depois palavras)
+  Object.entries(translations)
+    .sort((a, b) => b[0].length - a[0].length) // Mais longas primeiro
+    .forEach(([eng, pt]) => {
+      const regex = new RegExp(eng, "gi");
+      translated = translated.replace(regex, pt);
+    });
 
   // Restaurar e-mails e links
   emails.forEach((email, i) => {
@@ -94,101 +119,85 @@ function translateAlert(message: string): string {
     translated = translated.replace(`__URL${i}__`, url);
   });
 
+  // Limpar espaços duplicados
+  translated = translated.replace(/\s+/g, " ").trim();
+
   // Capitalizar primeira letra
   translated = translated.charAt(0).toUpperCase() + translated.slice(1);
 
   return translated;
 }
 
-// Componente para renderizar mensagem com links e e-mails destacados
+// Componente para renderizar mensagem com BOTÕES de links e e-mails
 function AlertMessageRenderer({ message }: { message: string }) {
   if (!message) return null;
 
+  // Extrair e-mails e links
   const emailRegex = /([\w.-]+@[\w.-]+\.\w+)/g;
   const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const combinedRegex = new RegExp(`${emailRegex.source}|${urlRegex.source}`, "g");
 
-  const parts: Array<{ type: "text" | "email" | "url"; content: string }> = [];
-  let lastIndex = 0;
-  let match;
+  const emails = message.match(emailRegex) || [];
+  const urls = message.match(urlRegex) || [];
 
-  while ((match = combinedRegex.exec(message)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push({
-        type: "text",
-        content: message.slice(lastIndex, match.index),
-      });
-    }
+  // Remover e-mails e links do texto para exibir apenas o texto limpo
+  let cleanText = message;
 
-    const matchedText = match[0];
-    const isEmail = matchedText.includes("@") && !matchedText.startsWith("http");
+  // Remover URLs
+  urls.forEach((url) => {
+    cleanText = cleanText.replace(url, "");
+  });
 
-    parts.push({
-      type: isEmail ? "email" : "url",
-      content: matchedText,
-    });
+  // Remover e-mails
+  emails.forEach((email) => {
+    cleanText = cleanText.replace(email, "");
+  });
 
-    lastIndex = combinedRegex.lastIndex;
-  }
-
-  if (lastIndex < message.length) {
-    parts.push({
-      type: "text",
-      content: message.slice(lastIndex),
-    });
-  }
-
-  const emails = parts.filter((p) => p.type === "email");
+  // Limpar espaços duplicados e pontuação órfã
+  cleanText = cleanText
+    .replace(/\s+/g, " ")
+    .replace(/\s+\./g, ".")
+    .replace(/\s+,/g, ",")
+    .replace(/\s+:/g, ":")
+    .replace(/\s+\)/g, ")")
+    .replace(/\(\s+/g, "(")
+    .trim();
 
   return (
-    <div className="space-y-3">
-      <p className="text-yellow-700 dark:text-yellow-300 leading-relaxed text-base">
-        {parts.map((part, index) => {
-          if (part.type === "email") {
-            return (
-              <span key={index} className="inline-flex items-center">
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="h-auto p-0 text-yellow-900 dark:text-yellow-200 font-semibold hover:text-yellow-700 dark:hover:text-yellow-100 underline inline-flex items-center gap-1"
-                  onClick={() => (window.location.href = `mailto:${part.content}`)}
-                >
-                  <Mail className="h-3.5 w-3.5" />
-                  {part.content}
-                </Button>
-              </span>
-            );
-          }
+    <div className="space-y-5">
+      {/* Texto limpo sem links/emails */}
+      <p className="text-yellow-800 dark:text-yellow-300 leading-relaxed text-[15px]">{cleanText}</p>
 
-          if (part.type === "url") {
-            return (
-              <span key={index} className="inline-flex items-center">
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="h-auto p-0 text-yellow-900 dark:text-yellow-200 font-semibold hover:text-yellow-700 dark:hover:text-yellow-100 underline inline-flex items-center gap-1"
-                  onClick={() => window.open(part.content, "_blank", "noopener,noreferrer")}
-                >
-                  <LinkIcon className="h-3.5 w-3.5" />
-                  {part.content}
-                </Button>
-              </span>
-            );
-          }
+      {/* Separador visual se houver botões */}
+      {(urls.length > 0 || emails.length > 0) && (
+        <div className="border-t border-yellow-300 dark:border-yellow-800 pt-4 mt-4" />
+      )}
 
-          return <span key={index}>{part.content}</span>;
-        })}
-      </p>
-
-      {emails.length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-2 mt-2 border-t border-yellow-300 dark:border-yellow-800">
-          {emails.map((part, index) => (
+      {/* Botões de links */}
+      {urls.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {urls.map((url, index) => (
             <Button
-              key={index}
+              key={`url-${index}`}
               size="sm"
-              variant="outline"
-              className="border-yellow-400 text-yellow-800 hover:bg-yellow-100 dark:border-yellow-700 dark:text-yellow-200 dark:hover:bg-yellow-900"
-              onClick={() => (window.location.href = `mailto:${part.content}`)}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700"
+              onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+            >
+              <LinkIcon className="h-4 w-4 mr-2" />
+              Acessar Link de Suporte
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {/* Botões de e-mails */}
+      {emails.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {emails.map((email, index) => (
+            <Button
+              key={`email-${index}`}
+              size="sm"
+              className="bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700"
+              onClick={() => (window.location.href = `mailto:${email}`)}
             >
               <Mail className="h-4 w-4 mr-2" />
               Falar com Suporte
