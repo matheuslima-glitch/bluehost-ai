@@ -35,7 +35,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const [progress, setProgress] = useState<PurchaseProgress[]>([]);
   const [showProgress, setShowProgress] = useState(false);
   const [foundDomains, setFoundDomains] = useState<string[]>([]);
-  const [showStructureSelection, setShowStructureSelection] = useState(false);
   const [selectedStructure, setSelectedStructure] = useState<"wordpress" | "atomicat">("wordpress");
   const [purchasedDomains, setPurchasedDomains] = useState<string[]>([]);
   const [showClassification, setShowClassification] = useState(false);
@@ -122,10 +121,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       // Aguardar 1.5s para o usuário ver o progresso completo
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      // Fechar popup de progresso e abrir seleção de estrutura
+      // Fechar popup de progresso e iniciar compra diretamente
       setShowProgress(false);
-      setShowStructureSelection(true);
-      setLoading(false);
+
+      // Iniciar compra automaticamente com a plataforma já selecionada
+      await handlePurchaseWithStructure();
     } catch (error: any) {
       console.error("Erro ao buscar domínios:", error);
       toast.error(error.message || "Erro ao processar busca de domínios");
@@ -138,7 +138,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   };
 
   const handlePurchaseWithStructure = async () => {
-    setShowStructureSelection(false);
     setShowProgress(true);
     setLoading(true);
     setProgress([]);
@@ -293,7 +292,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   };
 
   // Dialog de configuração inicial
-  if (!showProgress && !showStructureSelection && !showClassification) {
+  if (!showProgress && !showClassification) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[425px] shadow-[0_0_40px_hsl(var(--glow-blue)_/_0.25)] border-[hsl(var(--accent-cyan)_/_0.3)]">
@@ -302,6 +301,19 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             <DialogDescription>Configure os parâmetros para buscar domínios disponíveis</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="structure">Plataforma</Label>
+              <Select value={selectedStructure} onValueChange={(value: any) => setSelectedStructure(value)}>
+                <SelectTrigger id="structure">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="wordpress">Wordpress</SelectItem>
+                  <SelectItem value="atomicat">Atomicat</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="quantity">Quantidade de Domínios</Label>
               <Input
@@ -328,7 +340,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               <Label htmlFor="language">Idioma</Label>
               <Input
                 id="language"
-                placeholder="Ex: português, inglês, espanhol..."
+                placeholder="portuguese"
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
               />
@@ -349,62 +361,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                 "Buscar Domínios"
               )}
             </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  // Dialog de seleção de estrutura
-  if (showStructureSelection) {
-    return (
-      <Dialog open={true} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-[500px] shadow-[0_0_40px_hsl(var(--glow-blue)_/_0.25)] border-[hsl(var(--accent-cyan)_/_0.3)]">
-          <DialogHeader>
-            <DialogTitle>🎉 Domínios Encontrados!</DialogTitle>
-            <DialogDescription>
-              Foram encontrados {foundDomains.length} domínios disponíveis. Selecione a estrutura desejada para
-              prosseguir com a compra.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="rounded-lg border p-4 bg-green-50 dark:bg-green-950/20">
-              <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">✅ Domínios Disponíveis:</h3>
-              <ul className="space-y-1">
-                {foundDomains.map((domain, index) => (
-                  <li key={index} className="text-sm text-green-700 dark:text-green-300">
-                    • {domain}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="structure">Selecione a Estrutura</Label>
-              <Select value={selectedStructure} onValueChange={(value: any) => setSelectedStructure(value)}>
-                <SelectTrigger id="structure">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="wordpress">WordPress</SelectItem>
-                  <SelectItem value="atomicat">Atomicat</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex gap-2 justify-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowStructureSelection(false);
-                setFoundDomains([]);
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handlePurchaseWithStructure}>Prosseguir com a Compra</Button>
           </div>
         </DialogContent>
       </Dialog>
