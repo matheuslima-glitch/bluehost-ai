@@ -49,6 +49,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setLoading(true);
     setShowProgress(true);
     setProgress([]);
+    setFoundDomains([]);
 
     try {
       // Pegar o usuário atual
@@ -59,79 +60,119 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         throw new Error("Usuário não autenticado");
       }
 
-      // ✅ CORREÇÃO: Adicionar feedback visual ANTES da chamada da API
-      addProgressStep("init", "in_progress", `🚀 Iniciando busca por ${quantity} domínios no nicho "${niche}"...`);
+      // Obter a URL da edge function do Supabase
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const functionUrl = `${supabaseUrl}/functions/v1/ai-domain-suggestions`;
 
-      // Aguardar 300ms para renderizar o primeiro step
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Preparar payload
+      const payload = {
+        keywords: niche,
+        quantity,
+        language,
+        niche,
+        structure: selectedStructure, // wordpress ou atomicat
+      };
 
-      addProgressStep("ai_generation", "in_progress", `🤖 Gerando sugestões de domínios com IA ...`);
+      console.log("📤 Calling edge function with SSE:", payload);
 
-      // Aguardar 300ms para renderizar
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      addProgressStep("verification", "in_progress", `🔍 Verificando disponibilidade via Namecheap API...`);
-
-      // Aguardar 300ms para renderizar
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      addProgressStep("processing", "in_progress", `⏳ Processando resultados... Isso pode levar alguns instantes.`);
-
-      // Step 1: Generate and verify domain availability with AI
-      const { data: suggestions, error: suggestionsError } = await supabase.functions.invoke("ai-domain-suggestions", {
-        body: {
-          keywords: niche,
-          quantity,
-          language,
-          niche,
+      // Fazer requisição para edge function
+      const response = await fetch(functionUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          apikey: supabaseKey,
         },
+        body: JSON.stringify(payload),
       });
 
-      if (suggestionsError) {
-        console.error("AI suggestions error:", suggestionsError);
-        addProgressStep("generation", "error", `❌ Erro ao gerar domínios: ${suggestionsError.message}`);
-        throw suggestionsError;
+      if (!response.ok) {
+        throw new Error(`Erro na requisição: ${response.status}`);
       }
 
-      if (!suggestions?.domains || suggestions.domains.length === 0) {
-        addProgressStep("generation", "error", "❌ Nenhum domínio disponível foi encontrado após verificação");
-        throw new Error("Nenhum domínio disponível foi encontrado. Todos os domínios gerados estão indisponíveis.");
+      // Processar Server-Sent Events (SSE)
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("Não foi possível ler a resposta");
       }
 
-      const foundCount = suggestions.domains.length;
-      const attempts = suggestions.attempts || 1;
-      const totalGenerated = suggestions.total_generated || foundCount;
-      const totalChecked = suggestions.total_checked || foundCount;
+      let buffer = "";
 
-      // ✅ Atualizar steps com status completado
-      addProgressStep("ai_generation", "completed", `✅ ${totalGenerated} domínios criativos gerados pela IA`);
-      addProgressStep("verification", "completed", `✅ ${totalChecked} domínios verificados no Namecheap`);
-      addProgressStep(
-        "result",
-        "completed",
-        `🎉 ${foundCount} domínios disponíveis encontrados após ${attempts} tentativa(s)!`,
-      );
+      while (true) {
+        const { done, value } = await reader.read();
 
-      // Salvar domínios encontrados
-      setFoundDomains(suggestions.domains);
+        if (done) break;
 
-      // Mostrar toast de sucesso
-      toast.success(`${foundCount} domínios disponíveis encontrados!`);
+        buffer += decoder.decode(value, { stream: true });
 
-      // Aguardar 1.5s para o usuário ver o progresso completo
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+        // Processar linhas completas
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || ""; // Manter última linha incompleta no buffer
 
-      // Fechar popup de progresso e iniciar compra diretamente
-      setShowProgress(false);
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const jsonData = JSON.parse(line.substring(6));
 
-      // Iniciar compra automaticamente com a plataforma já selecionada
-      await handlePurchaseWithStructure();
+              // Se for o resultado final
+              if (jsonData.type === "final") {
+                const finalData = jsonData.data;
+                console.log("✅ Final result:", finalData);
+
+                if (finalData.domains && finalData.domains.length > 0) {
+                  setFoundDomains(finalData.domains);
+
+                  // Se já tiver domínios comprados e configurados, ir direto para classificação
+                  if (finalData.purchased_domains && finalData.purchased_domains.length > 0) {
+                    setPurchasedDomains(finalData.purchased_domains);
+                    setClassifications(
+                      finalData.purchased_domains.map((domain: string) => ({
+                        domain,
+                        trafficSource: "Google Ads",
+                      })),
+                    );
+
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                    setShowProgress(false);
+                    setShowClassification(true);
+                    setLoading(false);
+                  } else {
+                    // Apenas encontrou domínios - n8n já deve ter feito a compra
+                    await new Promise((resolve) => setTimeout(resolve, 1500));
+                    setShowProgress(false);
+                    setLoading(false);
+                    toast.success(`${finalData.domains.length} domínios encontrados!`);
+                  }
+                }
+              }
+              // Se for erro
+              else if (jsonData.type === "error") {
+                console.error("❌ Error from edge function:", jsonData.error);
+                addProgressStep("error", "error", `❌ ${jsonData.error}`);
+                setLoading(false);
+                await new Promise((resolve) => setTimeout(resolve, 3000));
+                setShowProgress(false);
+              }
+              // Se for update de progresso
+              else if (jsonData.step) {
+                console.log("📊 Progress update:", jsonData);
+                addProgressStep(jsonData.step, jsonData.status, jsonData.message);
+              }
+            } catch (e) {
+              console.error("Error parsing SSE data:", e);
+            }
+          }
+        }
+      }
     } catch (error: any) {
-      console.error("Erro ao buscar domínios:", error);
+      console.error("❌ Erro ao buscar domínios:", error);
+      addProgressStep("error", "error", `❌ Erro: ${error.message}`);
       toast.error(error.message || "Erro ao processar busca de domínios");
       setLoading(false);
 
-      // Manter o progresso visível por 3s antes de fechar
       await new Promise((resolve) => setTimeout(resolve, 3000));
       setShowProgress(false);
     }
