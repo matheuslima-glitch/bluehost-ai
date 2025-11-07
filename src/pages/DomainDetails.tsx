@@ -548,7 +548,7 @@ export default function DomainDetails() {
         </Dialog>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Informações Básicas</CardTitle>
@@ -630,18 +630,17 @@ export default function DomainDetails() {
               <div className="flex gap-3">
                 {domain.platform?.toLowerCase() === "wordpress" && (
                   <Button
-                    size="sm"
                     onClick={() => {
                       const wordpressUrl = `https://${domain.domain_name}/wordpanel124`;
                       window.open(wordpressUrl, "_blank");
                       toast.info("Abrindo painel WordPress. Faça login com as credenciais fornecidas.");
                     }}
-                    className="flex items-center gap-2 bg-[#21759b] hover:bg-[#1e6a8d] text-white"
+                    className="flex items-center gap-2 bg-[#21759b] hover:bg-[#1e6a8d] text-white flex-1"
                   >
                     <img
                       src="https://upload.wikimedia.org/wikipedia/commons/9/93/Wordpress_Blue_logo.png"
                       alt="WordPress"
-                      className="h-4 w-4 object-contain"
+                      className="h-5 w-5 object-contain"
                     />
                     <span className="text-sm">Login WordPress</span>
                   </Button>
@@ -649,18 +648,17 @@ export default function DomainDetails() {
 
                 {domain.platform?.toLowerCase() === "atomicat" && (
                   <Button
-                    size="sm"
                     onClick={() => {
                       const atomicatUrl = "https://app.atomicat.com.br/login";
                       window.open(atomicatUrl, "_blank");
                       toast.info("Abrindo painel Atomicat. Faça login com as credenciais fornecidas.");
                     }}
-                    className="flex items-center gap-2 bg-gradient-to-r from-gray-900 to-gray-600 hover:from-gray-800 hover:to-gray-500 text-white"
+                    className="flex items-center gap-2 bg-gradient-to-r from-gray-900 to-gray-600 hover:from-gray-800 hover:to-gray-500 text-white flex-1"
                   >
                     <img
                       src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png"
                       alt="Atomicat"
-                      className="h-4 w-4 object-contain rounded"
+                      className="h-5 w-5 object-contain rounded"
                     />
                     <span className="text-sm">Login Atomicat</span>
                   </Button>
@@ -674,7 +672,7 @@ export default function DomainDetails() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Configurações</CardTitle>
             <CardDescription>Configure plataforma e fonte de tráfego</CardDescription>
