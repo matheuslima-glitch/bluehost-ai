@@ -465,11 +465,11 @@ export default function DomainManagement() {
                         <ArrowUpDown className="h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead>
+                    <TableHead className="text-center">
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("platform")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto"
                       >
                         Plataforma
                         <ArrowUpDown className="h-4 w-4" />
@@ -506,7 +506,7 @@ export default function DomainManagement() {
                         <ArrowUpDown className="h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -519,7 +519,7 @@ export default function DomainManagement() {
                         </div>
                       </TableCell>
                       <TableCell>{getStatusBadge(domain.status)}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         {domain.platform ? (
                           <div className="flex items-center justify-center">
                             {domain.platform.toLowerCase() === "wordpress" && (
@@ -577,7 +577,7 @@ export default function DomainManagement() {
                           {domain.monthly_visits.toLocaleString()}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell>
                         <Button variant="ghost" size="sm" onClick={() => navigate(`/domains/${domain.id}`)}>
                           <LayoutDashboard className="h-4 w-4 mr-2" />
                           Ver Detalhes
