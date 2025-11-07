@@ -372,6 +372,7 @@ export default function DomainManagement() {
                   type="date"
                   value={filters.purchase_date_start}
                   onChange={(e) => handleFilterChange("purchase_date_start", e.target.value)}
+                  className="dark:bg-background dark:text-foreground dark:[color-scheme:dark]"
                 />
               </div>
 
@@ -382,6 +383,7 @@ export default function DomainManagement() {
                   type="date"
                   value={filters.purchase_date_end}
                   onChange={(e) => handleFilterChange("purchase_date_end", e.target.value)}
+                  className="dark:bg-background dark:text-foreground dark:[color-scheme:dark]"
                 />
               </div>
 
@@ -445,7 +447,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("domain_name")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-black/10 dark:hover:bg-white/10"
                       >
                         Domínio
                         <ArrowUpDown className="h-4 w-4" />
@@ -455,7 +457,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("status")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-black/10 dark:hover:bg-white/10"
                       >
                         Status
                         <ArrowUpDown className="h-4 w-4" />
@@ -465,7 +467,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("platform")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-black/10 dark:hover:bg-white/10"
                       >
                         Plataforma
                         <ArrowUpDown className="h-4 w-4" />
@@ -475,7 +477,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("traffic_source")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-black/10 dark:hover:bg-white/10"
                       >
                         Fonte de Tráfego
                         <ArrowUpDown className="h-4 w-4" />
@@ -486,7 +488,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("expiration_date")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-black/10 dark:hover:bg-white/10"
                       >
                         Expiração
                         <ArrowUpDown className="h-4 w-4" />
@@ -496,7 +498,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("monthly_visits")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-black/10 dark:hover:bg-white/10"
                       >
                         Visitas/Mês
                         <ArrowUpDown className="h-4 w-4" />
@@ -545,7 +547,9 @@ export default function DomainManagement() {
                       </TableCell>
                       <TableCell className="text-center">
                         {domain.traffic_source ? (
-                          <Badge variant="secondary">{domain.traffic_source}</Badge>
+                          <Badge variant="secondary">
+                            {domain.traffic_source.charAt(0).toUpperCase() + domain.traffic_source.slice(1)}
+                          </Badge>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
