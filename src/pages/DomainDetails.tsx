@@ -636,14 +636,14 @@ export default function DomainDetails() {
                       window.open(wordpressUrl, "_blank");
                       toast.info("Abrindo painel WordPress. Faça login com as credenciais fornecidas.");
                     }}
-                    className="flex items-center gap-2 bg-[#21759b] hover:bg-[#1e6a8d] text-white flex-1"
+                    className="flex items-center gap-2 bg-[#21759b] hover:bg-[#1e6a8d] text-white"
                   >
                     <img
                       src="https://upload.wikimedia.org/wikipedia/commons/9/93/Wordpress_Blue_logo.png"
                       alt="WordPress"
                       className="h-4 w-4 object-contain"
                     />
-                    <span className="text-xs">Login WordPress</span>
+                    <span className="text-sm">Login WordPress</span>
                   </Button>
                 )}
 
@@ -655,14 +655,14 @@ export default function DomainDetails() {
                       window.open(atomicatUrl, "_blank");
                       toast.info("Abrindo painel Atomicat. Faça login com as credenciais fornecidas.");
                     }}
-                    className="flex items-center gap-2 bg-gradient-to-r from-gray-900 to-gray-600 hover:from-gray-800 hover:to-gray-500 text-white flex-1"
+                    className="flex items-center gap-2 bg-gradient-to-r from-gray-900 to-gray-600 hover:from-gray-800 hover:to-gray-500 text-white"
                   >
                     <img
                       src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png"
                       alt="Atomicat"
                       className="h-4 w-4 object-contain rounded"
                     />
-                    <span className="text-xs">Login Atomicat</span>
+                    <span className="text-sm">Login Atomicat</span>
                   </Button>
                 )}
 
