@@ -630,6 +630,7 @@ export default function DomainDetails() {
               <div className="flex gap-3">
                 {domain.platform?.toLowerCase() === "wordpress" && (
                   <Button
+                    size="sm"
                     onClick={() => {
                       const wordpressUrl = `https://${domain.domain_name}/wordpanel124`;
                       window.open(wordpressUrl, "_blank");
@@ -640,14 +641,15 @@ export default function DomainDetails() {
                     <img
                       src="https://upload.wikimedia.org/wikipedia/commons/9/93/Wordpress_Blue_logo.png"
                       alt="WordPress"
-                      className="h-5 w-5 object-contain"
+                      className="h-4 w-4 object-contain"
                     />
-                    <span className="text-sm">Login WordPress</span>
+                    <span className="text-xs">Login WordPress</span>
                   </Button>
                 )}
 
                 {domain.platform?.toLowerCase() === "atomicat" && (
                   <Button
+                    size="sm"
                     onClick={() => {
                       const atomicatUrl = "https://app.atomicat.com.br/login";
                       window.open(atomicatUrl, "_blank");
@@ -658,9 +660,9 @@ export default function DomainDetails() {
                     <img
                       src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png"
                       alt="Atomicat"
-                      className="h-5 w-5 object-contain rounded"
+                      className="h-4 w-4 object-contain rounded"
                     />
-                    <span className="text-sm">Login Atomicat</span>
+                    <span className="text-xs">Login Atomicat</span>
                   </Button>
                 )}
 
