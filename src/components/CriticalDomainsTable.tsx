@@ -15,7 +15,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Trash2, RefreshCw, AlertTriangle, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Trash2,
+  RefreshCw,
+  AlertTriangle,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Mail,
+  Link as LinkIcon,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -26,6 +35,171 @@ interface CriticalDomainsTableProps {
   onDomainsChange: () => void;
 }
 
+// Função de tradução automática EN → PT
+function translateAlert(message: string): string {
+  if (!message) return "";
+
+  const translations: Record<string, string> = {
+    sorry: "desculpe",
+    "you will not be able to access": "você não poderá acessar",
+    "the domain": "o domínio",
+    "as the domain is currently locked": "pois o domínio está atualmente bloqueado",
+    "domain locked reason": "motivo do bloqueio",
+    "suspended due to fraudulent activity": "suspenso devido a atividade fraudulenta",
+    "please contact": "por favor, entre em contato",
+    suspended: "suspenso",
+    locked: "bloqueado",
+    expired: "expirado",
+    pending: "pendente",
+    verification: "verificação",
+    required: "necessário",
+    abuse: "abuso",
+    fraud: "fraude",
+    fraudulent: "fraudulenta",
+    activity: "atividade",
+    "domain name": "nome do domínio",
+    registrar: "registrador",
+    "for more information": "para mais informações",
+    "contact us": "entre em contato conosco",
+    "legal and abuse": "jurídico e abuso",
+    legalandabuse: "jurídico e abuso",
+  };
+
+  let translated = message;
+
+  // Preservar e-mails e links
+  const emails = message.match(/[\w.-]+@[\w.-]+\.\w+/g) || [];
+  const urls = message.match(/https?:\/\/[^\s]+/g) || [];
+
+  emails.forEach((email, i) => {
+    translated = translated.replace(email, `__EMAIL${i}__`);
+  });
+
+  urls.forEach((url, i) => {
+    translated = translated.replace(url, `__URL${i}__`);
+  });
+
+  // Traduzir
+  Object.entries(translations).forEach(([eng, pt]) => {
+    const regex = new RegExp(eng, "gi");
+    translated = translated.replace(regex, pt);
+  });
+
+  // Restaurar e-mails e links
+  emails.forEach((email, i) => {
+    translated = translated.replace(`__EMAIL${i}__`, email);
+  });
+
+  urls.forEach((url, i) => {
+    translated = translated.replace(`__URL${i}__`, url);
+  });
+
+  // Capitalizar primeira letra
+  translated = translated.charAt(0).toUpperCase() + translated.slice(1);
+
+  return translated;
+}
+
+// Componente para renderizar mensagem com links e e-mails destacados
+function AlertMessageRenderer({ message }: { message: string }) {
+  if (!message) return null;
+
+  const emailRegex = /([\w.-]+@[\w.-]+\.\w+)/g;
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const combinedRegex = new RegExp(`${emailRegex.source}|${urlRegex.source}`, "g");
+
+  const parts: Array<{ type: "text" | "email" | "url"; content: string }> = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = combinedRegex.exec(message)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({
+        type: "text",
+        content: message.slice(lastIndex, match.index),
+      });
+    }
+
+    const matchedText = match[0];
+    const isEmail = matchedText.includes("@") && !matchedText.startsWith("http");
+
+    parts.push({
+      type: isEmail ? "email" : "url",
+      content: matchedText,
+    });
+
+    lastIndex = combinedRegex.lastIndex;
+  }
+
+  if (lastIndex < message.length) {
+    parts.push({
+      type: "text",
+      content: message.slice(lastIndex),
+    });
+  }
+
+  const emails = parts.filter((p) => p.type === "email");
+
+  return (
+    <div className="space-y-3">
+      <p className="text-yellow-700 dark:text-yellow-300 leading-relaxed text-base">
+        {parts.map((part, index) => {
+          if (part.type === "email") {
+            return (
+              <span key={index} className="inline-flex items-center">
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-yellow-900 dark:text-yellow-200 font-semibold hover:text-yellow-700 dark:hover:text-yellow-100 underline inline-flex items-center gap-1"
+                  onClick={() => (window.location.href = `mailto:${part.content}`)}
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  {part.content}
+                </Button>
+              </span>
+            );
+          }
+
+          if (part.type === "url") {
+            return (
+              <span key={index} className="inline-flex items-center">
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-yellow-900 dark:text-yellow-200 font-semibold hover:text-yellow-700 dark:hover:text-yellow-100 underline inline-flex items-center gap-1"
+                  onClick={() => window.open(part.content, "_blank", "noopener,noreferrer")}
+                >
+                  <LinkIcon className="h-3.5 w-3.5" />
+                  {part.content}
+                </Button>
+              </span>
+            );
+          }
+
+          return <span key={index}>{part.content}</span>;
+        })}
+      </p>
+
+      {emails.length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-2 mt-2 border-t border-yellow-300 dark:border-yellow-800">
+          {emails.map((part, index) => (
+            <Button
+              key={index}
+              size="sm"
+              variant="outline"
+              className="border-yellow-400 text-yellow-800 hover:bg-yellow-100 dark:border-yellow-700 dark:text-yellow-200 dark:hover:bg-yellow-900"
+              onClick={() => (window.location.href = `mailto:${part.content}`)}
+            >
+              <Mail className="h-4 w-4 mr-2" />
+              Falar com Suporte
+            </Button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomainsTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [domainToDelete, setDomainToDelete] = useState<any>(null);
@@ -33,31 +207,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const [renewalPrices, setRenewalPrices] = useState<Record<string, number>>({});
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
   const [currentAlertMessage, setCurrentAlertMessage] = useState("");
-  const [namecheapAlerts, setNamecheapAlerts] = useState<Record<string, string>>({});
   const [currentPage, setCurrentPage] = useState(0);
-
-  // Load alert domains from Namecheap
-  useEffect(() => {
-    const loadAlertDomains = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "ALERT" },
-        });
-
-        if (!error && data?.domains) {
-          const alertMap: Record<string, string> = {};
-          data.domains.forEach((domain: any) => {
-            alertMap[domain.name] = domain.alertMessage;
-          });
-          setNamecheapAlerts(alertMap);
-        }
-      } catch (err) {
-        console.error("Error loading alert domains:", err);
-      }
-    };
-
-    loadAlertDomains();
-  }, []);
 
   // Filtrar apenas domínios com status críticos
   const now = new Date();
@@ -68,7 +218,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     if (d.status === "expired" || d.status === "suspended") return true;
     if (!d.expiration_date) return false;
     const expDate = new Date(d.expiration_date);
-    const hasAlert = namecheapAlerts[d.domain_name];
+    const hasAlert = d.has_alert;
     return (
       d.status !== "expired" &&
       (hasAlert || (expDate > now && expDate < thirtyDaysFromNow) || (expDate > now && expDate < fifteenDaysFromNow))
@@ -76,7 +226,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   });
 
   const getStatusBadge = (domain: any) => {
-    const hasAlert = namecheapAlerts[domain.domain_name];
+    const hasAlert = domain.has_alert;
 
     if (hasAlert) {
       return <Badge className="bg-yellow-500">Alerta</Badge>;
@@ -100,8 +250,10 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   };
 
   const handleAlertClick = (domain: any) => {
-    const alertMessage = namecheapAlerts[domain.domain_name] || "Status suspenso no registrador.";
-    setCurrentAlertMessage(alertMessage);
+    const alertMessage = domain.has_alert || "Status suspenso no registrador.";
+    // Traduzir automaticamente a mensagem
+    const translatedMessage = translateAlert(alertMessage);
+    setCurrentAlertMessage(translatedMessage);
     setAlertDialogOpen(true);
   };
 
@@ -232,7 +384,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {(namecheapAlerts[domain.domain_name] || domain.status === "suspended") && (
+                          {(domain.has_alert || domain.status === "suspended") && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -336,8 +488,10 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
               <AlertCircle className="h-5 w-5" />
               Alerta do Domínio
             </DialogTitle>
-            <DialogDescription className="text-yellow-600 dark:text-yellow-400 text-base pt-4">
-              {currentAlertMessage}
+            <DialogDescription asChild>
+              <div className="pt-4">
+                <AlertMessageRenderer message={currentAlertMessage} />
+              </div>
             </DialogDescription>
           </DialogHeader>
         </DialogContent>
