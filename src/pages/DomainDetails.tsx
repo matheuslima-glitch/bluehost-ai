@@ -548,8 +548,8 @@ export default function DomainDetails() {
         </Dialog>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 items-start">
-        <Card className="h-full">
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
           <CardHeader>
             <CardTitle>Informações Básicas</CardTitle>
             <CardDescription>Status e dados principais do domínio</CardDescription>
@@ -672,7 +672,7 @@ export default function DomainDetails() {
           </CardContent>
         </Card>
 
-        <Card className="h-full">
+        <Card>
           <CardHeader>
             <CardTitle>Configurações</CardTitle>
             <CardDescription>Configure plataforma e fonte de tráfego</CardDescription>
