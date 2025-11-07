@@ -521,23 +521,28 @@ export default function DomainManagement() {
                       <TableCell>{getStatusBadge(domain.status)}</TableCell>
                       <TableCell>
                         {domain.platform ? (
-                          <Badge variant="outline" className="flex items-center gap-2">
+                          <div className="flex items-center justify-center">
                             {domain.platform.toLowerCase() === "wordpress" && (
                               <img
                                 src="https://upload.wikimedia.org/wikipedia/commons/9/93/Wordpress_Blue_logo.png"
                                 alt="WordPress"
-                                className="h-4 w-4 rounded-full"
+                                className="h-6 w-6 rounded-full"
+                                title="WordPress"
                               />
                             )}
                             {domain.platform.toLowerCase() === "atomicat" && (
                               <img
                                 src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png"
                                 alt="AtomiCat"
-                                className="h-4 w-4 rounded"
+                                className="h-6 w-6 rounded"
+                                title="AtomiCat"
                               />
                             )}
-                            {domain.platform}
-                          </Badge>
+                            {domain.platform.toLowerCase() !== "wordpress" &&
+                              domain.platform.toLowerCase() !== "atomicat" && (
+                                <Badge variant="outline">{domain.platform}</Badge>
+                              )}
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
