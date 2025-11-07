@@ -447,7 +447,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("domain_name")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent hover:text-black dark:hover:text-white"
                       >
                         Domínio
                         <ArrowUpDown className="h-4 w-4" />
@@ -457,7 +457,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("status")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent hover:text-black dark:hover:text-white"
                       >
                         Status
                         <ArrowUpDown className="h-4 w-4" />
@@ -467,7 +467,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("platform")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-transparent hover:text-black dark:hover:text-white"
                       >
                         Plataforma
                         <ArrowUpDown className="h-4 w-4" />
@@ -477,7 +477,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("traffic_source")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-transparent hover:text-black dark:hover:text-white"
                       >
                         Fonte de Tráfego
                         <ArrowUpDown className="h-4 w-4" />
@@ -488,7 +488,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("expiration_date")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent hover:text-black dark:hover:text-white"
                       >
                         Expiração
                         <ArrowUpDown className="h-4 w-4" />
@@ -498,7 +498,7 @@ export default function DomainManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("monthly_visits")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent hover:text-black dark:hover:text-white"
                       >
                         Visitas/Mês
                         <ArrowUpDown className="h-4 w-4" />
