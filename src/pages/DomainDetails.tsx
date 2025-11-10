@@ -115,78 +115,63 @@ export default function DomainDetails() {
   useEffect(() => {
     const fetchAnalytics = async () => {
       if (!domain?.domain_name) {
-        console.log("❌ Sem domain_name, não é possível buscar analytics");
         setLoadingAnalytics(false);
         return;
       }
 
-      console.log("🔍 Buscando analytics para:", domain.domain_name);
-      console.log("📊 Zone ID do domínio:", domain.zone_id);
-
       setLoadingAnalytics(true);
 
       try {
-        // PRIMEIRA TENTATIVA: Buscar por domain_name
-        console.log("🔎 Tentativa 1: Buscando por domain_name:", domain.domain_name);
+        // Buscar por domain_name primeiro
         let { data, error } = await supabase
           .from("domain_analytics")
           .select("*")
           .eq("domain_name", domain.domain_name)
           .single();
 
-        // SE NÃO ENCONTRAR, tentar por zone_id
+        // Se não encontrar, tentar por zone_id
         if (error && domain.zone_id) {
-          console.log("⚠️ Não encontrado por domain_name, tentando por zone_id:", domain.zone_id);
           const result = await supabase.from("domain_analytics").select("*").eq("zone_id", domain.zone_id).single();
 
           data = result.data;
           error = result.error;
         }
 
-        // SE AINDA NÃO ENCONTRAR, listar todos para debug
-        if (error) {
-          console.log("⚠️ Não encontrado. Listando TODOS os registros para debug:");
-          const { data: allRecords } = await supabase.from("domain_analytics").select("domain_name, zone_id").limit(10);
-
-          console.table(allRecords);
-          console.error("❌ Erro final ao buscar analytics:", error);
-
-          toast.error(`Analytics não encontrado para ${domain.domain_name}`);
+        if (error || !data) {
           setAnalyticsData(null);
           setChartData([]);
           setLoadingAnalytics(false);
           return;
         }
 
-        if (data) {
-          console.log("✅ Analytics encontrado!", data);
-          setAnalyticsData(data);
+        setAnalyticsData(data);
 
-          // Transformar os dados para o formato do gráfico
-          const months = [
-            { month: "Jan", visits: data.jan_visits || 0 },
-            { month: "Fev", visits: data.feb_visits || 0 },
-            { month: "Mar", visits: data.mar_visits || 0 },
-            { month: "Abr", visits: data.apr_visits || 0 },
-            { month: "Mai", visits: data.may_visits || 0 },
-            { month: "Jun", visits: data.jun_visits || 0 },
-            { month: "Jul", visits: data.jul_visits || 0 },
-            { month: "Ago", visits: data.aug_visits || 0 },
-            { month: "Set", visits: data.sep_visits || 0 },
-            { month: "Out", visits: data.oct_visits || 0 },
-            { month: "Nov", visits: data.nov_visits || 0 },
-            { month: "Dez", visits: data.dec_visits || 0 },
-          ];
+        // Pegar o mês atual (0 = Janeiro, 11 = Dezembro)
+        const currentMonth = new Date().getMonth();
 
-          console.log("📈 Dados do gráfico:", months);
-          setChartData(months);
-          toast.success("Analytics carregado com sucesso!");
-        }
+        // Array com todos os meses
+        const allMonths = [
+          { month: "Jan", visits: data.jan_visits || 0, index: 0 },
+          { month: "Fev", visits: data.feb_visits || 0, index: 1 },
+          { month: "Mar", visits: data.mar_visits || 0, index: 2 },
+          { month: "Abr", visits: data.apr_visits || 0, index: 3 },
+          { month: "Mai", visits: data.may_visits || 0, index: 4 },
+          { month: "Jun", visits: data.jun_visits || 0, index: 5 },
+          { month: "Jul", visits: data.jul_visits || 0, index: 6 },
+          { month: "Ago", visits: data.aug_visits || 0, index: 7 },
+          { month: "Set", visits: data.sep_visits || 0, index: 8 },
+          { month: "Out", visits: data.oct_visits || 0, index: 9 },
+          { month: "Nov", visits: data.nov_visits || 0, index: 10 },
+          { month: "Dez", visits: data.dec_visits || 0, index: 11 },
+        ];
+
+        // Filtrar apenas os meses até o atual
+        const filteredMonths = allMonths.filter((m) => m.index <= currentMonth);
+
+        setChartData(filteredMonths);
       } catch (error) {
-        console.error("💥 Erro ao processar analytics:", error);
         setAnalyticsData(null);
         setChartData([]);
-        toast.error("Erro ao processar analytics");
       } finally {
         setLoadingAnalytics(false);
       }
@@ -833,10 +818,7 @@ export default function DomainDetails() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Dashboard de Visitas Mensais</CardTitle>
-              <CardDescription>
-                Histórico de visitas nos últimos 12 meses
-                {analyticsData && ` (ano: ${analyticsData.year || new Date().getFullYear()})`}
-              </CardDescription>
+              <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
             </div>
             <TrendingUp className="h-5 w-5 text-muted-foreground" />
           </div>
