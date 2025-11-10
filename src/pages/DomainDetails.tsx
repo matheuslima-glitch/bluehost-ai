@@ -72,6 +72,11 @@ export default function DomainDetails() {
   const [nameserversInput, setNameserversInput] = useState("");
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  
+  // Estados para analytics reais do Supabase
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true);
+  const [chartData, setChartData] = useState<any[]>([]);
 
   // Fetch custom filters from database
   const { data: customFilters = [] } = useQuery({
@@ -106,25 +111,65 @@ export default function DomainDetails() {
     ...customFilters.filter((f) => f.filter_type === "traffic_source").map((f) => f.filter_value),
   ];
 
-  // Generate mock monthly visits data
-  const generateMonthlyData = (monthlyVisits: number) => {
-    const data = [];
-    const currentDate = new Date();
-
-    for (let i = 11; i >= 0; i--) {
-      const date = subMonths(currentDate, i);
-      const monthName = format(date, "MMM/yy", { locale: ptBR });
-      const variation = 0.7 + Math.random() * 0.6; // 70% to 130% variation
-      const visits = Math.round(monthlyVisits * variation);
-
-      data.push({
-        month: monthName,
-        visits: visits,
-      });
-    }
-
-    return data;
-  };
+  // Buscar dados reais de analytics do Supabase
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      if (!domain?.zone_id) {
+        setLoadingAnalytics(false);
+        return;
+      }
+      
+      setLoadingAnalytics(true);
+      
+      try {
+        // Buscar dados da tabela domain_analytics
+        const { data, error } = await supabase
+          .from('domain_analytics')
+          .select('*')
+          .eq('zone_id', domain.zone_id)
+          .single();
+        
+        if (error) {
+          console.error('Erro ao buscar analytics:', error);
+          // Se não encontrar dados, não mostrar erro, apenas deixar vazio
+          setAnalyticsData(null);
+          setChartData([]);
+          setLoadingAnalytics(false);
+          return;
+        }
+        
+        if (data) {
+          setAnalyticsData(data);
+          
+          // Transformar os dados para o formato do gráfico
+          const months = [
+            { month: 'Jan', visits: data.jan_visits || 0 },
+            { month: 'Fev', visits: data.feb_visits || 0 },
+            { month: 'Mar', visits: data.mar_visits || 0 },
+            { month: 'Abr', visits: data.apr_visits || 0 },
+            { month: 'Mai', visits: data.may_visits || 0 },
+            { month: 'Jun', visits: data.jun_visits || 0 },
+            { month: 'Jul', visits: data.jul_visits || 0 },
+            { month: 'Ago', visits: data.aug_visits || 0 },
+            { month: 'Set', visits: data.sep_visits || 0 },
+            { month: 'Out', visits: data.oct_visits || 0 },
+            { month: 'Nov', visits: data.nov_visits || 0 },
+            { month: 'Dez', visits: data.dec_visits || 0 }
+          ];
+          
+          setChartData(months);
+        }
+      } catch (error) {
+        console.error('Erro ao processar analytics:', error);
+        setAnalyticsData(null);
+        setChartData([]);
+      } finally {
+        setLoadingAnalytics(false);
+      }
+    };
+    
+    fetchAnalytics();
+  }, [domain?.zone_id]);
 
   useEffect(() => {
     loadDomain();
@@ -761,37 +806,91 @@ export default function DomainDetails() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Dashboard de Visitas Mensais</CardTitle>
-          <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Dashboard de Visitas Mensais</CardTitle>
+              <CardDescription>
+                Histórico de visitas nos últimos 12 meses
+                {analyticsData && ` (ano: ${analyticsData.year || new Date().getFullYear()})`}
+              </CardDescription>
+            </div>
+            <TrendingUp className="h-5 w-5 text-muted-foreground" />
+          </div>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={generateMonthlyData(domain.monthly_visits)}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
-              <YAxis
-                className="text-xs"
-                tick={{ fill: "hsl(var(--foreground))" }}
-                tickFormatter={(value) => value.toLocaleString()}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--background))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-                labelStyle={{ color: "hsl(var(--foreground))" }}
-                formatter={(value: number) => [value.toLocaleString() + " visitas", "Visitas"]}
-              />
-              <Line
-                type="monotone"
-                dataKey="visits"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={{ fill: "hsl(var(--primary))" }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {loadingAnalytics ? (
+            <div className="flex items-center justify-center h-[300px]">
+              <LoadingSpinner />
+            </div>
+          ) : chartData.length === 0 || !analyticsData ? (
+            <div className="flex flex-col items-center justify-center h-[300px] text-center">
+              <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">
+                Nenhum dado de analytics encontrado para este domínio
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Os dados serão atualizados automaticamente via Edge Function (cloudflare-analytics)
+              </p>
+            </div>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    dataKey="month" 
+                    className="text-xs" 
+                    tick={{ fill: "hsl(var(--foreground))" }} 
+                  />
+                  <YAxis
+                    className="text-xs"
+                    tick={{ fill: "hsl(var(--foreground))" }}
+                    tickFormatter={(value) => value.toLocaleString('pt-BR')}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                    formatter={(value: number) => [value.toLocaleString('pt-BR') + " visitas", "Visitas"]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="visits"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={{ fill: "hsl(var(--primary))" }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              
+              {/* Estatísticas resumidas */}
+              {analyticsData && (
+                <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">
+                      {analyticsData.annual_visits?.toLocaleString('pt-BR') || 0}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Total Anual</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">
+                      {Math.round((analyticsData.annual_visits || 0) / 12).toLocaleString('pt-BR')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Média Mensal</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">
+                      {Math.max(...chartData.map((m: any) => m.visits)).toLocaleString('pt-BR')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Pico Mensal</p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 
