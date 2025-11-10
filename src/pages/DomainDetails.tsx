@@ -72,7 +72,7 @@ export default function DomainDetails() {
   const [nameserversInput, setNameserversInput] = useState("");
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
-  
+
   // Estados para analytics reais do Supabase
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
@@ -114,62 +114,86 @@ export default function DomainDetails() {
   // Buscar dados reais de analytics do Supabase
   useEffect(() => {
     const fetchAnalytics = async () => {
-      if (!domain?.zone_id) {
+      if (!domain?.domain_name) {
+        console.log("❌ Sem domain_name, não é possível buscar analytics");
         setLoadingAnalytics(false);
         return;
       }
-      
+
+      console.log("🔍 Buscando analytics para:", domain.domain_name);
+      console.log("📊 Zone ID do domínio:", domain.zone_id);
+
       setLoadingAnalytics(true);
-      
+
       try {
-        // Buscar dados da tabela domain_analytics
-        const { data, error } = await supabase
-          .from('domain_analytics')
-          .select('*')
-          .eq('zone_id', domain.zone_id)
+        // PRIMEIRA TENTATIVA: Buscar por domain_name
+        console.log("🔎 Tentativa 1: Buscando por domain_name:", domain.domain_name);
+        let { data, error } = await supabase
+          .from("domain_analytics")
+          .select("*")
+          .eq("domain_name", domain.domain_name)
           .single();
-        
+
+        // SE NÃO ENCONTRAR, tentar por zone_id
+        if (error && domain.zone_id) {
+          console.log("⚠️ Não encontrado por domain_name, tentando por zone_id:", domain.zone_id);
+          const result = await supabase.from("domain_analytics").select("*").eq("zone_id", domain.zone_id).single();
+
+          data = result.data;
+          error = result.error;
+        }
+
+        // SE AINDA NÃO ENCONTRAR, listar todos para debug
         if (error) {
-          console.error('Erro ao buscar analytics:', error);
-          // Se não encontrar dados, não mostrar erro, apenas deixar vazio
+          console.log("⚠️ Não encontrado. Listando TODOS os registros para debug:");
+          const { data: allRecords } = await supabase.from("domain_analytics").select("domain_name, zone_id").limit(10);
+
+          console.table(allRecords);
+          console.error("❌ Erro final ao buscar analytics:", error);
+
+          toast.error(`Analytics não encontrado para ${domain.domain_name}`);
           setAnalyticsData(null);
           setChartData([]);
           setLoadingAnalytics(false);
           return;
         }
-        
+
         if (data) {
+          console.log("✅ Analytics encontrado!", data);
           setAnalyticsData(data);
-          
+
           // Transformar os dados para o formato do gráfico
           const months = [
-            { month: 'Jan', visits: data.jan_visits || 0 },
-            { month: 'Fev', visits: data.feb_visits || 0 },
-            { month: 'Mar', visits: data.mar_visits || 0 },
-            { month: 'Abr', visits: data.apr_visits || 0 },
-            { month: 'Mai', visits: data.may_visits || 0 },
-            { month: 'Jun', visits: data.jun_visits || 0 },
-            { month: 'Jul', visits: data.jul_visits || 0 },
-            { month: 'Ago', visits: data.aug_visits || 0 },
-            { month: 'Set', visits: data.sep_visits || 0 },
-            { month: 'Out', visits: data.oct_visits || 0 },
-            { month: 'Nov', visits: data.nov_visits || 0 },
-            { month: 'Dez', visits: data.dec_visits || 0 }
+            { month: "Jan", visits: data.jan_visits || 0 },
+            { month: "Fev", visits: data.feb_visits || 0 },
+            { month: "Mar", visits: data.mar_visits || 0 },
+            { month: "Abr", visits: data.apr_visits || 0 },
+            { month: "Mai", visits: data.may_visits || 0 },
+            { month: "Jun", visits: data.jun_visits || 0 },
+            { month: "Jul", visits: data.jul_visits || 0 },
+            { month: "Ago", visits: data.aug_visits || 0 },
+            { month: "Set", visits: data.sep_visits || 0 },
+            { month: "Out", visits: data.oct_visits || 0 },
+            { month: "Nov", visits: data.nov_visits || 0 },
+            { month: "Dez", visits: data.dec_visits || 0 },
           ];
-          
+
+          console.log("📈 Dados do gráfico:", months);
           setChartData(months);
+          toast.success("Analytics carregado com sucesso!");
         }
       } catch (error) {
-        console.error('Erro ao processar analytics:', error);
+        console.error("💥 Erro ao processar analytics:", error);
         setAnalyticsData(null);
         setChartData([]);
+        toast.error("Erro ao processar analytics");
       } finally {
         setLoadingAnalytics(false);
       }
     };
-    
+
     fetchAnalytics();
-  }, [domain?.zone_id]);
+  }, [domain?.domain_name, domain?.zone_id]);
 
   useEffect(() => {
     loadDomain();
@@ -825,9 +849,7 @@ export default function DomainDetails() {
           ) : chartData.length === 0 || !analyticsData ? (
             <div className="flex flex-col items-center justify-center h-[300px] text-center">
               <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                Nenhum dado de analytics encontrado para este domínio
-              </p>
+              <p className="text-muted-foreground">Nenhum dado de analytics encontrado para este domínio</p>
               <p className="text-sm text-muted-foreground mt-2">
                 Os dados serão atualizados automaticamente via Edge Function (cloudflare-analytics)
               </p>
@@ -837,15 +859,11 @@ export default function DomainDetails() {
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="month" 
-                    className="text-xs" 
-                    tick={{ fill: "hsl(var(--foreground))" }} 
-                  />
+                  <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
                   <YAxis
                     className="text-xs"
                     tick={{ fill: "hsl(var(--foreground))" }}
-                    tickFormatter={(value) => value.toLocaleString('pt-BR')}
+                    tickFormatter={(value) => value.toLocaleString("pt-BR")}
                   />
                   <Tooltip
                     contentStyle={{
@@ -854,7 +872,7 @@ export default function DomainDetails() {
                       borderRadius: "8px",
                     }}
                     labelStyle={{ color: "hsl(var(--foreground))" }}
-                    formatter={(value: number) => [value.toLocaleString('pt-BR') + " visitas", "Visitas"]}
+                    formatter={(value: number) => [value.toLocaleString("pt-BR") + " visitas", "Visitas"]}
                   />
                   <Line
                     type="monotone"
@@ -865,25 +883,23 @@ export default function DomainDetails() {
                   />
                 </LineChart>
               </ResponsiveContainer>
-              
+
               {/* Estatísticas resumidas */}
               {analyticsData && (
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
                   <div className="text-center">
-                    <p className="text-2xl font-bold">
-                      {analyticsData.annual_visits?.toLocaleString('pt-BR') || 0}
-                    </p>
+                    <p className="text-2xl font-bold">{analyticsData.annual_visits?.toLocaleString("pt-BR") || 0}</p>
                     <p className="text-sm text-muted-foreground">Total Anual</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold">
-                      {Math.round((analyticsData.annual_visits || 0) / 12).toLocaleString('pt-BR')}
+                      {Math.round((analyticsData.annual_visits || 0) / 12).toLocaleString("pt-BR")}
                     </p>
                     <p className="text-sm text-muted-foreground">Média Mensal</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold">
-                      {Math.max(...chartData.map((m: any) => m.visits)).toLocaleString('pt-BR')}
+                      {Math.max(...chartData.map((m: any) => m.visits)).toLocaleString("pt-BR")}
                     </p>
                     <p className="text-sm text-muted-foreground">Pico Mensal</p>
                   </div>
