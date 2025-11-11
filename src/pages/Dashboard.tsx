@@ -187,8 +187,8 @@ export default function Dashboard() {
         .single();
 
       if (!analyticsGeralError && analyticsGeralData) {
-        // Calcular total de visitas do ano
-        const totalVisitsFromDB = analyticsGeralData.annual_visits || 0;
+        // Calcular total de visitas do ano (converter bigint para number)
+        const totalVisitsFromDB = Number(analyticsGeralData.annual_visits) || 0;
         setTotalVisits(totalVisitsFromDB);
 
         // Gerar dados dos últimos 12 meses (rolling)
@@ -196,20 +196,20 @@ export default function Dashboard() {
         const currentMonth = now.getMonth(); // 0-11
         const currentYear = now.getFullYear();
 
-        // Array com todos os meses do ano
+        // Array com todos os meses do ano (converter bigint para number)
         const monthsData = [
-          { name: "Jan", visits: analyticsGeralData.jan_visits || 0, month: 0 },
-          { name: "Fev", visits: analyticsGeralData.feb_visits || 0, month: 1 },
-          { name: "Mar", visits: analyticsGeralData.mar_visits || 0, month: 2 },
-          { name: "Abr", visits: analyticsGeralData.apr_visits || 0, month: 3 },
-          { name: "Mai", visits: analyticsGeralData.may_visits || 0, month: 4 },
-          { name: "Jun", visits: analyticsGeralData.jun_visits || 0, month: 5 },
-          { name: "Jul", visits: analyticsGeralData.jul_visits || 0, month: 6 },
-          { name: "Ago", visits: analyticsGeralData.aug_visits || 0, month: 7 },
-          { name: "Set", visits: analyticsGeralData.sep_visits || 0, month: 8 },
-          { name: "Out", visits: analyticsGeralData.oct_visits || 0, month: 9 },
-          { name: "Nov", visits: analyticsGeralData.nov_visits || 0, month: 10 },
-          { name: "Dez", visits: analyticsGeralData.dec_visits || 0, month: 11 },
+          { name: "Jan", visits: Number(analyticsGeralData.jan_visits) || 0, month: 0 },
+          { name: "Fev", visits: Number(analyticsGeralData.feb_visits) || 0, month: 1 },
+          { name: "Mar", visits: Number(analyticsGeralData.mar_visits) || 0, month: 2 },
+          { name: "Abr", visits: Number(analyticsGeralData.apr_visits) || 0, month: 3 },
+          { name: "Mai", visits: Number(analyticsGeralData.may_visits) || 0, month: 4 },
+          { name: "Jun", visits: Number(analyticsGeralData.jun_visits) || 0, month: 5 },
+          { name: "Jul", visits: Number(analyticsGeralData.jul_visits) || 0, month: 6 },
+          { name: "Ago", visits: Number(analyticsGeralData.aug_visits) || 0, month: 7 },
+          { name: "Set", visits: Number(analyticsGeralData.sep_visits) || 0, month: 8 },
+          { name: "Out", visits: Number(analyticsGeralData.oct_visits) || 0, month: 9 },
+          { name: "Nov", visits: Number(analyticsGeralData.nov_visits) || 0, month: 10 },
+          { name: "Dez", visits: Number(analyticsGeralData.dec_visits) || 0, month: 11 },
         ];
 
         // Calcular os últimos 12 meses (rolling)
@@ -663,10 +663,25 @@ export default function Dashboard() {
               <LineChart data={monthlyVisitsData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="mes" />
-                <YAxis />
-                <Tooltip />
+                <YAxis
+                  tickFormatter={(value) => {
+                    // Formatar números grandes de forma legível
+                    if (value >= 1000000) {
+                      return `${(value / 1000000).toFixed(1)}M`;
+                    } else if (value >= 1000) {
+                      return `${(value / 1000).toFixed(0)}k`;
+                    }
+                    return value.toString();
+                  }}
+                  domain={["auto", "auto"]}
+                  scale="linear"
+                />
+                <Tooltip
+                  formatter={(value: number) => [value.toLocaleString("pt-BR") + " visitas", "Visitas"]}
+                  labelFormatter={(label) => `Mês: ${label}`}
+                />
                 <Legend />
-                <Line type="monotone" dataKey="visitas" stroke="hsl(var(--primary))" strokeWidth={2} />
+                <Line type="monotone" dataKey="visitas" stroke="hsl(var(--primary))" strokeWidth={2} name="Visitas" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
