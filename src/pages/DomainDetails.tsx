@@ -1,3 +1,4 @@
+```tsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, X, Plus, Trash2, Edit2, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format, subMonths } from "date-fns";
+import { format } from "date-fns"; // Removido subMonths
 import { ptBR } from "date-fns/locale";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
@@ -73,6 +74,10 @@ export default function DomainDetails() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
+  // Novos estados para analytics
+  const [chartData, setChartData] = useState<Array<{ month: string; visits: number }>>([]);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
   // Fetch custom filters from database
   const { data: customFilters = [] } = useQuery({
     queryKey: ["custom-filters", user?.id],
@@ -106,25 +111,7 @@ export default function DomainDetails() {
     ...customFilters.filter((f) => f.filter_type === "traffic_source").map((f) => f.filter_value),
   ];
 
-  // Generate mock monthly visits data
-  const generateMonthlyData = (monthlyVisits: number) => {
-    const data = [];
-    const currentDate = new Date();
-
-    for (let i = 11; i >= 0; i--) {
-      const date = subMonths(currentDate, i);
-      const monthName = format(date, "MMM/yy", { locale: ptBR });
-      const variation = 0.7 + Math.random() * 0.6; // 70% to 130% variation
-      const visits = Math.round(monthlyVisits * variation);
-
-      data.push({
-        month: monthName,
-        visits: visits,
-      });
-    }
-
-    return data;
-  };
+  // Função mockada 'generateMonthlyData' removida
 
   useEffect(() => {
     loadDomain();
@@ -141,6 +128,97 @@ export default function DomainDetails() {
       loadDnsRecords();
     }
   }, [domain?.zone_id]);
+
+  // Novo useEffect para carregar dados reais de analytics
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      if (!domain) {
+        setChartData([]);
+        return;
+      }
+
+      setLoadingAnalytics(true);
+      try {
+        let analyticsData: any = null;
+
+        // 1. Tentar buscar por domain_name
+        if (domain.domain_name) {
+          const { data, error } = await supabase
+            .from("domain_analytics")
+            .select("*")
+            .eq("domain_name", domain.domain_name)
+            .single();
+
+          if (data) {
+            analyticsData = data;
+          } else if (error && error.code !== "PGRST116") {
+            // PGRST116 = 0 rows, ignora
+            console.error("Error fetching analytics by domain_name:", error);
+          }
+        }
+
+        // 2. Se não achou, tentar por zone_id
+        if (!analyticsData && domain.zone_id) {
+          const { data, error } = await supabase
+            .from("domain_analytics")
+            .select("*")
+            .eq("zone_id", domain.zone_id)
+            .single();
+
+          if (data) {
+            analyticsData = data;
+          } else if (error && error.code !== "PGRST116") {
+            console.error("Error fetching analytics by zone_id:", error);
+          }
+        }
+
+        // 3. Se não encontrou dados, array vazio
+        if (!analyticsData) {
+          setChartData([]);
+          return;
+        }
+
+        // 4. Processar dados dos últimos 12 meses
+        const processedData: Array<{ month: string; visits: number }> = [];
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+        for (let i = 0; i < 12; i++) {
+          // Calcula a data para o mês 'i' meses atrás
+          const date = new Date(currentYear, currentDate.getMonth() - i, 1);
+          const monthIndex = date.getMonth(); // 0-11
+          const year = date.getFullYear();
+
+          const monthName = monthNames[monthIndex]; // "jan", "feb", etc.
+          // Determina o sufixo com base se o ano é o atual ou o anterior
+          const yearSuffix = year === currentYear ? "_cy" : "_py";
+          const columnName = `${monthName}${yearSuffix}`; // ex: "nov_cy" ou "dec_py"
+
+          const visits = analyticsData[columnName] || 0;
+          const monthLabel = format(date, "MMM/yy", { locale: ptBR }); // ex: "Nov/25"
+
+          processedData.push({ month: monthLabel, visits: Number(visits) });
+        }
+
+        // Reverte para que os dados fiquem em ordem cronológica (mais antigo -> mais novo)
+        setChartData(processedData.reverse());
+      } catch (error: any) {
+        console.error("Error loading analytics:", error);
+        toast.error("Erro ao carregar dados de analytics");
+        setChartData([]);
+      } finally {
+        setLoadingAnalytics(false);
+      }
+    };
+
+    // Roda quando o domínio é carregado ou alterado
+    if (domain) {
+      loadAnalytics();
+    } else {
+      setChartData([]);
+    }
+  }, [domain]); // Depende do objeto domain
 
   const loadActivityLogs = async () => {
     if (!id) return;
@@ -764,34 +842,45 @@ export default function DomainDetails() {
           <CardTitle>Dashboard de Visitas Mensais</CardTitle>
           <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
         </CardHeader>
+        {/* Modificação do Card de Analytics */}
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={generateMonthlyData(domain.monthly_visits)}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
-              <YAxis
-                className="text-xs"
-                tick={{ fill: "hsl(var(--foreground))" }}
-                tickFormatter={(value) => value.toLocaleString()}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--background))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-                labelStyle={{ color: "hsl(var(--foreground))" }}
-                formatter={(value: number) => [value.toLocaleString() + " visitas", "Visitas"]}
-              />
-              <Line
-                type="monotone"
-                dataKey="visits"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={{ fill: "hsl(var(--primary))" }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {loadingAnalytics ? (
+            <div className="flex justify-center items-center h-[300px]">
+              <LoadingSpinner />
+            </div>
+          ) : chartData.length === 0 ? (
+            <div className="flex justify-center items-center h-[300px]">
+              <p className="text-muted-foreground">Nenhum dado encontrado</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData}> {/* Usa chartData ao invés de mock */}
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
+                <YAxis
+                  className="text-xs"
+                  tick={{ fill: "hsl(var(--foreground))" }}
+                  tickFormatter={(value) => value.toLocaleString()}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--background))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                  }}
+                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                  formatter={(value: number) => [value.toLocaleString() + " visitas", "Visitas"]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="visits"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  dot={{ fill: "hsl(var(--primary))" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </CardContent>
       </Card>
 
@@ -904,3 +993,4 @@ export default function DomainDetails() {
     </div>
   );
 }
+```
