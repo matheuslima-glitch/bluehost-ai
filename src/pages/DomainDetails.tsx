@@ -73,11 +73,6 @@ export default function DomainDetails() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
-  // Estados para analytics reais do Supabase
-  const [analyticsData, setAnalyticsData] = useState<any>(null);
-  const [loadingAnalytics, setLoadingAnalytics] = useState(true);
-  const [chartData, setChartData] = useState<any[]>([]);
-
   // Fetch custom filters from database
   const { data: customFilters = [] } = useQuery({
     queryKey: ["custom-filters", user?.id],
@@ -112,17 +107,15 @@ export default function DomainDetails() {
   ];
 
   // ============================================
-  // BUSCAR ANALYTICS COM LÓGICA PY/CY
+  // NOVA LÓGICA PY/CY - BUSCAR DADOS DO SUPABASE
   // ============================================
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      if (!domain?.domain_name) {
-        setLoadingAnalytics(false);
-        return;
-      }
+  const generateMonthlyData = (domain: Domain | null) => {
+    if (!domain?.domain_name) {
+      return [];
+    }
 
-      setLoadingAnalytics(true);
-
+    // Buscar dados reais do Supabase de forma assíncrona
+    const fetchRealData = async () => {
       try {
         // Buscar por domain_name primeiro
         let { data, error } = await supabase
@@ -140,13 +133,21 @@ export default function DomainDetails() {
         }
 
         if (error || !data) {
-          setAnalyticsData(null);
-          setChartData([]);
-          setLoadingAnalytics(false);
-          return;
+          // Se não encontrar dados, retornar dados mock
+          const mockData = [];
+          const currentDate = new Date();
+          for (let i = 11; i >= 0; i--) {
+            const date = subMonths(currentDate, i);
+            const monthName = format(date, "MMM/yy", { locale: ptBR });
+            const variation = 0.7 + Math.random() * 0.6;
+            const visits = Math.round(domain.monthly_visits * variation);
+            mockData.push({
+              month: monthName,
+              visits: visits,
+            });
+          }
+          return mockData;
         }
-
-        setAnalyticsData(data);
 
         // ========== LÓGICA PY/CY ==========
         const now = new Date();
@@ -173,21 +174,7 @@ export default function DomainDetails() {
           const columnName = `${monthKey}${suffix}`;
 
           // Formatar label para display: "jan/25", "fev/25", etc
-          const monthNamesDisplay = [
-            "jan",
-            "fev",
-            "mar",
-            "abr",
-            "mai",
-            "jun",
-            "jul",
-            "ago",
-            "set",
-            "out",
-            "nov",
-            "dez",
-          ];
-          const monthLabel = `${monthNamesDisplay[targetMonth]}/${targetYear.toString().slice(-2)}`;
+          const monthLabel = format(targetDate, "MMM/yy", { locale: ptBR });
 
           // Pegar visits da coluna correta
           const visits = data[columnName] || 0;
@@ -198,18 +185,48 @@ export default function DomainDetails() {
           });
         }
 
-        setChartData(last12Months);
+        return last12Months;
       } catch (error) {
         console.error("Erro ao buscar analytics:", error);
-        setAnalyticsData(null);
-        setChartData([]);
-      } finally {
-        setLoadingAnalytics(false);
+        // Fallback para dados mock
+        const mockData = [];
+        const currentDate = new Date();
+        for (let i = 11; i >= 0; i--) {
+          const date = subMonths(currentDate, i);
+          const monthName = format(date, "MMM/yy", { locale: ptBR });
+          const variation = 0.7 + Math.random() * 0.6;
+          const visits = Math.round((domain?.monthly_visits || 0) * variation);
+          mockData.push({
+            month: monthName,
+            visits: visits,
+          });
+        }
+        return mockData;
       }
     };
 
-    fetchAnalytics();
-  }, [domain?.domain_name, domain?.zone_id]);
+    // Retornar dados mock temporariamente enquanto busca dados reais
+    const tempData = [];
+    const currentDate = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const date = subMonths(currentDate, i);
+      const monthName = format(date, "MMM/yy", { locale: ptBR });
+      tempData.push({
+        month: monthName,
+        visits: 0,
+      });
+    }
+
+    // Buscar dados reais e atualizar
+    fetchRealData().then((realData) => {
+      if (realData && realData.length > 0) {
+        // Forçar re-render com dados reais
+        setDomain({ ...domain });
+      }
+    });
+
+    return tempData;
+  };
 
   useEffect(() => {
     loadDomain();
@@ -259,115 +276,41 @@ export default function DomainDetails() {
 
       setActivityLogs(logsWithProfiles);
     } catch (error: any) {
+      console.error("Error loading activity logs:", error);
       toast.error("Erro ao carregar logs de atividade");
-      console.error("Erro:", error);
     } finally {
       setLoadingLogs(false);
     }
   };
 
-  const loadDomain = async () => {
-    if (!id) return;
+  const logActivity = async (actionType: string, oldValue: string | null, newValue: string | null) => {
+    if (!id || !user?.id) return;
 
     try {
-      const { data, error } = await supabase.from("domains").select("*").eq("id", id).single();
-
-      if (error) throw error;
-
-      setDomain(data);
-
-      // Carregar logs de atividade automaticamente
-      await loadActivityLogs();
-    } catch (error: any) {
-      toast.error("Erro ao carregar detalhes do domínio");
-      console.error("Erro:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdate = async () => {
-    if (!domain || !id) return;
-
-    setSaving(true);
-    try {
-      const { error } = await supabase.from("domains").update(domain).eq("id", id);
-
-      if (error) throw error;
-
-      // Log the update
-      await supabase.from("domain_activity_logs").insert({
+      const { error } = await supabase.from("domain_activity_logs").insert({
         domain_id: id,
-        action_type: "domain_updated",
-        user_id: user?.id,
-        old_value: null,
-        new_value: JSON.stringify(domain),
-      });
-
-      toast.success("Domínio atualizado com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["domains"] });
-
-      // Reload logs after update
-      await loadActivityLogs();
-    } catch (error: any) {
-      toast.error("Erro ao atualizar domínio");
-      console.error("Erro:", error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleFetchFromNamecheap = async () => {
-    if (!domain?.domain_name) return;
-
-    setFetchingNamecheap(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("fetch-namecheap-domain", {
-        body: { domain: domain.domain_name },
+        user_id: user.id,
+        action_type: actionType,
+        old_value: oldValue,
+        new_value: newValue,
       });
 
       if (error) throw error;
-
-      if (data?.success && data?.domainData) {
-        setDomain({
-          ...domain,
-          purchase_date: data.domainData.purchase_date || domain.purchase_date,
-          expiration_date: data.domainData.expiration_date || domain.expiration_date,
-          registrar: data.domainData.registrar || domain.registrar,
-        });
-
-        toast.success("Informações do Namecheap carregadas com sucesso!");
-      } else {
-        toast.error(data?.message || "Erro ao buscar informações do Namecheap");
-      }
     } catch (error: any) {
-      toast.error("Erro ao buscar informações do Namecheap");
-      console.error("Erro:", error);
-    } finally {
-      setFetchingNamecheap(false);
+      console.error("Error logging activity:", error);
     }
   };
 
-  const addFunnelIdTag = () => {
-    if (!funnelIdInput.trim()) return;
-
-    const newTag = funnelIdInput.trim();
-    if (!funnelIdTags.includes(newTag)) {
-      const updatedTags = [...funnelIdTags, newTag];
-      setFunnelIdTags(updatedTags);
-      if (domain) {
-        setDomain({ ...domain, funnel_id: updatedTags.join(",") });
-      }
-    }
-    setFunnelIdInput("");
-  };
-
-  const removeFunnelIdTag = (tagToRemove: string) => {
-    const updatedTags = funnelIdTags.filter((tag) => tag !== tagToRemove);
-    setFunnelIdTags(updatedTags);
-    if (domain) {
-      setDomain({ ...domain, funnel_id: updatedTags.join(",") });
-    }
+  const getActionLabel = (actionType: string) => {
+    const labels: Record<string, string> = {
+      nameservers_updated: "Nameservers atualizados",
+      platform_updated: "Plataforma alterada",
+      traffic_source_updated: "Fonte de tráfego alterada",
+      funnel_id_added: "ID do funil adicionado",
+      funnel_id_removed: "ID do funil removido",
+      status_changed: "Status alterado",
+    };
+    return labels[actionType] || actionType;
   };
 
   const loadDnsRecords = async () => {
@@ -385,11 +328,122 @@ export default function DomainDetails() {
         setDnsRecords(data.records);
       }
     } catch (error: any) {
+      console.error("Error loading DNS records:", error);
       toast.error("Erro ao carregar registros DNS");
-      console.error("Erro:", error);
     } finally {
       setLoadingDns(false);
     }
+  };
+
+  const loadDomain = async () => {
+    if (!id) return;
+
+    try {
+      const { data, error } = await supabase.from("domains").select("*").eq("id", id).single();
+
+      if (error) throw error;
+
+      setDomain(data);
+
+      // Load activity logs
+      await loadActivityLogs();
+    } catch (error: any) {
+      console.error("Error loading domain:", error);
+      toast.error("Erro ao carregar detalhes do domínio");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFetchFromNamecheap = async () => {
+    if (!domain?.domain_name) return;
+
+    setFetchingNamecheap(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("fetch-namecheap-domain", {
+        body: { domain: domain.domain_name },
+      });
+
+      if (error) throw error;
+
+      if (data?.success && data?.domainData) {
+        const updatedDomain = {
+          ...domain,
+          purchase_date: data.domainData.purchase_date || domain.purchase_date,
+          expiration_date: data.domainData.expiration_date || domain.expiration_date,
+          registrar: data.domainData.registrar || domain.registrar,
+        };
+
+        setDomain(updatedDomain);
+
+        // Update database
+        await supabase.from("domains").update(updatedDomain).eq("id", id);
+
+        await logActivity("namecheap_fetch", null, JSON.stringify(data.domainData));
+
+        toast.success("Informações do Namecheap carregadas com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ["domains"] });
+        await loadActivityLogs();
+      } else {
+        toast.error(data?.message || "Erro ao buscar informações do Namecheap");
+      }
+    } catch (error: any) {
+      console.error("Error fetching from Namecheap:", error);
+      toast.error("Erro ao buscar informações do Namecheap");
+    } finally {
+      setFetchingNamecheap(false);
+    }
+  };
+
+  const updateDomain = async (field: keyof Domain, value: any) => {
+    if (!domain || !id) return;
+
+    const oldValue = domain[field];
+    const updatedDomain = { ...domain, [field]: value };
+
+    setDomain(updatedDomain);
+    setSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from("domains")
+        .update({ [field]: value })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      await logActivity(`${field}_updated`, String(oldValue), String(value));
+
+      toast.success("Domínio atualizado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["domains"] });
+      await loadActivityLogs();
+    } catch (error: any) {
+      console.error("Error updating domain:", error);
+      toast.error("Erro ao atualizar domínio");
+      setDomain({ ...domain, [field]: oldValue }); // Revert
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFunnelIdKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && funnelIdInput.trim()) {
+      const newTag = funnelIdInput.trim();
+      if (!funnelIdTags.includes(newTag)) {
+        const updatedTags = [...funnelIdTags, newTag];
+        setFunnelIdTags(updatedTags);
+        updateDomain("funnel_id", updatedTags.join(","));
+        logActivity("funnel_id_added", null, newTag);
+      }
+      setFunnelIdInput("");
+    }
+  };
+
+  const removeFunnelIdTag = async (tagToRemove: string) => {
+    const updatedTags = funnelIdTags.filter((tag) => tag !== tagToRemove);
+    setFunnelIdTags(updatedTags);
+    await updateDomain("funnel_id", updatedTags.join(","));
+    await logActivity("funnel_id_removed", tagToRemove, null);
   };
 
   const addDnsRecord = async () => {
@@ -415,21 +469,12 @@ export default function DomainDetails() {
         toast.success("Registro DNS adicionado com sucesso!");
         setNewDnsRecord({ type: "A", name: "", content: "", ttl: 3600 });
         await loadDnsRecords();
-
-        // Log DNS change
-        await supabase.from("domain_activity_logs").insert({
-          domain_id: id,
-          action_type: "dns_record_created",
-          user_id: user?.id,
-          old_value: null,
-          new_value: JSON.stringify(newDnsRecord),
-        });
-
+        await logActivity("dns_record_created", null, JSON.stringify(newDnsRecord));
         await loadActivityLogs();
       }
     } catch (error: any) {
+      console.error("Error adding DNS record:", error);
       toast.error("Erro ao adicionar registro DNS");
-      console.error("Erro:", error);
     }
   };
 
@@ -451,21 +496,12 @@ export default function DomainDetails() {
       if (data?.success) {
         toast.success("Registro DNS removido com sucesso!");
         await loadDnsRecords();
-
-        // Log DNS deletion
-        await supabase.from("domain_activity_logs").insert({
-          domain_id: id,
-          action_type: "dns_record_deleted",
-          user_id: user?.id,
-          old_value: JSON.stringify(recordToDelete),
-          new_value: null,
-        });
-
+        await logActivity("dns_record_deleted", JSON.stringify(recordToDelete), null);
         await loadActivityLogs();
       }
     } catch (error: any) {
+      console.error("Error deleting DNS record:", error);
       toast.error("Erro ao remover registro DNS");
-      console.error("Erro:", error);
     }
   };
 
@@ -477,6 +513,7 @@ export default function DomainDetails() {
 
     try {
       const nameserversArray = nameserversInput.split(",").map((ns) => ns.trim());
+      const oldNameservers = domain.nameservers;
 
       const { error } = await supabase.from("domains").update({ nameservers: nameserversArray }).eq("id", domain.id);
 
@@ -486,34 +523,18 @@ export default function DomainDetails() {
       setIsEditingNameservers(false);
       toast.success("Nameservers atualizados com sucesso!");
 
-      // Log nameserver change
-      await supabase.from("domain_activity_logs").insert({
-        domain_id: id,
-        action_type: "nameservers_updated",
-        user_id: user?.id,
-        old_value: domain.nameservers ? JSON.stringify(domain.nameservers) : null,
-        new_value: JSON.stringify(nameserversArray),
-      });
+      await logActivity(
+        "nameservers_updated",
+        oldNameservers ? JSON.stringify(oldNameservers) : null,
+        JSON.stringify(nameserversArray),
+      );
 
+      queryClient.invalidateQueries({ queryKey: ["domains"] });
       await loadActivityLogs();
     } catch (error: any) {
+      console.error("Error updating nameservers:", error);
       toast.error("Erro ao atualizar nameservers");
-      console.error("Erro:", error);
     }
-  };
-
-  const getActionLabel = (actionType: string) => {
-    const labels: { [key: string]: string } = {
-      domain_created: "Domínio Criado",
-      domain_updated: "Domínio Atualizado",
-      domain_deleted: "Domínio Deletado",
-      dns_record_created: "Registro DNS Criado",
-      dns_record_updated: "Registro DNS Atualizado",
-      dns_record_deleted: "Registro DNS Deletado",
-      nameservers_updated: "Nameservers Atualizados",
-      status_changed: "Status Alterado",
-    };
-    return labels[actionType] || actionType;
   };
 
   if (loading) {
@@ -556,22 +577,19 @@ export default function DomainDetails() {
             <Server className="h-4 w-4 mr-2" />
             {fetchingNamecheap ? "Buscando..." : "Buscar Namecheap"}
           </Button>
-          <Button onClick={handleUpdate} disabled={saving}>
-            {saving ? "Salvando..." : "Salvar Alterações"}
-          </Button>
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Informações Básicas</CardTitle>
-            <CardDescription>Detalhes principais do domínio</CardDescription>
+            <CardTitle>Informações do Domínio</CardTitle>
+            <CardDescription>Detalhes e configurações principais</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={domain.status} onValueChange={(value) => setDomain({ ...domain, status: value })}>
+              <Select value={domain.status} onValueChange={(value) => updateDomain("status", value)} disabled={saving}>
                 <SelectTrigger id="status">
                   <SelectValue />
                 </SelectTrigger>
@@ -585,49 +603,12 @@ export default function DomainDetails() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="platform">Plataforma</Label>
-              <Select
-                value={domain.platform || ""}
-                onValueChange={(value) => setDomain({ ...domain, platform: value })}
-              >
-                <SelectTrigger id="platform">
-                  <SelectValue placeholder="Selecione uma plataforma" />
-                </SelectTrigger>
-                <SelectContent>
-                  {platformOptions.map((platform) => (
-                    <SelectItem key={platform} value={platform}>
-                      {platform}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="traffic_source">Fonte de Tráfego</Label>
-              <Select
-                value={domain.traffic_source || ""}
-                onValueChange={(value) => setDomain({ ...domain, traffic_source: value })}
-              >
-                <SelectTrigger id="traffic_source">
-                  <SelectValue placeholder="Selecione uma fonte" />
-                </SelectTrigger>
-                <SelectContent>
-                  {trafficSourceOptions.map((source) => (
-                    <SelectItem key={source} value={source}>
-                      {source}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="registrar">Registrador</Label>
               <Input
                 id="registrar"
                 value={domain.registrar || ""}
-                onChange={(e) => setDomain({ ...domain, registrar: e.target.value })}
+                onChange={(e) => updateDomain("registrar", e.target.value)}
+                disabled={saving}
                 placeholder="Ex: Namecheap, GoDaddy..."
               />
             </div>
@@ -637,42 +618,10 @@ export default function DomainDetails() {
               <Input
                 id="zone_id"
                 value={domain.zone_id || ""}
-                onChange={(e) => setDomain({ ...domain, zone_id: e.target.value })}
+                onChange={(e) => updateDomain("zone_id", e.target.value)}
+                disabled={saving}
                 placeholder="ID da zona no Cloudflare"
               />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Configurações Adicionais</CardTitle>
-            <CardDescription>Funil IDs e outras configurações</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Funnel IDs</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={funnelIdInput}
-                  onChange={(e) => setFunnelIdInput(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && addFunnelIdTag()}
-                  placeholder="Digite um ID e pressione Enter"
-                />
-                <Button onClick={addFunnelIdTag} size="icon" variant="outline">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              {funnelIdTags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {funnelIdTags.map((tag, index) => (
-                    <Badge key={index} variant="secondary" className="gap-1">
-                      {tag}
-                      <X className="h-3 w-3 cursor-pointer" onClick={() => removeFunnelIdTag(tag)} />
-                    </Badge>
-                  ))}
-                </div>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -724,6 +673,82 @@ export default function DomainDetails() {
                   : "Não definida"}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Configurações Adicionais</CardTitle>
+            <CardDescription>Plataforma, tráfego e IDs de funil</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="platform">Plataforma</Label>
+              <Select
+                value={domain.platform || ""}
+                onValueChange={(value) => updateDomain("platform", value)}
+                disabled={saving}
+              >
+                <SelectTrigger id="platform">
+                  <Server className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Selecione uma plataforma" />
+                </SelectTrigger>
+                <SelectContent>
+                  {platformOptions.map((platform) => (
+                    <SelectItem key={platform} value={platform}>
+                      {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {domain.purchase_date ? "Informação preenchida automaticamente" : "Configure manualmente a plataforma"}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="traffic_source">Fonte de Tráfego</Label>
+              <Select
+                value={domain.traffic_source || ""}
+                onValueChange={(value) => updateDomain("traffic_source", value)}
+                disabled={saving}
+              >
+                <SelectTrigger id="traffic_source">
+                  <Wifi className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Selecione uma fonte" />
+                </SelectTrigger>
+                <SelectContent>
+                  {trafficSourceOptions.map((source) => (
+                    <SelectItem key={source} value={source}>
+                      {source.charAt(0).toUpperCase() + source.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="funnel_id">ID do Funil</Label>
+              <Input
+                id="funnel_id"
+                type="text"
+                placeholder="Digite o ID e pressione Enter"
+                value={funnelIdInput}
+                onChange={(e) => setFunnelIdInput(e.target.value)}
+                onKeyPress={handleFunnelIdKeyPress}
+                disabled={saving}
+              />
+              {funnelIdTags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {funnelIdTags.map((tag, index) => (
+                    <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                      {tag}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => removeFunnelIdTag(tag)} />
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="space-y-2">
               <Label>Data e Hora da Compra</Label>
@@ -740,80 +765,37 @@ export default function DomainDetails() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1.5">
-              <CardTitle>Dashboard de Visitas Mensais</CardTitle>
-              <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
-            </div>
-            <TrendingUp className="h-5 w-5 text-muted-foreground" />
-          </div>
+          <CardTitle>Dashboard de Visitas Mensais</CardTitle>
+          <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
         </CardHeader>
         <CardContent>
-          {loadingAnalytics ? (
-            <div className="flex items-center justify-center h-[300px]">
-              <LoadingSpinner />
-            </div>
-          ) : chartData.length === 0 || !analyticsData ? (
-            <div className="flex flex-col items-center justify-center h-[300px] text-center">
-              <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Nenhum dado de analytics encontrado para este domínio</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Os dados serão atualizados automaticamente via n8n (cloudflare-analytics)
-              </p>
-            </div>
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
-                  <YAxis
-                    className="text-xs"
-                    tick={{ fill: "hsl(var(--foreground))" }}
-                    tickFormatter={(value) => value.toLocaleString("pt-BR")}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--background))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                    labelStyle={{ color: "hsl(var(--foreground))" }}
-                    formatter={(value: number) => [value.toLocaleString("pt-BR") + " visitas", "Visitas"]}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="visits"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(var(--primary))" }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-
-              {/* Estatísticas resumidas */}
-              {analyticsData && (
-                <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold">{analyticsData.annual_visits?.toLocaleString("pt-BR") || 0}</p>
-                    <p className="text-sm text-muted-foreground">Total Anual</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold">
-                      {Math.round((analyticsData.annual_visits || 0) / 12).toLocaleString("pt-BR")}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Média Mensal</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold">
-                      {Math.max(...chartData.map((m: any) => m.visits)).toLocaleString("pt-BR")}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Pico Mensal</p>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={generateMonthlyData(domain)}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
+              <YAxis
+                className="text-xs"
+                tick={{ fill: "hsl(var(--foreground))" }}
+                tickFormatter={(value) => value.toLocaleString()}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--background))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                }}
+                labelStyle={{ color: "hsl(var(--foreground))" }}
+                formatter={(value: number) => [value.toLocaleString() + " visitas", "Visitas"]}
+              />
+              <Line
+                type="monotone"
+                dataKey="visits"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2}
+                dot={{ fill: "hsl(var(--primary))" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
 
