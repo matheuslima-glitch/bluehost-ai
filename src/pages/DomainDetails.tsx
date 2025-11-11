@@ -73,6 +73,12 @@ export default function DomainDetails() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
+  // ============================================
+  // ESTADOS PARA ANALYTICS COM PY/CY
+  // ============================================
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
   // Fetch custom filters from database
   const { data: customFilters = [] } = useQuery({
     queryKey: ["custom-filters", user?.id],
@@ -107,15 +113,17 @@ export default function DomainDetails() {
   ];
 
   // ============================================
-  // NOVA LÓGICA PY/CY - BUSCAR DADOS DO SUPABASE
+  // BUSCAR ANALYTICS DO SUPABASE COM PY/CY
   // ============================================
-  const generateMonthlyData = (domain: Domain | null) => {
-    if (!domain?.domain_name) {
-      return [];
-    }
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      if (!domain?.domain_name) {
+        setLoadingAnalytics(false);
+        return;
+      }
 
-    // Buscar dados reais do Supabase de forma assíncrona
-    const fetchRealData = async () => {
+      setLoadingAnalytics(true);
+
       try {
         // Buscar por domain_name primeiro
         let { data, error } = await supabase
@@ -133,7 +141,7 @@ export default function DomainDetails() {
         }
 
         if (error || !data) {
-          // Se não encontrar dados, retornar dados mock
+          // Fallback para dados mock
           const mockData = [];
           const currentDate = new Date();
           for (let i = 11; i >= 0; i--) {
@@ -146,7 +154,9 @@ export default function DomainDetails() {
               visits: visits,
             });
           }
-          return mockData;
+          setChartData(mockData);
+          setLoadingAnalytics(false);
+          return;
         }
 
         // ========== LÓGICA PY/CY ==========
@@ -185,10 +195,11 @@ export default function DomainDetails() {
           });
         }
 
-        return last12Months;
+        setChartData(last12Months);
       } catch (error) {
         console.error("Erro ao buscar analytics:", error);
-        // Fallback para dados mock
+
+        // Fallback para dados mock em caso de erro
         const mockData = [];
         const currentDate = new Date();
         for (let i = 11; i >= 0; i--) {
@@ -201,32 +212,14 @@ export default function DomainDetails() {
             visits: visits,
           });
         }
-        return mockData;
+        setChartData(mockData);
+      } finally {
+        setLoadingAnalytics(false);
       }
     };
 
-    // Retornar dados mock temporariamente enquanto busca dados reais
-    const tempData = [];
-    const currentDate = new Date();
-    for (let i = 11; i >= 0; i--) {
-      const date = subMonths(currentDate, i);
-      const monthName = format(date, "MMM/yy", { locale: ptBR });
-      tempData.push({
-        month: monthName,
-        visits: 0,
-      });
-    }
-
-    // Buscar dados reais e atualizar
-    fetchRealData().then((realData) => {
-      if (realData && realData.length > 0) {
-        // Forçar re-render com dados reais
-        setDomain({ ...domain });
-      }
-    });
-
-    return tempData;
-  };
+    fetchAnalytics();
+  }, [domain?.domain_name, domain?.zone_id]);
 
   useEffect(() => {
     loadDomain();
@@ -769,33 +762,39 @@ export default function DomainDetails() {
           <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={generateMonthlyData(domain)}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
-              <YAxis
-                className="text-xs"
-                tick={{ fill: "hsl(var(--foreground))" }}
-                tickFormatter={(value) => value.toLocaleString()}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--background))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-                labelStyle={{ color: "hsl(var(--foreground))" }}
-                formatter={(value: number) => [value.toLocaleString() + " visitas", "Visitas"]}
-              />
-              <Line
-                type="monotone"
-                dataKey="visits"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={{ fill: "hsl(var(--primary))" }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {loadingAnalytics ? (
+            <div className="flex items-center justify-center h-[300px]">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
+                <YAxis
+                  className="text-xs"
+                  tick={{ fill: "hsl(var(--foreground))" }}
+                  tickFormatter={(value) => value.toLocaleString()}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--background))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                  }}
+                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                  formatter={(value: number) => [value.toLocaleString() + " visitas", "Visitas"]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="visits"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  dot={{ fill: "hsl(var(--primary))" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </CardContent>
       </Card>
 
