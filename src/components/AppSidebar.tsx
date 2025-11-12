@@ -1,4 +1,4 @@
-import { Home, Search, Globe, Settings, LogOut, User } from "lucide-react";
+import { Home, Search, Globe, Settings, LogOut } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -61,16 +61,22 @@ export function AppSidebar() {
     <Sidebar className="border-r-0" collapsible="icon">
       {/* Header - Logo e Nome */}
       <SidebarHeader className="border-b-0 p-4 pb-2">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-            <Globe className="h-5 w-5 text-primary-foreground" />
+        {isCollapsed ? (
+          <div className="flex items-center justify-center w-full">
+            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
+              <Globe className="h-5 w-5 text-primary-foreground" />
+            </div>
           </div>
-          {!isCollapsed && (
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+              <Globe className="h-5 w-5 text-primary-foreground" />
+            </div>
             <div className="flex flex-col min-w-0">
               <span className="font-bold text-lg truncate">DomainHub</span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </SidebarHeader>
 
       {/* Menu Principal */}
@@ -82,17 +88,21 @@ export function AppSidebar() {
                 const isActive = location.pathname === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild tooltip={isCollapsed ? item.title : undefined} className="h-10">
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={isCollapsed ? item.title : undefined}
+                      className={isCollapsed ? "h-10 w-10 p-0" : "h-10"}
+                    >
                       <NavLink
                         to={item.url}
                         className={
                           isActive
-                            ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50"
-                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center justify-center"
+                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center"
                         }
                       >
                         <item.icon className={isCollapsed ? "h-5 w-5" : "h-4 w-4"} />
-                        <span>{item.title}</span>
+                        {!isCollapsed && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -106,7 +116,7 @@ export function AppSidebar() {
       {/* Footer - Usuário e Logout */}
       <SidebarFooter className="border-t-0 p-3">
         {isCollapsed ? (
-          <div className="flex flex-col gap-2 items-center">
+          <div className="flex flex-col gap-2 items-center w-full">
             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg" title={userName}>
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
