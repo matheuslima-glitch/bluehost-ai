@@ -61,22 +61,16 @@ export function AppSidebar() {
     <Sidebar className="border-r-0" collapsible="icon">
       {/* Header - Logo e Nome */}
       <SidebarHeader className="border-b-0 p-4 pb-2">
-        {isCollapsed ? (
-          <div className="flex items-center justify-center w-full">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-              <Globe className="h-5 w-5 text-primary-foreground" />
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+            <Globe className="h-5 w-5 text-primary-foreground" />
           </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-              <Globe className="h-5 w-5 text-primary-foreground" />
-            </div>
+          {!isCollapsed && (
             <div className="flex flex-col min-w-0">
               <span className="font-bold text-lg truncate">DomainHub</span>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </SidebarHeader>
 
       {/* Menu Principal */}
@@ -88,21 +82,17 @@ export function AppSidebar() {
                 const isActive = location.pathname === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={isCollapsed ? item.title : undefined}
-                      className={isCollapsed ? "h-10 w-10 p-0" : "h-10"}
-                    >
+                    <SidebarMenuButton asChild tooltip={isCollapsed ? item.title : undefined} className="h-10">
                       <NavLink
                         to={item.url}
                         className={
                           isActive
-                            ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center justify-center"
-                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center"
+                            ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                         }
                       >
-                        <item.icon className={isCollapsed ? "h-5 w-5" : "h-4 w-4"} />
-                        {!isCollapsed && <span>{item.title}</span>}
+                        <item.icon className="h-5 w-5" />
+                        <span>{item.title}</span>
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
