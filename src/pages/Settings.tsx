@@ -239,6 +239,7 @@ export default function Settings() {
 
   const saveSoundPreference = async () => {
     try {
+      console.log("Salvando preferência de som:", selectedSound);
       const { error } = await supabase
         .from("profiles")
         .update({ alert_sound_preference: selectedSound })
@@ -247,6 +248,7 @@ export default function Settings() {
       if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      console.log("Preferência de som salva com sucesso:", selectedSound);
       toast({
         title: "Sucesso",
         description: "Preferência de som de alerta salva com sucesso!",

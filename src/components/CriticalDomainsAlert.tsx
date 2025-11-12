@@ -22,8 +22,9 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   const [firstName, setFirstName] = useState("");
-  const [alertSound, setAlertSound] = useState("alert-1");
+  const [alertSound, setAlertSound] = useState<string | null>(null);
   const [soundPlayed, setSoundPlayed] = useState(false);
+  const [userDataLoaded, setUserDataLoaded] = useState(false);
 
   useEffect(() => {
     // Buscar nome do usuário e preferência de som
@@ -41,34 +42,45 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
         setFirstName(name);
       }
 
-      if (data?.alert_sound_preference) {
-        setAlertSound(data.alert_sound_preference);
-      }
+      // Definir o som preferido ou usar o padrão
+      const soundPreference = data?.alert_sound_preference || "alert-1";
+      console.log("Preferência de som carregada:", soundPreference);
+      setAlertSound(soundPreference);
+      setUserDataLoaded(true);
     };
 
     loadUserData();
   }, [user?.id]);
 
   useEffect(() => {
-    // Mostrar alerta SEMPRE que houver domínios críticos
+    // Só mostrar alerta e tocar som DEPOIS de carregar os dados do usuário
+    if (!userDataLoaded || alertSound === null) return;
+
     const hasCriticalDomains = suspendedCount > 0 || expiredCount > 0;
 
-    if (hasCriticalDomains) {
+    if (hasCriticalDomains && !soundPlayed) {
       setOpen(true);
-
-      // Tocar som imediatamente quando abrir o popup
-      if (!soundPlayed) {
-        playAlertSound();
-        setSoundPlayed(true);
-      }
-    } else {
+      playAlertSound();
+      setSoundPlayed(true);
+    } else if (!hasCriticalDomains) {
       // Reset quando não houver domínios críticos
       setSoundPlayed(false);
     }
-  }, [suspendedCount, expiredCount, alertSound, soundPlayed]);
+  }, [suspendedCount, expiredCount, userDataLoaded, alertSound, soundPlayed]);
 
   const playAlertSound = () => {
-    const soundUrl = ALERT_SOUNDS[alertSound] || ALERT_SOUNDS["alert-1"];
+    if (!alertSound) {
+      console.log("Som ainda não carregado");
+      return;
+    }
+
+    const soundUrl = ALERT_SOUNDS[alertSound];
+    if (!soundUrl) {
+      console.error("Som não encontrado:", alertSound);
+      return;
+    }
+
+    console.log("Tocando som:", alertSound, "URL:", soundUrl);
     const audio = new Audio(soundUrl);
     audio.volume = 1.0;
     audio.play().catch((error) => {
