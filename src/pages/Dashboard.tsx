@@ -22,6 +22,7 @@ import {
 } from "recharts";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { CriticalDomainsTable } from "@/components/CriticalDomainsTable";
+import { CriticalDomainsAlert } from "@/components/CriticalDomainsAlert";
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -403,6 +404,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Alerta de Domínios Críticos */}
+      <CriticalDomainsAlert suspendedCount={stats.suspended} expiredCount={stats.expired} />
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Dashboard Geral</h1>
