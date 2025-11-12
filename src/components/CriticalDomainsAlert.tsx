@@ -93,9 +93,10 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
         <div className="bg-red-600 p-6 relative">
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 text-white hover:text-red-100 transition-colors"
+            className="absolute top-4 right-4 text-white hover:text-white/80 transition-opacity p-1"
+            aria-label="Fechar"
           >
-            <X className="h-5 w-5" />
+            <X className="h-6 w-6" strokeWidth={2} />
           </button>
 
           <DialogHeader>
