@@ -15,11 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect } from "react";
 import { ALERT_SOUNDS } from "@/components/CriticalDomainsAlert";
 
-// Nomes dos sons de alerta (4 sons)
+// Nomes dos sons de alerta (3 sons)
 const SOUND_NAMES: Record<string, string> = {
   "alert-1": "Alerta de Perigo - Tom Intermitente",
   "alert-2": "Atenção Máxima - Alarme Duplo",
-  "alert-3": "Alerta de Sistema - Bipe Eletrônico",
   "alert-4": "Alerta Suave - True Tone",
 };
 
