@@ -183,53 +183,38 @@ export default function Dashboard() {
       const { data: analyticsGeralData, error: analyticsGeralError } = await supabase
         .from("analytics_geral")
         .select("*")
-        .eq("year", new Date().getFullYear())
+        .eq("current_year", new Date().getFullYear())
         .single();
 
       if (!analyticsGeralError && analyticsGeralData) {
-        // Calcular total de visitas do ano (converter bigint para number)
+        // Calcular total de visitas (converter bigint para number)
         const totalVisitsFromDB = Number(analyticsGeralData.annual_visits) || 0;
         setTotalVisits(totalVisitsFromDB);
 
-        // Gerar dados dos últimos 12 meses (rolling)
-        const now = new Date();
-        const currentMonth = now.getMonth(); // 0-11
-        const currentYear = now.getFullYear();
+        // Gerar dados dos últimos 12 meses (mix de _py e _cy)
+        const currentMonth = new Date().getMonth(); // 0-11
+        const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+        const monthKeys = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
-        // Array com todos os meses do ano (converter bigint para number)
-        const monthsData = [
-          { name: "Jan", visits: Number(analyticsGeralData.jan_visits) || 0, month: 0 },
-          { name: "Fev", visits: Number(analyticsGeralData.feb_visits) || 0, month: 1 },
-          { name: "Mar", visits: Number(analyticsGeralData.mar_visits) || 0, month: 2 },
-          { name: "Abr", visits: Number(analyticsGeralData.apr_visits) || 0, month: 3 },
-          { name: "Mai", visits: Number(analyticsGeralData.may_visits) || 0, month: 4 },
-          { name: "Jun", visits: Number(analyticsGeralData.jun_visits) || 0, month: 5 },
-          { name: "Jul", visits: Number(analyticsGeralData.jul_visits) || 0, month: 6 },
-          { name: "Ago", visits: Number(analyticsGeralData.aug_visits) || 0, month: 7 },
-          { name: "Set", visits: Number(analyticsGeralData.sep_visits) || 0, month: 8 },
-          { name: "Out", visits: Number(analyticsGeralData.oct_visits) || 0, month: 9 },
-          { name: "Nov", visits: Number(analyticsGeralData.nov_visits) || 0, month: 10 },
-          { name: "Dez", visits: Number(analyticsGeralData.dec_visits) || 0, month: 11 },
-        ];
-
-        // Calcular os últimos 12 meses (rolling)
         const last12Months = [];
 
+        // Gerar últimos 12 meses (de 11 meses atrás até mês atual)
         for (let i = 11; i >= 0; i--) {
-          const targetDate = new Date(currentYear, currentMonth - i, 1);
-          const targetMonth = targetDate.getMonth();
-          const targetYear = targetDate.getFullYear();
+          const monthIndex = (currentMonth - i + 12) % 12;
+          const monthKey = monthKeys[monthIndex];
+          const monthName = monthNames[monthIndex];
 
-          // Formatar como "jan/25", "fev/25", etc
-          const monthNames = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-          const monthLabel = `${monthNames[targetMonth]}/${targetYear.toString().slice(-2)}`;
+          // Determinar se usa _py (ano anterior) ou _cy (ano atual)
+          const isPreviousYear = i > currentMonth;
+          const suffix = isPreviousYear ? "_py" : "_cy";
+          const fieldName = `${monthKey}${suffix}`;
 
-          // Pegar dados do mês correspondente
-          const monthData = monthsData.find((m) => m.month === targetMonth);
+          // Pegar valor JÁ SOMADO de analytics_geral
+          const visits = Number(analyticsGeralData[fieldName]) || 0;
 
           last12Months.push({
-            mes: monthLabel,
-            visitas: monthData ? monthData.visits : 0,
+            mes: monthName,
+            visitas: visits,
           });
         }
 
