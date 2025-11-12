@@ -15,6 +15,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect } from "react";
 import { ALERT_SOUNDS } from "@/components/CriticalDomainsAlert";
 
+// Nomes dos sons do iOS
+const SOUND_NAMES: Record<string, string> = {
+  "ios-1": "Tri-tone (Padrão iOS)",
+  "ios-2": "Chime",
+  "ios-3": "Glass",
+  "ios-4": "Horn",
+  "ios-5": "Bell",
+  "ios-6": "Electronic",
+  "ios-7": "Ping",
+  "ios-8": "Swoosh",
+  "ios-9": "Popcorn",
+  "ios-10": "Fanfare",
+  "ios-11": "Ding",
+  "ios-12": "Alert",
+  "ios-13": "Alarm",
+  "ios-14": "Beacon",
+  "ios-15": "Bloom",
+};
+
 export default function Settings() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -25,7 +44,7 @@ export default function Settings() {
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [newPlatformFilter, setNewPlatformFilter] = useState("");
   const [newTrafficSourceFilter, setNewTrafficSourceFilter] = useState("");
-  const [selectedSound, setSelectedSound] = useState("alarm-1");
+  const [selectedSound, setSelectedSound] = useState("ios-1");
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
 
   // Fetch profile data
@@ -42,7 +61,7 @@ export default function Settings() {
       if (data) {
         setFullName(data.full_name || "");
         setWhatsappNumber(data.whatsapp_number || "");
-        setSelectedSound(data.alert_sound_preference || "alarm-1");
+        setSelectedSound(data.alert_sound_preference || "ios-1");
       }
       return data;
     },
@@ -225,26 +244,24 @@ export default function Settings() {
     }
   };
 
-  const handleSoundChange = (soundId: string) => {
-    setSelectedSound(soundId);
-    previewSound(soundId);
+  const handleSoundChange = (value: string) => {
+    setSelectedSound(value);
+    previewSound(value); // Reproduz automaticamente ao selecionar
   };
 
   const saveSoundPreference = async () => {
-    if (!user?.id) return;
-
     try {
       const { error } = await supabase
         .from("profiles")
         .update({ alert_sound_preference: selectedSound })
-        .eq("id", user.id);
+        .eq("id", user?.id);
 
       if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       toast({
         title: "Sucesso",
-        description: "Preferência de som salva com sucesso!",
+        description: "Preferência de som de alerta salva com sucesso!",
       });
     } catch (error) {
       console.error("Erro ao salvar preferência de som:", error);
@@ -256,7 +273,7 @@ export default function Settings() {
     }
   };
 
-  // Cleanup audio quando o componente desmontar
+  // Cleanup: parar áudio ao desmontar o componente
   useEffect(() => {
     return () => {
       if (currentAudio) {
@@ -266,35 +283,11 @@ export default function Settings() {
     };
   }, [currentAudio]);
 
-  // Nomes descritivos para os sons
-  const SOUND_NAMES: Record<string, string> = {
-    "alarm-1": "Alarme Urgente - Tom agudo",
-    "alarm-2": "Alarme de Emergência - Sirene",
-    "alarm-3": "Alerta Crítico - Bipe contínuo",
-    "alarm-4": "Aviso de Perigo - Tom intermitente",
-    "alarm-5": "Atenção Máxima - Alarme duplo",
-    "alarm-6": "Alerta Crítico - Tom grave",
-    "alarm-7": "Perigo Iminente - Sirene rápida",
-    "alarm-8": "Alerta de Sistema - Bipe eletrônico",
-    "alarm-9": "Alarme de Segurança - Tom clássico",
-    "alarm-10": "Sirene de Aviso - Tom longo",
-    "alarm-11": "Tom de Alerta - Bipe triplo",
-    "alarm-12": "Emergência - Tom de ambulância",
-    "alarm-13": "Urgência - Bipe rápido",
-    "alarm-14": "Crítico - Tom pulsante",
-    "alarm-15": "Perigo - Sirene de alarme",
-  };
-
   const platformFilters = customFilters.filter((f) => f.filter_type === "platform");
   const trafficSourceFilters = customFilters.filter((f) => f.filter_type === "traffic_source");
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Configurações</h1>
-        <p className="text-muted-foreground">Gerencie suas preferências e integrações</p>
-      </div>
-
       {/* Profile Settings */}
       <Card>
         <CardHeader>
@@ -302,25 +295,27 @@ export default function Settings() {
             <User className="h-5 w-5" />
             Perfil
           </CardTitle>
-          <CardDescription>Informações básicas da sua conta</CardDescription>
+          <CardDescription>Gerencie suas informações pessoais</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">E-mail</Label>
-            <Input id="email" value={user?.email} disabled />
+            <Label htmlFor="full-name">Nome Completo</Label>
+            <Input
+              id="full-name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Seu nome completo"
+            />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="name">Nome Completo</Label>
-            <Input id="name" placeholder="Seu nome" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="whatsapp">WhatsApp</Label>
+            <Label htmlFor="whatsapp">Número do WhatsApp</Label>
             <Input
               id="whatsapp"
-              placeholder="+55 11 99999-9999"
               value={whatsappNumber}
               onChange={(e) => setWhatsappNumber(e.target.value)}
+              placeholder="+55 11 99999-9999"
             />
+            <p className="text-sm text-muted-foreground">Formato: +55 11 99999-9999 (incluir código do país e DDD)</p>
           </div>
           <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
             {updateProfileMutation.isPending ? "Salvando..." : "Salvar Alterações"}
