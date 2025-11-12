@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   BarChart,
   Bar,
@@ -25,6 +26,8 @@ import { CriticalDomainsTable } from "@/components/CriticalDomainsTable";
 import { CriticalDomainsAlert } from "@/components/CriticalDomainsAlert";
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const [firstName, setFirstName] = useState("");
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -41,7 +44,6 @@ export default function Dashboard() {
   const [balance, setBalance] = useState<{ usd: number; brl: number } | null>(null);
   const [totalVisits, setTotalVisits] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [balanceCurrency, setBalanceCurrency] = useState<"usd" | "brl">("usd");
   const [expiredDomains, setExpiredDomains] = useState(0);
   const [expiringDomains, setExpiringDomains] = useState(0);
@@ -58,7 +60,20 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboardData();
+    loadUserName();
   }, []);
+
+  // Buscar nome do usuário
+  const loadUserName = async () => {
+    if (!user?.id) return;
+
+    const { data } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+
+    if (data?.full_name) {
+      const name = data.full_name.split(" ")[0]; // Pegar primeiro nome
+      setFirstName(name);
+    }
+  };
 
   // CORREÇÃO 1: Função para verificar se as integrações estão configuradas
   const checkIntegrationsStatus = async () => {
@@ -353,39 +368,6 @@ export default function Dashboard() {
     }
   };
 
-  const syncIntegrations = async () => {
-    setSyncing(true);
-    toast.info("Sincronizando integrações...");
-
-    try {
-      // Sync Namecheap
-      const { error: ncError } = await supabase.functions.invoke("namecheap-domains", {
-        body: { action: "list" },
-      });
-
-      // Sync Cloudflare
-      const { error: cfError } = await supabase.functions.invoke("cloudflare-integration", {
-        body: { action: "zones" },
-      });
-
-      // Sync cPanel
-      const { error: cpError } = await supabase.functions.invoke("cpanel-integration", {
-        body: { action: "domains" },
-      });
-
-      if (!ncError && !cfError && !cpError) {
-        toast.success("Integrações sincronizadas com sucesso!");
-        await loadDashboardData();
-      } else {
-        toast.warning("Algumas integrações falharam ao sincronizar");
-      }
-    } catch (error: any) {
-      toast.error("Erro ao sincronizar integrações");
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const pieData = [
     { name: "Ativos", value: stats.active, color: "#22c55e" },
     { name: "Expirando", value: stats.expiring, color: "#eab308" },
@@ -409,12 +391,9 @@ export default function Dashboard() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard Geral</h1>
+          <h1 className="text-3xl font-bold">Olá{firstName ? `, ${firstName}` : ""}!</h1>
           <p className="text-muted-foreground">Visão completa de todos os seus domínios</p>
         </div>
-        <Button onClick={syncIntegrations} disabled={syncing}>
-          {syncing ? "Sincronizando..." : "Sincronizar"}
-        </Button>
       </div>
 
       {/* Stats Cards */}
