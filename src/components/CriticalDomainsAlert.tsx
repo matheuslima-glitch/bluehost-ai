@@ -10,13 +10,12 @@ interface CriticalDomainsAlertProps {
   expiredCount: number;
 }
 
-// Mapeamento de sons de alerta (4 sons)
+// Mapeamento de sons de alerta (3 sons)
 const ALERT_SOUNDS: Record<string, string> = {
   "alert-1": "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3", // Alerta de Perigo - Tom Intermitente
   "alert-2": "https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3", // Atenção Máxima - Alarme Duplo
-  "alert-3": "https://assets.mixkit.co/active_storage/sfx/2871/2871-preview.mp3", // Alerta de Sistema - Bipe Eletrônico
   "alert-4":
-    "https://dsehaqdqnrkjrhbvkfrk.supabase.co/storage/v1/object/sign/Alert%20sound/1112(1).MP3?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lYTNjYWYwMi1lNGU0LTQ4MWUtYjY5OC0yZjQxN2FiZGM2ZWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJBbGVydCBzb3VuZC8xMTEyKDEpLk1QMyIsImlhdCI6MTc2MjkzMTgwNSwiZXhwIjozMTU1MzYyOTMxODA1fQ.WOFs0UorDf-SXwWfKqBRbyNQ7AWh63EqZaskBaGlGg0", // Alerta Suave - True Tone
+    "https://dsehaqdqnrkjrhbvkfrk.supabase.co/storage/v1/object/sign/Alert%20sound/new-notification-010-352755.mp3?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lYTNjYWYwMi1lNGU0LTQ4MWUtYjY5OC0yZjQxN2FiZGM2ZWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJBbGVydCBzb3VuZC9uZXctbm90aWZpY2F0aW9uLTAxMC0zNTI3NTUubXAzIiwiaWF0IjoxNzYyOTU4OTk0LCJleHAiOjMxNTUzNjI5NTg5OTR9.0bVNuzd8fubejntdSG7-kzTjQ1UpKrcNmDnbYVMwmJI", // Alerta Suave - True Tone
 };
 
 export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalDomainsAlertProps) {
@@ -24,7 +23,7 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
   const { user } = useAuth();
   const [firstName, setFirstName] = useState("");
   const [alertSound, setAlertSound] = useState("alert-1");
-  const [userDataLoaded, setUserDataLoaded] = useState(false);
+  const [soundPlayed, setSoundPlayed] = useState(false);
 
   useEffect(() => {
     // Buscar nome do usuário e preferência de som
@@ -45,26 +44,28 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
       if (data?.alert_sound_preference) {
         setAlertSound(data.alert_sound_preference);
       }
-
-      // Marca que os dados do usuário foram carregados
-      setUserDataLoaded(true);
     };
 
     loadUserData();
   }, [user?.id]);
 
   useEffect(() => {
-    // Só mostra o alerta depois que os dados do usuário foram carregados
-    // Isso evita tocar o som 2 vezes (uma com o padrão e outra com o som salvo)
-    if (!userDataLoaded) return;
-
+    // Mostrar alerta SEMPRE que houver domínios críticos
     const hasCriticalDomains = suspendedCount > 0 || expiredCount > 0;
 
     if (hasCriticalDomains) {
       setOpen(true);
-      playAlertSound();
+
+      // Tocar som imediatamente quando abrir o popup
+      if (!soundPlayed) {
+        playAlertSound();
+        setSoundPlayed(true);
+      }
+    } else {
+      // Reset quando não houver domínios críticos
+      setSoundPlayed(false);
     }
-  }, [suspendedCount, expiredCount, userDataLoaded]);
+  }, [suspendedCount, expiredCount, alertSound, soundPlayed]);
 
   const playAlertSound = () => {
     const soundUrl = ALERT_SOUNDS[alertSound] || ALERT_SOUNDS["alert-1"];
