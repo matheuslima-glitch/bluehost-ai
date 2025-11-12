@@ -234,6 +234,37 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     );
   });
 
+  // Função para determinar a prioridade de ordenação
+  const getDomainPriority = (domain: any): number => {
+    // 1. Suspenso - Prioridade máxima
+    if (domain.status === "suspended") return 1;
+
+    // 2. Alerta
+    if (domain.has_alert) return 2;
+
+    // 3. Expirado
+    if (domain.status === "expired") return 3;
+
+    // 4. Crítico (15 dias)
+    if (domain.expiration_date) {
+      const expDate = new Date(domain.expiration_date);
+      if (expDate > now && expDate < fifteenDaysFromNow) return 4;
+
+      // 5. Expirando em breve (30 dias)
+      if (expDate > now && expDate < thirtyDaysFromNow) return 5;
+    }
+
+    // Outros casos (não deveria chegar aqui devido ao filtro)
+    return 6;
+  };
+
+  // Ordenar domínios críticos pela prioridade
+  const sortedCriticalDomains = [...criticalDomains].sort((a, b) => {
+    const priorityA = getDomainPriority(a);
+    const priorityB = getDomainPriority(b);
+    return priorityA - priorityB;
+  });
+
   const getStatusBadge = (domain: any) => {
     const hasAlert = domain.has_alert;
 
@@ -268,10 +299,10 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
 
   // Paginação
   const itemsPerPage = 10;
-  const totalPages = Math.ceil(criticalDomains.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedCriticalDomains.length / itemsPerPage);
   const startIndex = currentPage * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedDomains = criticalDomains.slice(startIndex, endIndex);
+  const paginatedDomains = sortedCriticalDomains.slice(startIndex, endIndex);
 
   // Altura dinâmica baseada no número de domínios (max 10 por página)
   const dynamicHeight = Math.min(paginatedDomains.length, 10) * 60 + 45; // 60px por linha + 45px do header
@@ -338,7 +369,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     }
   };
 
-  if (criticalDomains.length === 0) {
+  if (sortedCriticalDomains.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -430,11 +461,11 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
               </Table>
             </ScrollArea>
 
-            {criticalDomains.length > itemsPerPage && (
+            {sortedCriticalDomains.length > itemsPerPage && (
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  Mostrando {startIndex + 1}-{Math.min(endIndex, criticalDomains.length)} de {criticalDomains.length}{" "}
-                  domínios críticos
+                  Mostrando {startIndex + 1}-{Math.min(endIndex, sortedCriticalDomains.length)} de{" "}
+                  {sortedCriticalDomains.length} domínios críticos
                 </p>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={handlePreviousPage} disabled={currentPage === 0}>
