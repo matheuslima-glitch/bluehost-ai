@@ -20,7 +20,7 @@ const SOUND_NAMES: Record<string, string> = {
   "alert-1": "Alerta de Perigo - Tom Intermitente",
   "alert-2": "Atenção Máxima - Alarme Duplo",
   "alert-3": "Alerta de Sistema - Bipe Eletrônico",
-  "alert-4": "Alerta Personalizado",
+  "alert-4": "Alerta Suave - True Tone",
 };
 
 export default function Settings() {
