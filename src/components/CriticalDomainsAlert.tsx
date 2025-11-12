@@ -82,9 +82,21 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
     setTimeout(() => {
       const criticalTable = document.querySelector("[data-critical-domains-table]");
       if (criticalTable) {
-        criticalTable.scrollIntoView({ behavior: "smooth", block: "start" });
+        criticalTable.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      } else {
+        // Fallback: tentar encontrar pela classe do componente
+        const fallbackTable = document.querySelector(".critical-domains-table");
+        if (fallbackTable) {
+          fallbackTable.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
       }
-    }, 100);
+    }, 300);
   };
 
   // Não renderizar nada se não houver domínios críticos
@@ -97,7 +109,7 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent
-        className="sm:max-w-[500px] p-0 gap-0 border-0 bg-white shadow-2xl overflow-hidden"
+        className="sm:max-w-[500px] p-0 gap-0 border-0 bg-white shadow-2xl overflow-hidden [&>button]:hidden"
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
@@ -195,6 +207,14 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
           </Button>
         </div>
       </DialogContent>
+
+      <style jsx global>{`
+        [data-radix-dialog-content] > button[aria-label*="Close"],
+        [data-radix-dialog-content] > button[class*="close"],
+        [role="dialog"] > button:first-of-type {
+          display: none !important;
+        }
+      `}</style>
     </Dialog>
   );
 }
