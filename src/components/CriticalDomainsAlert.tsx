@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
@@ -77,6 +77,14 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
 
   const handleClose = () => {
     setOpen(false);
+
+    // Rolar para a tabela de domínios críticos após fechar o popup
+    setTimeout(() => {
+      const criticalTable = document.querySelector("[data-critical-domains-table]");
+      if (criticalTable) {
+        criticalTable.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 100);
   };
 
   // Não renderizar nada se não houver domínios críticos
@@ -87,18 +95,14 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
   const totalCritical = suspendedCount + expiredCount;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-[500px] p-0 gap-0 border-0 bg-white shadow-2xl overflow-hidden">
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent
+        className="sm:max-w-[500px] p-0 gap-0 border-0 bg-white shadow-2xl overflow-hidden"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         {/* Header vermelho */}
-        <div className="bg-red-600 p-6 relative">
-          <button
-            onClick={handleClose}
-            className="absolute top-4 right-4 text-white hover:text-white/80 transition-opacity p-1"
-            aria-label="Fechar"
-          >
-            <X className="h-6 w-6" strokeWidth={2} />
-          </button>
-
+        <div className="bg-red-600 p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3 text-white text-2xl font-bold">
               <div className="bg-white rounded-full p-2">
