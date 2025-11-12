@@ -224,13 +224,15 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
 
   const criticalDomains = domains.filter((d) => {
-    // Verificar status suspenso (case-insensitive e variações)
     const statusLower = d.status?.toLowerCase() || "";
-    if (statusLower === "suspended" || statusLower === "suspend" || d.status === "expired") return true;
+
+    // Incluir expirados e suspensos
+    if (statusLower === "expired" || statusLower === "suspended" || statusLower === "suspend") return true;
 
     if (!d.expiration_date) return false;
     const expDate = new Date(d.expiration_date);
     const hasAlert = d.has_alert;
+
     return (
       d.status !== "expired" &&
       (hasAlert || (expDate > now && expDate < thirtyDaysFromNow) || (expDate > now && expDate < fifteenDaysFromNow))
@@ -274,24 +276,34 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     const hasAlert = domain.has_alert;
     const statusLower = domain.status?.toLowerCase() || "";
 
-    if (hasAlert) {
-      return <Badge className="bg-yellow-500">Alerta</Badge>;
-    }
-    if (statusLower === "expired") {
-      return <Badge variant="destructive">Expirado</Badge>;
-    }
+    // 1. SUSPENSO - Prioridade máxima
     if (statusLower === "suspended" || statusLower === "suspend") {
       return <Badge className="bg-orange-500">Suspenso</Badge>;
     }
+
+    // 2. ALERTA
+    if (hasAlert) {
+      return <Badge className="bg-yellow-500">Alerta</Badge>;
+    }
+
+    // 3. EXPIRADO
+    if (statusLower === "expired") {
+      return <Badge variant="destructive">Expirado</Badge>;
+    }
+
+    // 4. CRÍTICO (15 dias)
     if (domain.expiration_date) {
       const expDate = new Date(domain.expiration_date);
       if (expDate > now && expDate < fifteenDaysFromNow) {
         return <Badge variant="destructive">Crítico (15 dias)</Badge>;
       }
+
+      // 5. EXPIRANDO EM BREVE (30 dias)
       if (expDate > now && expDate < thirtyDaysFromNow) {
         return <Badge className="bg-yellow-500">Expirando em breve (30 dias)</Badge>;
       }
     }
+
     return <Badge>Ativo</Badge>;
   };
 
