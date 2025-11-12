@@ -21,7 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -123,15 +123,37 @@ export default function DomainDetails() {
       }
 
       if (data) {
-        // Mapear os dados para o formato do gráfico
-        const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-        const monthsFullName = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+        // Obter mês e ano atual
+        const now = new Date();
+        const currentMonth = now.getMonth(); // 0-11
+        const currentYear = now.getFullYear();
 
-        const chartData = months.map((month, index) => ({
-          month: monthsFullName[index],
-          anoAnterior: data[`${month}_py`] || 0,
-          anoAtual: data[`${month}_cy`] || 0,
-        }));
+        // Nomes dos meses
+        const monthNames = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+        const monthLabels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+        const chartData = [];
+
+        // Gerar os últimos 12 meses
+        for (let i = 11; i >= 0; i--) {
+          const targetDate = new Date(currentYear, currentMonth - i, 1);
+          const targetMonth = targetDate.getMonth(); // 0-11
+          const targetYear = targetDate.getFullYear();
+          const monthKey = monthNames[targetMonth];
+
+          // Determinar se é do ano anterior (PY) ou ano atual (CY)
+          const isCurrentYear = targetYear === currentYear;
+          const columnSuffix = isCurrentYear ? "cy" : "py";
+          const columnName = `${monthKey}_${columnSuffix}`;
+
+          // Label com mês/ano
+          const label = `${monthLabels[targetMonth]}/${String(targetYear).slice(-2)}`;
+
+          chartData.push({
+            month: label,
+            visitas: data[columnName] || 0,
+          });
+        }
 
         setAnalyticsData(chartData);
       }
@@ -786,7 +808,7 @@ export default function DomainDetails() {
       <Card>
         <CardHeader>
           <CardTitle>Dashboard de Visitas Mensais</CardTitle>
-          <CardDescription>Histórico de visitas comparando ano anterior e ano atual</CardDescription>
+          <CardDescription>Histórico de visitas nos últimos 12 meses (ano: {new Date().getFullYear()})</CardDescription>
         </CardHeader>
         <CardContent>
           {loadingAnalytics ? (
@@ -798,43 +820,58 @@ export default function DomainDetails() {
               Nenhum dado de analytics encontrado para este domínio
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={analyticsData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
-                <YAxis
-                  className="text-xs"
-                  tick={{ fill: "hsl(var(--foreground))" }}
-                  tickFormatter={(value) => value.toLocaleString()}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--background))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                  labelStyle={{ color: "hsl(var(--foreground))" }}
-                  formatter={(value: number) => [value.toLocaleString() + " visitas", ""]}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="anoAnterior"
-                  stroke="#94a3b8"
-                  strokeWidth={2}
-                  dot={{ fill: "#94a3b8" }}
-                  name="Ano Anterior"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="anoAtual"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={{ fill: "hsl(var(--primary))" }}
-                  name="Ano Atual"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={analyticsData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
+                  <YAxis
+                    className="text-xs"
+                    tick={{ fill: "hsl(var(--foreground))" }}
+                    tickFormatter={(value) => value.toLocaleString()}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                    formatter={(value: number) => [value.toLocaleString() + " visitas", "Visitas"]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="visitas"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={{ fill: "hsl(var(--primary))" }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+
+              <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
+                <div className="text-center">
+                  <p className="text-3xl font-bold">
+                    {analyticsData.reduce((sum, item) => sum + item.visitas, 0).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">Total Anual</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold">
+                    {Math.round(
+                      analyticsData.reduce((sum, item) => sum + item.visitas, 0) / analyticsData.length,
+                    ).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">Média Mensal</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold">
+                    {Math.max(...analyticsData.map((item) => item.visitas)).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">Pico Mensal</p>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
