@@ -12,17 +12,18 @@ interface CriticalDomainsAlertProps {
 
 // Mapeamento de sons de alerta (4 sons)
 const ALERT_SOUNDS: Record<string, string> = {
-  "ios-1": "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3", // Alerta de Perigo - Tom Intermitente
-  "ios-2": "https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3", // Atenção Máxima - Alarme Duplo
-  "ios-3": "https://assets.mixkit.co/active_storage/sfx/2871/2871-preview.mp3", // Alerta de Sistema - Bipe Eletrônico
-  "ios-4": "https://assets.mixkit.co/active_storage/sfx/2873/2873-preview.mp3", // Urgência - Bipe Rápido
+  "alert-1": "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3", // Alerta de Perigo - Tom Intermitente
+  "alert-2": "https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3", // Atenção Máxima - Alarme Duplo
+  "alert-3": "https://assets.mixkit.co/active_storage/sfx/2871/2871-preview.mp3", // Alerta de Sistema - Bipe Eletrônico
+  "alert-4":
+    "https://dsehaqdqnrkjrhbvkfrk.supabase.co/storage/v1/object/sign/Alert%20sound/1112(1).MP3?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lYTNjYWYwMi1lNGU0LTQ4MWUtYjY5OC0yZjQxN2FiZGM2ZWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJBbGVydCBzb3VuZC8xMTEyKDEpLk1QMyIsImlhdCI6MTc2MjkzMTgwNSwiZXhwIjozMTU1MzYyOTMxODA1fQ.WOFs0UorDf-SXwWfKqBRbyNQ7AWh63EqZaskBaGlGg0", // Alerta Personalizado
 };
 
 export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalDomainsAlertProps) {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   const [firstName, setFirstName] = useState("");
-  const [alertSound, setAlertSound] = useState("ios-1");
+  const [alertSound, setAlertSound] = useState("alert-1");
 
   useEffect(() => {
     // Buscar nome do usuário e preferência de som
@@ -59,7 +60,7 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
   }, [suspendedCount, expiredCount, alertSound]);
 
   const playAlertSound = () => {
-    const soundUrl = ALERT_SOUNDS[alertSound] || ALERT_SOUNDS["ios-1"];
+    const soundUrl = ALERT_SOUNDS[alertSound] || ALERT_SOUNDS["alert-1"];
     const audio = new Audio(soundUrl);
     audio.volume = 1.0;
     audio.play().catch((error) => {

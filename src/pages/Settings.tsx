@@ -17,10 +17,10 @@ import { ALERT_SOUNDS } from "@/components/CriticalDomainsAlert";
 
 // Nomes dos sons de alerta (4 sons)
 const SOUND_NAMES: Record<string, string> = {
-  "ios-1": "Alerta de Perigo - Tom Intermitente",
-  "ios-2": "Atenção Máxima - Alarme Duplo",
-  "ios-3": "Alerta de Sistema - Bipe Eletrônico",
-  "ios-4": "Urgência - Bipe Rápido",
+  "alert-1": "Alerta de Perigo - Tom Intermitente",
+  "alert-2": "Atenção Máxima - Alarme Duplo",
+  "alert-3": "Alerta de Sistema - Bipe Eletrônico",
+  "alert-4": "Alerta Personalizado",
 };
 
 export default function Settings() {
@@ -33,7 +33,7 @@ export default function Settings() {
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [newPlatformFilter, setNewPlatformFilter] = useState("");
   const [newTrafficSourceFilter, setNewTrafficSourceFilter] = useState("");
-  const [selectedSound, setSelectedSound] = useState("ios-1");
+  const [selectedSound, setSelectedSound] = useState("alert-1");
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
 
   // Fetch profile data
@@ -50,7 +50,7 @@ export default function Settings() {
       if (data) {
         setFullName(data.full_name || "");
         setWhatsappNumber(data.whatsapp_number || "");
-        setSelectedSound(data.alert_sound_preference || "ios-1");
+        setSelectedSound(data.alert_sound_preference || "alert-1");
       }
       return data;
     },
