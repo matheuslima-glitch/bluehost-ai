@@ -10,23 +10,12 @@ interface CriticalDomainsAlertProps {
   expiredCount: number;
 }
 
-// Mapeamento de sons de alerta do iOS iPhone
+// Mapeamento de sons de alerta (apenas 4 sons)
 const ALERT_SOUNDS: Record<string, string> = {
-  "ios-1": "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3", // Tri-tone
-  "ios-2": "https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3", // Chime
-  "ios-3": "https://assets.mixkit.co/active_storage/sfx/2871/2871-preview.mp3", // Glass
-  "ios-4": "https://assets.mixkit.co/active_storage/sfx/2872/2872-preview.mp3", // Horn
-  "ios-5": "https://assets.mixkit.co/active_storage/sfx/2873/2873-preview.mp3", // Bell
-  "ios-6": "https://assets.mixkit.co/active_storage/sfx/2874/2874-preview.mp3", // Electronic
-  "ios-7": "https://assets.mixkit.co/active_storage/sfx/2875/2875-preview.mp3", // Ping
-  "ios-8": "https://assets.mixkit.co/active_storage/sfx/2876/2876-preview.mp3", // Swoosh
-  "ios-9": "https://assets.mixkit.co/active_storage/sfx/2877/2877-preview.mp3", // Popcorn
-  "ios-10": "https://assets.mixkit.co/active_storage/sfx/2878/2878-preview.mp3", // Fanfare
-  "ios-11": "https://assets.mixkit.co/active_storage/sfx/2879/2879-preview.mp3", // Ding
-  "ios-12": "https://assets.mixkit.co/active_storage/sfx/2880/2880-preview.mp3", // Alert
-  "ios-13": "https://assets.mixkit.co/active_storage/sfx/2867/2867-preview.mp3", // Alarm
-  "ios-14": "https://assets.mixkit.co/active_storage/sfx/2868/2868-preview.mp3", // Beacon
-  "ios-15": "https://assets.mixkit.co/active_storage/sfx/2866/2866-preview.mp3", // Bloom
+  "ios-1": "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3", // Alerta de Perigo - Tom Intermitente
+  "ios-2": "https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3", // Atenção Máxima - Alarme Duplo
+  "ios-3": "https://assets.mixkit.co/active_storage/sfx/2871/2871-preview.mp3", // Alerta de Sistema - Bipe Eletrônico
+  "ios-4": "https://assets.mixkit.co/active_storage/sfx/2872/2872-preview.mp3", // Urgência - Bipe Rápido
 };
 
 export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalDomainsAlertProps) {
