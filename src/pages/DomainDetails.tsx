@@ -110,11 +110,15 @@ export default function DomainDetails() {
 
   // Carregar dados de analytics do Supabase
   const loadAnalyticsData = async () => {
-    if (!id) return;
+    if (!domain?.zone_id) return;
 
     setLoadingAnalytics(true);
     try {
-      const { data, error } = await supabase.from("domain_analytics").select("*").eq("domain_id", id).single();
+      const { data, error } = await supabase
+        .from("domain_analytics")
+        .select("*")
+        .eq("zone_id", domain.zone_id)
+        .single();
 
       if (error) {
         console.error("Error loading analytics:", error);
@@ -128,8 +132,8 @@ export default function DomainDetails() {
         const currentMonth = now.getMonth(); // 0-11
         const currentYear = now.getFullYear();
 
-        // Nomes dos meses
-        const monthNames = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+        // Nomes dos meses em INGLÊS (como estão no Supabase)
+        const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
         const monthLabels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
         const chartData = [];
@@ -179,14 +183,9 @@ export default function DomainDetails() {
   useEffect(() => {
     if (domain?.zone_id) {
       loadDnsRecords();
-    }
-  }, [domain?.zone_id]);
-
-  useEffect(() => {
-    if (id) {
       loadAnalyticsData();
     }
-  }, [id]);
+  }, [domain?.zone_id]);
 
   const loadActivityLogs = async () => {
     if (!id) return;
@@ -808,7 +807,7 @@ export default function DomainDetails() {
       <Card>
         <CardHeader>
           <CardTitle>Dashboard de Visitas Mensais</CardTitle>
-          <CardDescription>Histórico de visitas nos últimos 12 meses (ano: {new Date().getFullYear()})</CardDescription>
+          <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
         </CardHeader>
         <CardContent>
           {loadingAnalytics ? (
