@@ -15,23 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect } from "react";
 import { ALERT_SOUNDS } from "@/components/CriticalDomainsAlert";
 
-// Nomes dos sons do iOS
+// Nomes dos sons de alerta (apenas 4 sons)
 const SOUND_NAMES: Record<string, string> = {
-  "ios-1": "Tri-tone (Padrão iOS)",
-  "ios-2": "Chime",
-  "ios-3": "Glass",
-  "ios-4": "Horn",
-  "ios-5": "Bell",
-  "ios-6": "Electronic",
-  "ios-7": "Ping",
-  "ios-8": "Swoosh",
-  "ios-9": "Popcorn",
-  "ios-10": "Fanfare",
-  "ios-11": "Ding",
-  "ios-12": "Alert",
-  "ios-13": "Alarm",
-  "ios-14": "Beacon",
-  "ios-15": "Bloom",
+  "ios-1": "Alerta de Perigo - Tom Intermitente",
+  "ios-2": "Atenção Máxima - Alarme Duplo",
+  "ios-3": "Alerta de Sistema - Bipe Eletrônico",
+  "ios-4": "Urgência - Bipe Rápido",
 };
 
 export default function Settings() {
