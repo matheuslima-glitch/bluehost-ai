@@ -224,7 +224,10 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
 
   const criticalDomains = domains.filter((d) => {
-    if (d.status === "expired" || d.status === "suspended") return true;
+    // Verificar status suspenso (case-insensitive e variações)
+    const statusLower = d.status?.toLowerCase() || "";
+    if (statusLower === "suspended" || statusLower === "suspend" || d.status === "expired") return true;
+
     if (!d.expiration_date) return false;
     const expDate = new Date(d.expiration_date);
     const hasAlert = d.has_alert;
@@ -234,16 +237,30 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     );
   });
 
+  // Debug: Verificar domínios suspensos
+  useEffect(() => {
+    const suspendedDomains = domains.filter((d) => {
+      const statusLower = d.status?.toLowerCase() || "";
+      return statusLower === "suspended" || statusLower === "suspend";
+    });
+    console.log("Total de domínios:", domains.length);
+    console.log("Domínios suspensos encontrados:", suspendedDomains.length);
+    console.log("Domínios suspensos:", suspendedDomains);
+    console.log("Domínios críticos total:", criticalDomains.length);
+  }, [domains]);
+
   // Função para determinar a prioridade de ordenação
   const getDomainPriority = (domain: any): number => {
+    const statusLower = domain.status?.toLowerCase() || "";
+
     // 1. Suspenso - Prioridade máxima
-    if (domain.status === "suspended") return 1;
+    if (statusLower === "suspended" || statusLower === "suspend") return 1;
 
     // 2. Alerta
     if (domain.has_alert) return 2;
 
     // 3. Expirado
-    if (domain.status === "expired") return 3;
+    if (statusLower === "expired") return 3;
 
     // 4. Crítico (15 dias)
     if (domain.expiration_date) {
@@ -267,14 +284,15 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
 
   const getStatusBadge = (domain: any) => {
     const hasAlert = domain.has_alert;
+    const statusLower = domain.status?.toLowerCase() || "";
 
     if (hasAlert) {
       return <Badge className="bg-yellow-500">Alerta</Badge>;
     }
-    if (domain.status === "expired") {
+    if (statusLower === "expired") {
       return <Badge variant="destructive">Expirado</Badge>;
     }
-    if (domain.status === "suspended") {
+    if (statusLower === "suspended" || statusLower === "suspend") {
       return <Badge className="bg-orange-500">Suspenso</Badge>;
     }
     if (domain.expiration_date) {
