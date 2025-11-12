@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { User, Bell, Palette, Filter, X } from "lucide-react";
+import { User, Bell, Palette, Filter, X, Volume2, Check } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Switch } from "@/components/ui/switch";
@@ -11,7 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState, useEffect } from "react";
+import { ALERT_SOUNDS } from "@/components/CriticalDomainsAlert";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -23,6 +25,8 @@ export default function Settings() {
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [newPlatformFilter, setNewPlatformFilter] = useState("");
   const [newTrafficSourceFilter, setNewTrafficSourceFilter] = useState("");
+  const [selectedSound, setSelectedSound] = useState("alarm-1");
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
 
   // Fetch profile data
   const { data: profile } = useQuery({
@@ -30,14 +34,15 @@ export default function Settings() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("full_name, whatsapp_number")
+        .select("full_name, whatsapp_number, alert_sound_preference")
         .eq("id", user?.id)
         .maybeSingle();
-      
+
       if (error) throw error;
       if (data) {
         setFullName(data.full_name || "");
         setWhatsappNumber(data.whatsapp_number || "");
+        setSelectedSound(data.alert_sound_preference || "alarm-1");
       }
       return data;
     },
@@ -53,8 +58,8 @@ export default function Settings() {
         .select("*")
         .eq("user_id", user?.id)
         .maybeSingle();
-      
-      if (error && error.code !== 'PGRST116') throw error;
+
+      if (error && error.code !== "PGRST116") throw error;
       return data;
     },
     enabled: !!user?.id,
@@ -69,7 +74,7 @@ export default function Settings() {
         .select("*")
         .eq("user_id", user?.id)
         .order("created_at", { ascending: false });
-      
+
       if (error) throw error;
       return data;
     },
@@ -86,7 +91,7 @@ export default function Settings() {
           whatsapp_number: whatsappNumber,
         })
         .eq("id", user?.id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -107,17 +112,16 @@ export default function Settings() {
 
   // Update notification settings mutation
   const updateNotificationMutation = useMutation({
-    mutationFn: async (settings: { alert_suspended: boolean; alert_expired: boolean; alert_expiring_soon: boolean }) => {
+    mutationFn: async (settings: {
+      alert_suspended: boolean;
+      alert_expired: boolean;
+      alert_expiring_soon: boolean;
+    }) => {
       if (notificationSettings) {
-        const { error } = await supabase
-          .from("notification_settings")
-          .update(settings)
-          .eq("user_id", user?.id);
+        const { error } = await supabase.from("notification_settings").update(settings).eq("user_id", user?.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from("notification_settings")
-          .insert({ user_id: user?.id, ...settings });
+        const { error } = await supabase.from("notification_settings").insert({ user_id: user?.id, ...settings });
         if (error) throw error;
       }
     },
@@ -133,14 +137,12 @@ export default function Settings() {
   // Add custom filter mutation
   const addFilterMutation = useMutation({
     mutationFn: async ({ filter_type, filter_value }: { filter_type: string; filter_value: string }) => {
-      const { error } = await supabase
-        .from("custom_filters")
-        .insert({
-          user_id: user?.id,
-          filter_type,
-          filter_value,
-        });
-      
+      const { error } = await supabase.from("custom_filters").insert({
+        user_id: user?.id,
+        filter_type,
+        filter_value,
+      });
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -162,11 +164,8 @@ export default function Settings() {
   // Delete custom filter mutation
   const deleteFilterMutation = useMutation({
     mutationFn: async (filterId: string) => {
-      const { error } = await supabase
-        .from("custom_filters")
-        .delete()
-        .eq("id", filterId);
-      
+      const { error } = await supabase.from("custom_filters").delete().eq("id", filterId);
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -202,8 +201,92 @@ export default function Settings() {
     }
   };
 
-  const platformFilters = customFilters.filter(f => f.filter_type === "platform");
-  const trafficSourceFilters = customFilters.filter(f => f.filter_type === "traffic_source");
+  // Funções para gerenciar sons de alerta
+  const previewSound = (soundId: string) => {
+    // Parar qualquer som que esteja tocando
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    }
+
+    const soundUrl = ALERT_SOUNDS[soundId];
+    if (soundUrl) {
+      const audio = new Audio(soundUrl);
+      audio.volume = 1.0;
+      audio.play().catch((error) => {
+        console.error("Erro ao reproduzir som:", error);
+        toast({
+          title: "Erro",
+          description: "Erro ao reproduzir som de preview",
+          variant: "destructive",
+        });
+      });
+      setCurrentAudio(audio);
+    }
+  };
+
+  const handleSoundChange = (soundId: string) => {
+    setSelectedSound(soundId);
+    previewSound(soundId);
+  };
+
+  const saveSoundPreference = async () => {
+    if (!user?.id) return;
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ alert_sound_preference: selectedSound })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      toast({
+        title: "Sucesso",
+        description: "Preferência de som salva com sucesso!",
+      });
+    } catch (error) {
+      console.error("Erro ao salvar preferência de som:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar preferência de som",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Cleanup audio quando o componente desmontar
+  useEffect(() => {
+    return () => {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+    };
+  }, [currentAudio]);
+
+  // Nomes descritivos para os sons
+  const SOUND_NAMES: Record<string, string> = {
+    "alarm-1": "Alarme Urgente - Tom agudo",
+    "alarm-2": "Alarme de Emergência - Sirene",
+    "alarm-3": "Alerta Crítico - Bipe contínuo",
+    "alarm-4": "Aviso de Perigo - Tom intermitente",
+    "alarm-5": "Atenção Máxima - Alarme duplo",
+    "alarm-6": "Alerta Crítico - Tom grave",
+    "alarm-7": "Perigo Iminente - Sirene rápida",
+    "alarm-8": "Alerta de Sistema - Bipe eletrônico",
+    "alarm-9": "Alarme de Segurança - Tom clássico",
+    "alarm-10": "Sirene de Aviso - Tom longo",
+    "alarm-11": "Tom de Alerta - Bipe triplo",
+    "alarm-12": "Emergência - Tom de ambulância",
+    "alarm-13": "Urgência - Bipe rápido",
+    "alarm-14": "Crítico - Tom pulsante",
+    "alarm-15": "Perigo - Sirene de alarme",
+  };
+
+  const platformFilters = customFilters.filter((f) => f.filter_type === "platform");
+  const trafficSourceFilters = customFilters.filter((f) => f.filter_type === "traffic_source");
 
   return (
     <div className="space-y-6">
@@ -219,9 +302,7 @@ export default function Settings() {
             <User className="h-5 w-5" />
             Perfil
           </CardTitle>
-          <CardDescription>
-            Informações básicas da sua conta
-          </CardDescription>
+          <CardDescription>Informações básicas da sua conta</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -230,18 +311,13 @@ export default function Settings() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="name">Nome Completo</Label>
-            <Input 
-              id="name" 
-              placeholder="Seu nome" 
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-            />
+            <Input id="name" placeholder="Seu nome" value={fullName} onChange={(e) => setFullName(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="whatsapp">WhatsApp</Label>
-            <Input 
-              id="whatsapp" 
-              placeholder="+55 11 99999-9999" 
+            <Input
+              id="whatsapp"
+              placeholder="+55 11 99999-9999"
               value={whatsappNumber}
               onChange={(e) => setWhatsappNumber(e.target.value)}
             />
@@ -259,22 +335,15 @@ export default function Settings() {
             <Palette className="h-5 w-5" />
             Aparência
           </CardTitle>
-          <CardDescription>
-            Personalize a interface do sistema
-          </CardDescription>
+          <CardDescription>Personalize a interface do sistema</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label>Modo Escuro</Label>
-              <p className="text-sm text-muted-foreground">
-                Alterar entre tema claro e escuro
-              </p>
+              <p className="text-sm text-muted-foreground">Alterar entre tema claro e escuro</p>
             </div>
-            <Switch
-              checked={theme === "dark"}
-              onCheckedChange={toggleTheme}
-            />
+            <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} />
           </div>
         </CardContent>
       </Card>
@@ -286,21 +355,17 @@ export default function Settings() {
             <Bell className="h-5 w-5" />
             Notificações via WhatsApp
           </CardTitle>
-          <CardDescription>
-            Receba alertas sobre seus domínios
-          </CardDescription>
+          <CardDescription>Receba alertas sobre seus domínios</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label>Domínios Suspensos</Label>
-              <p className="text-sm text-muted-foreground">
-                Alertas quando domínios forem suspensos
-              </p>
+              <p className="text-sm text-muted-foreground">Alertas quando domínios forem suspensos</p>
             </div>
-            <Switch 
+            <Switch
               checked={notificationSettings?.alert_suspended || false}
-              onCheckedChange={(checked) => 
+              onCheckedChange={(checked) =>
                 updateNotificationMutation.mutate({
                   alert_suspended: checked,
                   alert_expired: notificationSettings?.alert_expired || false,
@@ -313,13 +378,11 @@ export default function Settings() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label>Domínios Expirados</Label>
-              <p className="text-sm text-muted-foreground">
-                Alertas quando domínios expirarem
-              </p>
+              <p className="text-sm text-muted-foreground">Alertas quando domínios expirarem</p>
             </div>
-            <Switch 
+            <Switch
               checked={notificationSettings?.alert_expired || false}
-              onCheckedChange={(checked) => 
+              onCheckedChange={(checked) =>
                 updateNotificationMutation.mutate({
                   alert_suspended: notificationSettings?.alert_suspended || false,
                   alert_expired: checked,
@@ -332,13 +395,11 @@ export default function Settings() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label>Próximos a Expirar (15 dias)</Label>
-              <p className="text-sm text-muted-foreground">
-                Alertas 15 dias antes da expiração
-              </p>
+              <p className="text-sm text-muted-foreground">Alertas 15 dias antes da expiração</p>
             </div>
-            <Switch 
+            <Switch
               checked={notificationSettings?.alert_expiring_soon || false}
-              onCheckedChange={(checked) => 
+              onCheckedChange={(checked) =>
                 updateNotificationMutation.mutate({
                   alert_suspended: notificationSettings?.alert_suspended || false,
                   alert_expired: notificationSettings?.alert_expired || false,
@@ -350,6 +411,63 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* Alert Sounds Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Volume2 className="h-5 w-5" />
+            Sons de Alerta
+          </CardTitle>
+          <CardDescription>
+            Escolha o som que será reproduzido quando houver domínios críticos (suspensos ou expirados)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-3">
+            <Label htmlFor="alert-sound" className="text-base">
+              Som de Alerta de Domínios Críticos
+            </Label>
+            <Select value={selectedSound} onValueChange={handleSoundChange}>
+              <SelectTrigger id="alert-sound" className="w-full">
+                <SelectValue placeholder="Selecione um som de alerta" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                {Object.entries(SOUND_NAMES).map(([soundId, soundName]) => (
+                  <SelectItem key={soundId} value={soundId}>
+                    <div className="flex items-center gap-2">
+                      <Volume2 className="h-4 w-4" />
+                      {soundName}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              Ao selecionar um som, ele será reproduzido automaticamente para você ouvir um preview.
+            </p>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <p className="text-sm text-blue-900 dark:text-blue-100">
+              <strong>💡 Dica:</strong> Escolha um som que chame sua atenção imediatamente. Este alerta será reproduzido
+              toda vez que você acessar o dashboard e houver domínios suspensos ou expirados.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t">
+            <Button variant="outline" onClick={() => previewSound(selectedSound)}>
+              <Volume2 className="h-4 w-4 mr-2" />
+              Ouvir Preview
+            </Button>
+
+            <Button onClick={saveSoundPreference}>
+              <Check className="h-4 w-4 mr-2" />
+              Salvar Preferência de Som
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Custom Filters */}
       <Card>
         <CardHeader>
@@ -357,26 +475,24 @@ export default function Settings() {
             <Filter className="h-5 w-5" />
             Criação de Filtros
           </CardTitle>
-          <CardDescription>
-            Crie filtros customizados para plataforma e fonte de tráfego
-          </CardDescription>
+          <CardDescription>Crie filtros customizados para plataforma e fonte de tráfego</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Platform Filters */}
           <div className="space-y-3">
             <Label>Plataformas</Label>
             <div className="flex gap-2">
-              <Input 
-                placeholder="Nova plataforma" 
+              <Input
+                placeholder="Nova plataforma"
                 value={newPlatformFilter}
                 onChange={(e) => setNewPlatformFilter(e.target.value)}
                 onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === "Enter") {
                     handleAddPlatformFilter();
                   }
                 }}
               />
-              <Button 
+              <Button
                 onClick={handleAddPlatformFilter}
                 disabled={addFilterMutation.isPending || !newPlatformFilter.trim()}
               >
@@ -387,10 +503,7 @@ export default function Settings() {
               {platformFilters.map((filter) => (
                 <Badge key={filter.id} variant="secondary" className="gap-1">
                   {filter.filter_value}
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
-                    onClick={() => deleteFilterMutation.mutate(filter.id)}
-                  />
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => deleteFilterMutation.mutate(filter.id)} />
                 </Badge>
               ))}
             </div>
@@ -402,17 +515,17 @@ export default function Settings() {
           <div className="space-y-3">
             <Label>Fontes de Tráfego</Label>
             <div className="flex gap-2">
-              <Input 
-                placeholder="Nova fonte de tráfego" 
+              <Input
+                placeholder="Nova fonte de tráfego"
                 value={newTrafficSourceFilter}
                 onChange={(e) => setNewTrafficSourceFilter(e.target.value)}
                 onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === "Enter") {
                     handleAddTrafficSourceFilter();
                   }
                 }}
               />
-              <Button 
+              <Button
                 onClick={handleAddTrafficSourceFilter}
                 disabled={addFilterMutation.isPending || !newTrafficSourceFilter.trim()}
               >
@@ -423,10 +536,7 @@ export default function Settings() {
               {trafficSourceFilters.map((filter) => (
                 <Badge key={filter.id} variant="secondary" className="gap-1">
                   {filter.filter_value}
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
-                    onClick={() => deleteFilterMutation.mutate(filter.id)}
-                  />
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => deleteFilterMutation.mutate(filter.id)} />
                 </Badge>
               ))}
             </div>
