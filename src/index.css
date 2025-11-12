@@ -56,7 +56,7 @@ All colors MUST be HSL.
 
     --gradient-primary: linear-gradient(135deg, hsl(214 100% 46%) 0%, hsl(220 100% 60%) 100%);
     --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(210 16% 98%) 100%);
-    
+
     /* Domain Search Gradients */
     --gradient-domain-hero: linear-gradient(135deg, hsl(199 89% 48%) 0%, hsl(217 91% 60%) 40%, hsl(224 76% 48%) 100%);
     --accent-cyan: 190 95% 55%;
@@ -116,7 +116,7 @@ All colors MUST be HSL.
 
     --gradient-primary: linear-gradient(135deg, hsl(214 100% 60%) 0%, hsl(220 100% 70%) 100%);
     --gradient-subtle: linear-gradient(180deg, hsl(222 47% 11%) 0%, hsl(222 47% 15%) 100%);
-    
+
     /* Domain Search Gradients - Dark Mode */
     --gradient-domain-hero: linear-gradient(135deg, hsl(199 89% 58%) 0%, hsl(217 91% 70%) 40%, hsl(224 76% 58%) 100%);
     --accent-cyan: 190 95% 65%;
@@ -138,4 +138,78 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Customizações adicionais para a sidebar */
+
+/* Remove bordas e separadores da sidebar para um visual mais limpo */
+[data-sidebar="sidebar"] {
+  border: none !important;
+}
+
+/* Ajusta espaçamento dos itens do menu */
+[data-sidebar="menu"] {
+  gap: 0.25rem;
+}
+
+/* Remove bordas dos grupos da sidebar */
+[data-sidebar="group"] {
+  border: none !important;
+}
+
+/* Melhora o visual dos botões do menu */
+[data-sidebar="menu-button"] {
+  transition: all 0.2s ease;
+  border-radius: 0.5rem;
+}
+
+/* Estilo do item ativo com azul claro */
+[data-sidebar="menu-button"][data-active="true"] {
+  background-color: rgb(239 246 255) !important; /* blue-50 */
+  color: rgb(37 99 235) !important; /* blue-600 */
+  font-weight: 500;
+}
+
+.dark [data-sidebar="menu-button"][data-active="true"] {
+  background-color: rgb(23 37 84 / 0.5) !important; /* blue-950/50 */
+  color: rgb(96 165 250) !important; /* blue-400 */
+}
+
+/* Hover suave nos itens do menu */
+[data-sidebar="menu-button"]:hover:not([data-active="true"]) {
+  background-color: rgb(243 244 246); /* gray-100 */
+}
+
+.dark [data-sidebar="menu-button"]:hover:not([data-active="true"]) {
+  background-color: rgb(31 41 55); /* gray-800 */
+}
+
+/* Ajusta o tamanho dos ícones quando colapsado */
+.group-data-[collapsible="icon"] [data-sidebar="menu-button"] svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Remove padding extra quando colapsado */
+.group-data-[collapsible="icon"] [data-sidebar="header"],
+.group-data-[collapsible="icon"] [data-sidebar="footer"] {
+  padding: 0.75rem;
+}
+
+/* Centraliza conteúdo quando colapsado */
+.group-data-[collapsible="icon"] [data-sidebar="footer"] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Tooltip styling */
+[data-sidebar="menu-button"] [role="tooltip"] {
+  background-color: rgb(17 24 39); /* gray-900 */
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
