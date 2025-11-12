@@ -237,18 +237,6 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     );
   });
 
-  // Debug: Verificar domínios suspensos
-  useEffect(() => {
-    const suspendedDomains = domains.filter((d) => {
-      const statusLower = d.status?.toLowerCase() || "";
-      return statusLower === "suspended" || statusLower === "suspend";
-    });
-    console.log("Total de domínios:", domains.length);
-    console.log("Domínios suspensos encontrados:", suspendedDomains.length);
-    console.log("Domínios suspensos:", suspendedDomains);
-    console.log("Domínios críticos total:", criticalDomains.length);
-  }, [domains]);
-
   // Função para determinar a prioridade de ordenação
   const getDomainPriority = (domain: any): number => {
     const statusLower = domain.status?.toLowerCase() || "";
