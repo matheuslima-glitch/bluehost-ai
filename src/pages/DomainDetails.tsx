@@ -129,8 +129,8 @@ export default function DomainDetails() {
 
         const chartData = months.map((month, index) => ({
           month: monthsFullName[index],
-          anoAnterior: data[`py_${month}`] || 0,
-          anoAtual: data[`cy_${month}`] || 0,
+          anoAnterior: data[`${month}_py`] || 0,
+          anoAtual: data[`${month}_cy`] || 0,
         }));
 
         setAnalyticsData(chartData);
