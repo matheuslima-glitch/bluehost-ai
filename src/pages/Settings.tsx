@@ -32,7 +32,7 @@ export default function Settings() {
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [newPlatformFilter, setNewPlatformFilter] = useState("");
   const [newTrafficSourceFilter, setNewTrafficSourceFilter] = useState("");
-  const [selectedSound, setSelectedSound] = useState("alert-1");
+  const [selectedSound, setSelectedSound] = useState("alert-4");
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
 
   // Fetch profile data
@@ -49,7 +49,7 @@ export default function Settings() {
       if (data) {
         setFullName(data.full_name || "");
         setWhatsappNumber(data.whatsapp_number || "");
-        setSelectedSound(data.alert_sound_preference || "alert-1");
+        setSelectedSound(data.alert_sound_preference || "alert-4");
       }
       return data;
     },

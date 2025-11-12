@@ -42,8 +42,8 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
         setFirstName(name);
       }
 
-      // Definir o som preferido ou usar o padrão
-      const soundPreference = data?.alert_sound_preference || "alert-1";
+      // Definir o som preferido ou usar o padrão (True Tone)
+      const soundPreference = data?.alert_sound_preference || "alert-4";
       console.log("Preferência de som carregada:", soundPreference);
       setAlertSound(soundPreference);
       setUserDataLoaded(true);

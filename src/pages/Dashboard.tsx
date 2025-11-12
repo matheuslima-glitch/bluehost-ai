@@ -390,9 +390,9 @@ export default function Dashboard() {
       <CriticalDomainsAlert suspendedCount={stats.suspended} expiredCount={stats.expired} />
 
       <div className="flex items-center justify-between">
-        <div>
+        <div className="space-y-1">
           <h1 className="text-3xl font-bold">Olá{firstName ? `, ${firstName}` : ""}!</h1>
-          <p className="text-muted-foreground">Visão completa de todos os seus domínios</p>
+          <p className="text-muted-foreground mt-2">Visão completa de todos os seus domínios</p>
         </div>
       </div>
 
