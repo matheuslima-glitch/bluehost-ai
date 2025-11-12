@@ -599,7 +599,9 @@ export default function Dashboard() {
       </div>
 
       {/* Critical Domains Management Table */}
-      <CriticalDomainsTable domains={domains} onDomainsChange={loadDashboardData} />
+      <div data-critical-domains-table className="critical-domains-table scroll-mt-4">
+        <CriticalDomainsTable domains={domains} onDomainsChange={loadDashboardData} />
+      </div>
 
       {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
