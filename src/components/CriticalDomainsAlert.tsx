@@ -10,7 +10,7 @@ interface CriticalDomainsAlertProps {
   expiredCount: number;
 }
 
-// Mapeamento de sons de alerta (apenas 4 sons)
+// Mapeamento de sons de alerta (4 sons mantidos do código original)
 const ALERT_SOUNDS: Record<string, string> = {
   "ios-1": "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3", // Alerta de Perigo - Tom Intermitente
   "ios-2": "https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3", // Atenção Máxima - Alarme Duplo
