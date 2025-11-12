@@ -110,15 +110,32 @@ export default function DomainDetails() {
 
   // Carregar dados de analytics do Supabase
   const loadAnalyticsData = async () => {
-    if (!domain?.zone_id) return;
+    if (!domain?.domain_name && !domain?.zone_id) return;
 
     setLoadingAnalytics(true);
     try {
-      const { data, error } = await supabase
-        .from("domain_analytics")
-        .select("*")
-        .eq("zone_id", domain.zone_id)
-        .single();
+      let data = null;
+      let error = null;
+
+      // Tentar buscar por domain_name primeiro
+      if (domain.domain_name) {
+        const result = await supabase
+          .from("domain_analytics")
+          .select("*")
+          .eq("domain_name", domain.domain_name)
+          .maybeSingle();
+
+        data = result.data;
+        error = result.error;
+      }
+
+      // Se não encontrou por domain_name, tentar por zone_id
+      if (!data && domain.zone_id) {
+        const result = await supabase.from("domain_analytics").select("*").eq("zone_id", domain.zone_id).maybeSingle();
+
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) {
         console.error("Error loading analytics:", error);
@@ -183,9 +200,14 @@ export default function DomainDetails() {
   useEffect(() => {
     if (domain?.zone_id) {
       loadDnsRecords();
-      loadAnalyticsData();
     }
   }, [domain?.zone_id]);
+
+  useEffect(() => {
+    if (domain) {
+      loadAnalyticsData();
+    }
+  }, [domain]);
 
   const loadActivityLogs = async () => {
     if (!id) return;
