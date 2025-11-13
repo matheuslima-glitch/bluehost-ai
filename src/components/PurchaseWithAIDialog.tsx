@@ -1,19 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Clock, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { Card } from "@/components/ui/card";
 
 interface PurchaseProgress {
   step: string;
   status: "pending" | "in_progress" | "completed" | "error";
   message: string;
   timestamp: string;
+  errorDetails?: string;
 }
 
 interface PurchaseWithAIDialogProps {
@@ -22,29 +24,83 @@ interface PurchaseWithAIDialogProps {
   onSuccess: () => void;
 }
 
-interface DomainClassification {
-  domain: string;
-  trafficSource: string;
-}
+// Mapeamento dos steps de progresso
+const WORDPRESS_STEPS = [
+  { key: "generating", label: "Gerando domínios com IA" },
+  { key: "checking", label: "Verificando disponibilidade" },
+  { key: "searching", label: "Buscando domínios baratos" },
+  { key: "purchasing", label: "Comprando domínio(s)" },
+  { key: "nameservers", label: "Alterando nameservers" },
+  { key: "cloudflare", label: "Configurando Cloudflare" },
+  { key: "completed", label: "Compra concluída" },
+];
+
+const ATOMICAT_STEPS = [
+  { key: "generating", label: "Gerando domínios com IA" },
+  { key: "checking", label: "Verificando disponibilidade" },
+  { key: "searching", label: "Buscando domínios baratos" },
+  { key: "purchasing", label: "Comprando domínio(s)" },
+  { key: "completed", label: "Compra concluída" },
+];
 
 export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: PurchaseWithAIDialogProps) {
   const [quantity, setQuantity] = useState<number>(1);
   const [niche, setNiche] = useState("");
   const [language, setLanguage] = useState("portuguese");
+  const [platform, setPlatform] = useState<"wordpress" | "atomicat">("wordpress");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<PurchaseProgress[]>([]);
   const [showProgress, setShowProgress] = useState(false);
-  const [foundDomains, setFoundDomains] = useState<string[]>([]);
-  const [showStructureSelection, setShowStructureSelection] = useState(false);
-  const [selectedStructure, setSelectedStructure] = useState<"wordpress" | "atomicat">("wordpress");
-  const [purchasedDomains, setPurchasedDomains] = useState<string[]>([]);
-  const [showClassification, setShowClassification] = useState(false);
-  const [classifications, setClassifications] = useState<DomainClassification[]>([]);
+  const [progressPercentage, setProgressPercentage] = useState(0);
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
+  const [balance, setBalance] = useState<number>(0);
+  const [estimatedCost, setEstimatedCost] = useState<number>(0);
+  const [checkingBalance, setCheckingBalance] = useState(false);
 
-  const addProgressStep = (step: string, status: PurchaseProgress["status"], message: string) => {
+  // Carregar saldo ao abrir o diálogo
+  useEffect(() => {
+    if (open) {
+      loadBalance();
+    }
+  }, [open]);
+
+  // Calcular custo estimado
+  useEffect(() => {
+    // Custo médio por domínio: $8.88 (Namecheap .com)
+    const avgCost = 8.88;
+    setEstimatedCost(quantity * avgCost);
+  }, [quantity]);
+
+  const loadBalance = async () => {
+    setCheckingBalance(true);
+    try {
+      const { data, error } = await supabase
+        .from("namecheap_balance")
+        .select("balance_usd")
+        .order("last_synced_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setBalance(data.balance_usd || 0);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar saldo:", error);
+      toast.error("Erro ao verificar saldo");
+    } finally {
+      setCheckingBalance(false);
+    }
+  };
+
+  const addProgressStep = (
+    step: string,
+    status: PurchaseProgress["status"],
+    message: string,
+    errorDetails?: string,
+  ) => {
     setProgress((prev) => {
-      // Verificar se já existe um step com mesmo nome
       const existingIndex = prev.findIndex((p) => p.step === step);
 
       const newStep: PurchaseProgress = {
@@ -52,29 +108,63 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         status,
         message,
         timestamp: new Date().toISOString(),
+        errorDetails,
       };
 
       if (existingIndex >= 0) {
-        // Atualizar step existente
         const updated = [...prev];
         updated[existingIndex] = newStep;
         return updated;
       } else {
-        // Adicionar novo step
         return [...prev, newStep];
       }
     });
+
+    // Atualizar percentual de progresso
+    updateProgressPercentage(step, status);
+  };
+
+  const updateProgressPercentage = (step: string, status: PurchaseProgress["status"]) => {
+    const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
+    const currentStepIndex = steps.findIndex((s) => s.key === step);
+
+    if (currentStepIndex === -1) return;
+
+    if (status === "completed") {
+      const percentage = ((currentStepIndex + 1) / steps.length) * 100;
+      setProgressPercentage(Math.round(percentage));
+    } else if (status === "in_progress") {
+      const percentage = (currentStepIndex / steps.length) * 100;
+      setProgressPercentage(Math.round(percentage));
+    } else if (status === "error") {
+      // Manter progresso atual em caso de erro
+    }
   };
 
   const handleGenerate = async () => {
+    // Validações
     if (!niche.trim()) {
       toast.error("Por favor, insira o nicho");
+      return;
+    }
+
+    // Validação 1: Saldo mínimo de $1
+    if (balance < 1) {
+      toast.error("Saldo insuficiente. Por favor, adicione pelo menos $1.00 para continuar.");
+      return;
+    }
+
+    // Validação 2: Verificar se o saldo estimado é suficiente
+    if (balance < estimatedCost) {
+      const missingAmount = (estimatedCost - balance).toFixed(2);
+      toast.error(`Saldo insuficiente. Adicione pelo menos $${missingAmount} para continuar.`);
       return;
     }
 
     setLoading(true);
     setShowProgress(true);
     setProgress([]);
+    setProgressPercentage(0);
 
     // Fechar EventSource anterior se existir
     if (eventSource) {
@@ -82,42 +172,33 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
 
     try {
-      // Pegar o usuário atual
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("Usuário não autenticado");
-      }
+      console.log("🚀 Iniciando compra de domínios...");
 
-      console.log("🚀 Iniciando busca de domínios...");
-
-      // PASSO 1: Chamar a Edge Function para iniciar o processo
-      const { data: initData, error: initError } = await supabase.functions.invoke("ai-domain-suggestions", {
+      // Chamar Edge Function
+      const { data, error } = await supabase.functions.invoke("purchase-domain-hub", {
         body: {
-          keywords: niche,
+          niche,
           quantity,
           language,
-          niche,
-          structure: selectedStructure,
+          platform,
+          balance,
         },
       });
 
-      if (initError) {
-        console.error("❌ Erro ao iniciar:", initError);
-        addProgressStep("init", "error", `❌ Erro ao iniciar: ${initError.message}`);
-        throw initError;
+      if (error) {
+        console.error("❌ Erro ao iniciar:", error);
+        addProgressStep("init", "error", "Erro ao iniciar processo", error.message);
+        throw error;
       }
 
-      if (!initData?.sessionId || !initData?.streamUrl) {
+      if (!data?.sessionId || !data?.streamUrl) {
         throw new Error("Resposta inválida da Edge Function");
       }
 
-      console.log("✅ Sessão criada:", initData.sessionId);
-      console.log("🌊 Stream URL:", initData.streamUrl);
+      console.log("✅ Sessão criada:", data.sessionId);
 
-      // PASSO 2: Conectar ao SSE para receber progresso em tempo real
-      const es = new EventSource(initData.streamUrl);
+      // Conectar ao SSE
+      const es = new EventSource(data.streamUrl);
       setEventSource(es);
 
       es.onopen = () => {
@@ -126,205 +207,88 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
       es.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
-          console.log("📨 Progresso recebido:", data);
+          const eventData = JSON.parse(event.data);
+          console.log("📨 Progresso recebido:", eventData);
 
-          // Adicionar step ao progresso
-          if (data.step) {
-            addProgressStep(data.step, data.status, data.message);
+          // Atualizar progresso
+          if (eventData.step && eventData.status && eventData.message) {
+            addProgressStep(eventData.step, eventData.status, eventData.message, eventData.errorDetails);
+          }
+
+          // Verificar se houve erro de saldo insuficiente durante a compra
+          if (eventData.type === "insufficient_balance") {
+            const missingAmount = eventData.missingAmount?.toFixed(2) || "0.00";
+            toast.error(`Saldo insuficiente. Adicione pelo menos $${missingAmount} para continuar.`);
+            addProgressStep("purchasing", "error", "Saldo insuficiente", `Faltam $${missingAmount}`);
+            setLoading(false);
+            es.close();
+            return;
           }
 
           // Verificar se é o resultado final
-          if (data.type === "final") {
-            console.log("✅ Processo finalizado:", data.data);
+          if (eventData.type === "final" || eventData.step === "completed") {
+            console.log("✅ Processo finalizado");
 
-            if (data.data.domains && data.data.domains.length > 0) {
-              setFoundDomains(data.data.domains);
-              toast.success(`${data.data.domains.length} domínios disponíveis encontrados!`);
+            if (eventData.status === "completed") {
+              toast.success("Domínios comprados e configurados com sucesso!");
 
-              // Aguardar 1.5s para mostrar o progresso completo
               setTimeout(() => {
                 setShowProgress(false);
-                setShowStructureSelection(true);
                 setLoading(false);
+                onOpenChange(false);
+                onSuccess();
+                resetForm();
                 es.close();
-              }, 1500);
-            } else {
-              toast.error("Nenhum domínio disponível foi encontrado");
-              setLoading(false);
-              setTimeout(() => {
-                setShowProgress(false);
-                es.close();
-              }, 3000);
+              }, 2000);
             }
           }
 
           // Verificar se houve erro
-          if (data.status === "error" || data.type === "error") {
-            console.error("❌ Erro reportado:", data);
-            toast.error(data.message || data.error || "Erro no processo");
+          if (eventData.status === "error" && eventData.type !== "insufficient_balance") {
+            console.error("❌ Erro no processo:", eventData);
             setLoading(false);
-            setTimeout(() => {
-              setShowProgress(false);
-              es.close();
-            }, 3000);
           }
         } catch (error) {
-          console.error("❌ Erro ao processar evento SSE:", error);
+          console.error("Erro ao processar evento SSE:", error);
         }
       };
 
       es.onerror = (error) => {
-        console.error("❌ Erro na conexão SSE:", error);
-        addProgressStep("connection", "error", "❌ Erro na conexão com o servidor");
+        console.error("❌ Erro SSE:", error);
+        addProgressStep("connection", "error", "Erro na conexão", "Falha na comunicação com o servidor");
         setLoading(false);
-        setTimeout(() => {
-          setShowProgress(false);
-          es.close();
-        }, 3000);
+        es.close();
       };
     } catch (error: any) {
-      console.error("❌ Erro ao buscar domínios:", error);
-      toast.error(error.message || "Erro ao processar busca de domínios");
-      addProgressStep("error", "error", `❌ Erro: ${error.message}`);
+      console.error("❌ Erro geral:", error);
+      toast.error(error.message || "Erro ao processar compra");
       setLoading(false);
-
-      // Manter o progresso visível por 3s antes de fechar
-      setTimeout(() => {
-        setShowProgress(false);
-      }, 3000);
+      setShowProgress(false);
     }
   };
 
-  const handlePurchaseWithStructure = async () => {
-    setShowStructureSelection(false);
-    setShowProgress(true);
-    setLoading(true);
+  const resetForm = () => {
+    setQuantity(1);
+    setNiche("");
+    setLanguage("portuguese");
+    setPlatform("wordpress");
     setProgress([]);
+    setProgressPercentage(0);
+    setShowProgress(false);
+  };
 
-    // Fechar EventSource anterior se existir
+  const handleClose = () => {
+    if (loading) {
+      toast.error("Aguarde o processo finalizar");
+      return;
+    }
+
     if (eventSource) {
       eventSource.close();
     }
 
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("Usuário não autenticado");
-      }
-
-      addProgressStep("purchase_init", "in_progress", `🛒 Iniciando compra de ${foundDomains.length} domínios...`);
-
-      // Aguardar 300ms
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      addProgressStep("purchase", "in_progress", `💳 Processando compra via Namecheap API...`);
-
-      // Step 2: Purchase and configure domains
-      const { data: purchaseResult, error: purchaseError } = await supabase.functions.invoke("purchase-domains", {
-        body: {
-          domains: foundDomains,
-          structure: selectedStructure,
-          userId: user.id,
-        },
-      });
-
-      if (purchaseError) {
-        console.error("Purchase error:", purchaseError);
-        addProgressStep("purchase", "error", `❌ Erro na compra: ${purchaseError.message}`);
-        throw purchaseError;
-      }
-
-      // Adicionar progresso do backend
-      if (purchaseResult?.progress) {
-        purchaseResult.progress.forEach((step: PurchaseProgress) => {
-          addProgressStep(step.step, step.status, step.message);
-        });
-      }
-
-      if (purchaseResult?.purchasedDomains && purchaseResult.purchasedDomains.length > 0) {
-        const domains = purchaseResult.purchasedDomains.map((d: any) => d.domain);
-        setPurchasedDomains(domains);
-
-        // Inicializar classificações
-        setClassifications(
-          domains.map((domain: string) => ({
-            domain,
-            trafficSource: "Google Ads",
-          })),
-        );
-
-        addProgressStep(
-          "complete",
-          "completed",
-          `✅ Processo concluído! ${domains.length} domínios comprados e configurados.`,
-        );
-
-        toast.success(`${domains.length} domínios comprados com sucesso!`);
-
-        // Aguardar 1s
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Mostrar dialog de classificação
-        setShowProgress(false);
-        setShowClassification(true);
-      } else {
-        throw new Error("Nenhum domínio foi comprado");
-      }
-    } catch (error: any) {
-      console.error("Erro na compra:", error);
-      toast.error(error.message || "Erro ao processar compra");
-      setLoading(false);
-
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      setShowProgress(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSaveClassifications = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("Usuário não autenticado");
-      }
-
-      // Salvar classificações no banco
-      for (const classification of classifications) {
-        const { error } = await supabase
-          .from("domains")
-          .update({ traffic_source: classification.trafficSource })
-          .eq("domain", classification.domain)
-          .eq("user_id", user.id);
-
-        if (error) {
-          console.error("Erro ao salvar classificação:", error);
-          throw error;
-        }
-      }
-
-      toast.success("Classificações salvas com sucesso!");
-      setShowClassification(false);
-      onSuccess();
-      onOpenChange(false);
-
-      // Resetar estado
-      setQuantity(1);
-      setNiche("");
-      setLanguage("portuguese");
-      setFoundDomains([]);
-      setPurchasedDomains([]);
-      setClassifications([]);
-      setProgress([]);
-    } catch (error: any) {
-      console.error("Erro ao salvar classificações:", error);
-      toast.error(error.message || "Erro ao salvar classificações");
-    }
+    onOpenChange(false);
+    resetForm();
   };
 
   const getStatusIcon = (status: PurchaseProgress["status"]) => {
@@ -340,229 +304,183 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
   };
 
-  const calculateProgress = () => {
-    if (progress.length === 0) return 0;
-    const completed = progress.filter((p) => p.status === "completed").length;
-    return Math.round((completed / progress.length) * 100);
-  };
+  const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
 
-  // Cleanup ao desmontar
-  useState(() => {
-    return () => {
-      if (eventSource) {
-        eventSource.close();
-      }
-    };
-  });
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Compra com IA</DialogTitle>
+          <DialogDescription>Configure os parâmetros para buscar e comprar domínios disponíveis</DialogDescription>
+        </DialogHeader>
 
-  // Dialog de configuração inicial
-  if (!showProgress && !showStructureSelection && !showClassification) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[425px] shadow-[0_0_40px_hsl(var(--glow-blue)_/_0.25)] border-[hsl(var(--accent-cyan)_/_0.3)]">
-          <DialogHeader>
-            <DialogTitle>Compra com IA</DialogTitle>
-            <DialogDescription>Configure os parâmetros para buscar domínios disponíveis</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
+        {!showProgress ? (
+          <div className="space-y-6 py-4">
+            {/* Saldo disponível */}
+            <Card className="p-4 bg-blue-50 border-blue-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Saldo Disponível</p>
+                  <p className="text-2xl font-bold text-blue-600">${balance.toFixed(2)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-600">Custo Estimado</p>
+                  <p className="text-xl font-semibold text-gray-700">${estimatedCost.toFixed(2)}</p>
+                </div>
+              </div>
+              {balance < estimatedCost && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-red-600">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Saldo insuficiente para esta compra</span>
+                </div>
+              )}
+            </Card>
+
+            {/* Quantidade */}
+            <div className="space-y-2">
               <Label htmlFor="quantity">Quantidade de Domínios</Label>
               <Input
                 id="quantity"
                 type="number"
-                min="1"
-                max="50"
+                min={1}
+                max={10}
                 value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                onChange={(e) => setQuantity(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+                disabled={loading}
               />
             </div>
 
-            <div className="grid gap-2">
+            {/* Nicho */}
+            <div className="space-y-2">
               <Label htmlFor="niche">Nicho</Label>
               <Input
                 id="niche"
                 placeholder="Ex: saúde, tecnologia, finanças..."
                 value={niche}
                 onChange={(e) => setNiche(e.target.value)}
+                disabled={loading}
               />
             </div>
 
-            <div className="grid gap-2">
+            {/* Idioma */}
+            <div className="space-y-2">
               <Label htmlFor="language">Idioma</Label>
-              <Input
-                id="language"
-                placeholder="Ex: português, inglês, espanhol..."
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button onClick={handleGenerate} disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Buscando...
-                </>
-              ) : (
-                "Buscar Domínios"
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  // Dialog de seleção de estrutura
-  if (showStructureSelection) {
-    return (
-      <Dialog open={true} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-[500px] shadow-[0_0_40px_hsl(var(--glow-blue)_/_0.25)] border-[hsl(var(--accent-cyan)_/_0.3)]">
-          <DialogHeader>
-            <DialogTitle>🎉 Domínios Encontrados!</DialogTitle>
-            <DialogDescription>
-              Foram encontrados {foundDomains.length} domínios disponíveis. Selecione a estrutura desejada para
-              prosseguir com a compra.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="rounded-lg border p-4 bg-green-50 dark:bg-green-950/20">
-              <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">✅ Domínios Disponíveis:</h3>
-              <ul className="space-y-1">
-                {foundDomains.map((domain, index) => (
-                  <li key={index} className="text-sm text-green-700 dark:text-green-300">
-                    • {domain}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="structure">Selecione a Estrutura</Label>
-              <Select value={selectedStructure} onValueChange={(value: any) => setSelectedStructure(value)}>
-                <SelectTrigger id="structure">
+              <Select value={language} onValueChange={setLanguage} disabled={loading}>
+                <SelectTrigger id="language">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="wordpress">WordPress</SelectItem>
-                  <SelectItem value="atomicat">Atomicat</SelectItem>
+                  <SelectItem value="portuguese">Português</SelectItem>
+                  <SelectItem value="english">Inglês</SelectItem>
+                  <SelectItem value="spanish">Espanhol</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Plataforma */}
+            <div className="space-y-2">
+              <Label htmlFor="platform">Plataforma</Label>
+              <Select
+                value={platform}
+                onValueChange={(v: "wordpress" | "atomicat") => setPlatform(v)}
+                disabled={loading}
+              >
+                <SelectTrigger id="platform">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="wordpress">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">WordPress</span>
+                      <span className="text-xs text-gray-500">Com Cloudflare e nameservers</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="atomicat">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">AtomiCat</span>
+                      <span className="text-xs text-gray-500">Configuração simplificada</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Botões */}
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={handleClose} disabled={loading} className="flex-1">
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleGenerate}
+                disabled={loading || checkingBalance || balance < 1 || balance < estimatedCost}
+                className="flex-1"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  "Buscar Domínios"
+                )}
+              </Button>
+            </div>
           </div>
-
-          <div className="flex gap-2 justify-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowStructureSelection(false);
-                setFoundDomains([]);
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handlePurchaseWithStructure}>Prosseguir com a Compra</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  // Dialog de progresso
-  if (showProgress) {
-    return (
-      <Dialog open={true} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto shadow-[0_0_40px_hsl(var(--glow-blue)_/_0.25)] border-[hsl(var(--accent-cyan)_/_0.3)]">
-          <DialogHeader>
-            <DialogTitle>Processando</DialogTitle>
-            <DialogDescription>Acompanhe o progresso da busca e compra dos domínios</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
+        ) : (
+          <div className="space-y-6 py-4">
+            {/* Barra de progresso geral */}
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Progresso geral</span>
-                <span>{calculateProgress()}%</span>
+                <span className="text-gray-600">Progresso Geral</span>
+                <span className="font-semibold">{progressPercentage}%</span>
               </div>
-              <Progress value={calculateProgress()} />
+              <Progress value={progressPercentage} className="h-3" />
             </div>
 
-            <div className="space-y-3 max-h-[400px] overflow-y-auto">
-              {progress.length === 0 ? (
-                <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-                  <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">Conectando com o servidor...</p>
-                    <p className="text-xs text-muted-foreground mt-1">Aguarde enquanto iniciamos o processo</p>
-                  </div>
-                </div>
-              ) : (
-                progress.map((step, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
-                    {getStatusIcon(step.status)}
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{step.message}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(step.timestamp).toLocaleTimeString("pt-BR")}
-                      </p>
+            {/* Lista de steps */}
+            <div className="space-y-3">
+              {steps.map((step, index) => {
+                const progressItem = progress.find((p) => p.step === step.key);
+                const status = progressItem?.status || "pending";
+
+                return (
+                  <div
+                    key={step.key}
+                    className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
+                      status === "completed"
+                        ? "bg-green-50 border-green-200"
+                        : status === "error"
+                          ? "bg-red-50 border-red-200"
+                          : status === "in_progress"
+                            ? "bg-blue-50 border-blue-200"
+                            : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
+                    <div className="mt-0.5">{getStatusIcon(status)}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{step.label}</p>
+                      {progressItem?.message && <p className="text-xs text-gray-600 mt-1">{progressItem.message}</p>}
+                      {status === "error" && progressItem?.errorDetails && (
+                        <p className="text-xs text-red-600 mt-1 font-medium">ERRO! {progressItem.errorDetails}</p>
+                      )}
                     </div>
                   </div>
-                ))
-              )}
+                );
+              })}
             </div>
+
+            {/* Mensagem de erro geral */}
+            {progress.some((p) => p.status === "error") && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2 text-red-700">
+                  <XCircle className="h-5 w-5" />
+                  <span className="font-semibold">ERRO!</span>
+                </div>
+                <p className="text-sm text-red-600 mt-1">Tente novamente ou verifique as configurações</p>
+              </div>
+            )}
           </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  // Dialog de classificação
-  return (
-    <Dialog open={showClassification} onOpenChange={setShowClassification}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto shadow-[0_0_40px_hsl(var(--glow-blue)_/_0.25)] border-[hsl(var(--accent-cyan)_/_0.3)]">
-        <DialogHeader>
-          <DialogTitle>Classificar Domínios</DialogTitle>
-          <DialogDescription>Selecione a fonte de tráfego para cada domínio comprado</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          {classifications.map((classification, index) => (
-            <div key={index} className="grid gap-2">
-              <Label>{classification.domain}</Label>
-              <Select
-                value={classification.trafficSource}
-                onValueChange={(value) => {
-                  const newClassifications = [...classifications];
-                  newClassifications[index].trafficSource = value;
-                  setClassifications(newClassifications);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Google Ads">Google Ads</SelectItem>
-                  <SelectItem value="Facebook Ads">Facebook Ads</SelectItem>
-                  <SelectItem value="Native Ads">Native Ads</SelectItem>
-                  <SelectItem value="Outros">Outros</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-2 justify-end">
-          <Button variant="outline" onClick={() => setShowClassification(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSaveClassifications}>Salvar Classificações</Button>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );
