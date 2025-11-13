@@ -433,10 +433,10 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="portuguese">Português</SelectItem>
-                  <SelectItem value="english">English</SelectItem>
-                  <SelectItem value="spanish">Español</SelectItem>
-                  <SelectItem value="german">Deutsch</SelectItem>
-                  <SelectItem value="french">Français</SelectItem>
+                  <SelectItem value="english">Inglês</SelectItem>
+                  <SelectItem value="spanish">Espanhol</SelectItem>
+                  <SelectItem value="german">Alemão</SelectItem>
+                  <SelectItem value="french">Francês</SelectItem>
                 </SelectContent>
               </Select>
             </div>
