@@ -18,6 +18,10 @@ const ALERT_SOUNDS: Record<string, string> = {
     "https://dsehaqdqnrkjrhbvkfrk.supabase.co/storage/v1/object/sign/Alert%20sound/new-notification-010-352755.mp3?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lYTNjYWYwMi1lNGU0LTQ4MWUtYjY5OC0yZjQxN2FiZGM2ZWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJBbGVydCBzb3VuZC9uZXctbm90aWZpY2F0aW9uLTAxMC0zNTI3NTUubXAzIiwiaWF0IjoxNzYyOTU4OTk0LCJleHAiOjMxNTUzNjI5NTg5OTR9.0bVNuzd8fubejntdSG7-kzTjQ1UpKrcNmDnbYVMwmJI", // Alerta Suave - True Tone
 };
 
+// Chave para armazenar no localStorage
+const LAST_ALERT_KEY = "critical_domains_last_alert";
+const SIX_HOURS_MS = 6 * 60 * 60 * 1000; // 6 horas em milissegundos
+
 export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalDomainsAlertProps) {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
@@ -59,14 +63,65 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
     const hasCriticalDomains = suspendedCount > 0 || expiredCount > 0;
 
     if (hasCriticalDomains && !soundPlayed) {
-      setOpen(true);
-      playAlertSound();
-      setSoundPlayed(true);
+      // Verificar se deve mostrar o popup baseado no tempo
+      const shouldShowAlert = checkShouldShowAlert();
+
+      if (shouldShowAlert) {
+        setOpen(true);
+        playAlertSound();
+        setSoundPlayed(true);
+        // Salvar timestamp atual no localStorage
+        saveLastAlertTime();
+      }
     } else if (!hasCriticalDomains) {
       // Reset quando não houver domínios críticos
       setSoundPlayed(false);
     }
   }, [suspendedCount, expiredCount, userDataLoaded, alertSound, soundPlayed]);
+
+  // Função para verificar se deve mostrar o alerta baseado no intervalo de 6 horas
+  const checkShouldShowAlert = (): boolean => {
+    try {
+      const lastAlertTime = localStorage.getItem(LAST_ALERT_KEY);
+
+      // Se nunca mostrou antes (primeira vez do dia), mostrar
+      if (!lastAlertTime) {
+        console.log("Primeira vez mostrando o alerta - exibindo popup");
+        return true;
+      }
+
+      const lastTime = parseInt(lastAlertTime, 10);
+      const currentTime = Date.now();
+      const timeDifference = currentTime - lastTime;
+
+      console.log("Último alerta:", new Date(lastTime).toLocaleString());
+      console.log("Tempo desde último alerta:", Math.floor(timeDifference / 1000 / 60), "minutos");
+
+      // Se passaram 6 horas ou mais, mostrar novamente
+      if (timeDifference >= SIX_HOURS_MS) {
+        console.log("6 horas passaram - exibindo popup");
+        return true;
+      }
+
+      const remainingMinutes = Math.floor((SIX_HOURS_MS - timeDifference) / 1000 / 60);
+      console.log("Próximo alerta em:", remainingMinutes, "minutos");
+      return false;
+    } catch (error) {
+      console.error("Erro ao verificar tempo do último alerta:", error);
+      return true; // Em caso de erro, mostrar o alerta
+    }
+  };
+
+  // Função para salvar o timestamp atual no localStorage
+  const saveLastAlertTime = () => {
+    try {
+      const currentTime = Date.now();
+      localStorage.setItem(LAST_ALERT_KEY, currentTime.toString());
+      console.log("Timestamp do alerta salvo:", new Date(currentTime).toLocaleString());
+    } catch (error) {
+      console.error("Erro ao salvar timestamp do alerta:", error);
+    }
+  };
 
   const playAlertSound = () => {
     if (!alertSound) {
