@@ -32,11 +32,12 @@ const TRANSLATIONS = {
     niche: "Nicho",
     nichePlaceholder: "Ex: saúde, tecnologia, finanças...",
     language: "Idioma",
+    languagePortuguese: "Português",
+    languageEnglish: "Inglês",
+    languageSpanish: "Espanhol",
+    languageGerman: "Alemão",
+    languageFrench: "Francês",
     platform: "Plataforma",
-    wordpress: "WordPress",
-    wordpressDesc: "Com Cloudflare e nameservers",
-    atomicat: "AtomiCat",
-    atomicatDesc: "Configuração simplificada",
     cancel: "Cancelar",
     search: "Buscar Domínios",
     processing: "Processando...",
@@ -45,6 +46,8 @@ const TRANSLATIONS = {
     errorDesc: "Tente novamente ou verifique as configurações",
     enterNiche: "Por favor, insira o nicho",
     successMsg: "Domínios comprados e configurados com sucesso!",
+    insufficientBalance:
+      "Saldo insuficiente! Adicione saldo para continuar com a compra de domínios. Dica: U$1 dólar para .online ou U$14+ dólares para .com",
     steps: {
       generating: "Gerando domínios com IA",
       checking: "Verificando disponibilidade",
@@ -62,11 +65,12 @@ const TRANSLATIONS = {
     niche: "Niche",
     nichePlaceholder: "Ex: health, technology, finance...",
     language: "Language",
+    languagePortuguese: "Português",
+    languageEnglish: "Inglês",
+    languageSpanish: "Espanhol",
+    languageGerman: "Alemão",
+    languageFrench: "Francês",
     platform: "Platform",
-    wordpress: "WordPress",
-    wordpressDesc: "With Cloudflare and nameservers",
-    atomicat: "AtomiCat",
-    atomicatDesc: "Simplified setup",
     cancel: "Cancel",
     search: "Search Domains",
     processing: "Processing...",
@@ -75,6 +79,8 @@ const TRANSLATIONS = {
     errorDesc: "Please try again or check settings",
     enterNiche: "Please enter the niche",
     successMsg: "Domains purchased and configured successfully!",
+    insufficientBalance:
+      "Insufficient balance! Add balance to continue purchasing domains. Tip: U$1 dollar for .online or U$14+ dollars for .com",
     steps: {
       generating: "Generating domains with AI",
       checking: "Checking availability",
@@ -92,11 +98,12 @@ const TRANSLATIONS = {
     niche: "Nicho",
     nichePlaceholder: "Ej: salud, tecnología, finanzas...",
     language: "Idioma",
+    languagePortuguese: "Português",
+    languageEnglish: "Inglês",
+    languageSpanish: "Espanhol",
+    languageGerman: "Alemão",
+    languageFrench: "Francês",
     platform: "Plataforma",
-    wordpress: "WordPress",
-    wordpressDesc: "Con Cloudflare y nameservers",
-    atomicat: "AtomiCat",
-    atomicatDesc: "Configuración simplificada",
     cancel: "Cancelar",
     search: "Buscar Dominios",
     processing: "Procesando...",
@@ -105,6 +112,8 @@ const TRANSLATIONS = {
     errorDesc: "Inténtelo de nuevo o verifique la configuración",
     enterNiche: "Por favor, ingrese el nicho",
     successMsg: "¡Dominios comprados y configurados con éxito!",
+    insufficientBalance:
+      "¡Saldo insuficiente! Agregue saldo para continuar comprando dominios. Consejo: U$1 dólar para .online o U$14+ dólares para .com",
     steps: {
       generating: "Generando dominios con IA",
       checking: "Verificando disponibilidad",
@@ -122,11 +131,12 @@ const TRANSLATIONS = {
     niche: "Nische",
     nichePlaceholder: "Z.B.: Gesundheit, Technologie, Finanzen...",
     language: "Sprache",
+    languagePortuguese: "Português",
+    languageEnglish: "Inglês",
+    languageSpanish: "Espanhol",
+    languageGerman: "Alemão",
+    languageFrench: "Francês",
     platform: "Plattform",
-    wordpress: "WordPress",
-    wordpressDesc: "Mit Cloudflare und Nameservern",
-    atomicat: "AtomiCat",
-    atomicatDesc: "Vereinfachte Einrichtung",
     cancel: "Abbrechen",
     search: "Domains suchen",
     processing: "Wird verarbeitet...",
@@ -135,6 +145,8 @@ const TRANSLATIONS = {
     errorDesc: "Bitte versuchen Sie es erneut oder überprüfen Sie die Einstellungen",
     enterNiche: "Bitte geben Sie die Nische ein",
     successMsg: "Domains erfolgreich gekauft und konfiguriert!",
+    insufficientBalance:
+      "Unzureichendes Guthaben! Fügen Sie Guthaben hinzu, um Domains zu kaufen. Tipp: U$1 Dollar für .online oder U$14+ Dollar für .com",
     steps: {
       generating: "Domains mit KI generieren",
       checking: "Verfügbarkeit prüfen",
@@ -152,11 +164,12 @@ const TRANSLATIONS = {
     niche: "Niche",
     nichePlaceholder: "Ex: santé, technologie, finance...",
     language: "Langue",
+    languagePortuguese: "Português",
+    languageEnglish: "Inglês",
+    languageSpanish: "Espanhol",
+    languageGerman: "Alemão",
+    languageFrench: "Francês",
     platform: "Plateforme",
-    wordpress: "WordPress",
-    wordpressDesc: "Avec Cloudflare et serveurs de noms",
-    atomicat: "AtomiCat",
-    atomicatDesc: "Configuration simplifiée",
     cancel: "Annuler",
     search: "Rechercher des Domaines",
     processing: "Traitement...",
@@ -165,6 +178,8 @@ const TRANSLATIONS = {
     errorDesc: "Veuillez réessayer ou vérifier les paramètres",
     enterNiche: "Veuillez saisir la niche",
     successMsg: "Domaines achetés et configurés avec succès!",
+    insufficientBalance:
+      "Solde insuffisant! Ajoutez du solde pour continuer l'achat de domaines. Astuce: U$1 dollar pour .online ou U$14+ dollars pour .com",
     steps: {
       generating: "Génération de domaines avec IA",
       checking: "Vérification de disponibilité",
@@ -177,7 +192,6 @@ const TRANSLATIONS = {
   },
 };
 
-// Mapeamento dos steps de progresso
 const WORDPRESS_STEPS = ["generating", "checking", "searching", "purchasing", "nameservers", "cloudflare", "completed"];
 const ATOMICAT_STEPS = ["generating", "checking", "searching", "purchasing", "completed"];
 
@@ -194,7 +208,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
   const t = TRANSLATIONS[language];
 
-  // Resetar progresso quando abre o dialog
   useEffect(() => {
     if (open) {
       setProgress(new Map());
@@ -223,7 +236,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       return newProgress;
     });
 
-    // Atualizar percentual de progresso
     updateProgressPercentage(step, status);
   };
 
@@ -243,16 +255,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   };
 
   const handleGenerate = async () => {
-    // Validações
     if (!niche.trim()) {
       toast.error(t.enterNiche);
       return;
     }
 
     setLoading(true);
-    setShowProgress(true);
-    setProgress(new Map());
-    setProgressPercentage(0);
 
     // Fechar EventSource anterior se existir
     if (eventSource) {
@@ -262,7 +270,10 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     try {
       console.log("🚀 Iniciando compra de domínios...");
 
-      // Chamar Edge Function
+      // ═══════════════════════════════════════════════════════════
+      // VALIDAÇÃO DE SALDO INSTANTÂNEA VIA EDGE FUNCTION
+      // ═══════════════════════════════════════════════════════════
+
       const { data, error } = await supabase.functions.invoke("purchase-domain-hub", {
         body: {
           niche,
@@ -272,9 +283,24 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         },
       });
 
+      // Verificar se é erro de saldo insuficiente
       if (error) {
-        console.error("❌ Erro ao iniciar:", error);
-        addProgressStep("init", "error", "Erro ao iniciar processo", error.message);
+        console.error("❌ Erro:", error);
+
+        // Verificar se é erro de saldo
+        if (error.message?.includes("insufficient_balance") || error.message?.includes("Saldo insuficiente")) {
+          toast.error(t.insufficientBalance, {
+            duration: 6000,
+            style: {
+              background: "#FEE2E2",
+              border: "1px solid #FCA5A5",
+              color: "#991B1B",
+            },
+          });
+          setLoading(false);
+          return;
+        }
+
         throw error;
       }
 
@@ -282,8 +308,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         throw new Error("Resposta inválida da Edge Function");
       }
 
-      console.log("✅ Sessão criada:", data.sessionId);
-      console.log("🔗 URL do Stream:", data.streamUrl);
+      console.log("✅ Saldo OK! Sessão criada:", data.sessionId);
+
+      // Mostrar progresso
+      setShowProgress(true);
+      setProgress(new Map());
+      setProgressPercentage(0);
 
       // Conectar ao SSE
       const es = new EventSource(data.streamUrl);
@@ -300,14 +330,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
           const eventData = JSON.parse(event.data);
           console.log("📊 Dados parseados:", eventData);
 
-          // Atualizar progresso EM TEMPO REAL
           if (eventData.step && eventData.status && eventData.message) {
             addProgressStep(eventData.step, eventData.status, eventData.message, eventData.errorDetails);
 
             console.log(`✅ Step ${eventData.step} atualizado para ${eventData.status}`);
           }
 
-          // Verificar se é o resultado final
           if (eventData.step === "completed" && eventData.status === "completed") {
             console.log("🎉 Processo finalizado com sucesso!");
             toast.success(t.successMsg);
@@ -322,7 +350,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             }, 2000);
           }
 
-          // Verificar se houve erro
           if (eventData.status === "error") {
             console.error("❌ Erro no processo:", eventData);
             toast.error(eventData.message || "Erro no processo");
@@ -386,14 +413,14 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t.title}</DialogTitle>
           <DialogDescription>{t.description}</DialogDescription>
         </DialogHeader>
 
         {!showProgress ? (
-          <div className="space-y-6 py-4">
+          <div className="space-y-4 py-4">
             {/* Quantidade */}
             <div className="space-y-2">
               <Label htmlFor="quantity">{t.quantity}</Label>
@@ -432,11 +459,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="portuguese">Português</SelectItem>
-                  <SelectItem value="english">Inglês</SelectItem>
-                  <SelectItem value="spanish">Espanhol</SelectItem>
-                  <SelectItem value="german">Alemão</SelectItem>
-                  <SelectItem value="french">Francês</SelectItem>
+                  <SelectItem value="portuguese">{t.languagePortuguese}</SelectItem>
+                  <SelectItem value="english">{t.languageEnglish}</SelectItem>
+                  <SelectItem value="spanish">{t.languageSpanish}</SelectItem>
+                  <SelectItem value="german">{t.languageGerman}</SelectItem>
+                  <SelectItem value="french">{t.languageFrench}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -453,24 +480,14 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="wordpress">
-                    <div className="flex flex-col items-start">
-                      <span className="font-medium">{t.wordpress}</span>
-                      <span className="text-xs text-gray-500">{t.wordpressDesc}</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="atomicat">
-                    <div className="flex flex-col items-start">
-                      <span className="font-medium">{t.atomicat}</span>
-                      <span className="text-xs text-gray-500">{t.atomicatDesc}</span>
-                    </div>
-                  </SelectItem>
+                  <SelectItem value="wordpress">WordPress</SelectItem>
+                  <SelectItem value="atomicat">AtomiCat</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Botões */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <Button variant="outline" onClick={handleClose} disabled={loading} className="flex-1">
                 {t.cancel}
               </Button>
@@ -487,7 +504,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             </div>
           </div>
         ) : (
-          <div className="space-y-6 py-4">
+          <div className="space-y-4 py-4">
             {/* Barra de progresso geral */}
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
@@ -497,12 +514,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               <Progress value={progressPercentage} className="h-3" />
             </div>
 
-            {/* Lista de steps - MOSTRA APENAS OS QUE JÁ FORAM RECEBIDOS */}
-            <div className="space-y-3">
+            {/* Lista de steps */}
+            <div className="space-y-2">
               {steps.map((stepKey) => {
                 const progressItem = progress.get(stepKey);
 
-                // Só mostra o step se já foi recebido pelo SSE
                 if (!progressItem) return null;
 
                 const status = progressItem.status;
@@ -536,12 +552,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
             {/* Mensagem de erro geral */}
             {Array.from(progress.values()).some((p) => p.status === "error") && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <div className="flex items-center gap-2 text-red-700">
                   <XCircle className="h-5 w-5" />
-                  <span className="font-semibold">{t.errorTitle}</span>
+                  <span className="font-semibold text-sm">{t.errorTitle}</span>
                 </div>
-                <p className="text-sm text-red-600 mt-1">{t.errorDesc}</p>
+                <p className="text-xs text-red-600 mt-1">{t.errorDesc}</p>
               </div>
             )}
           </div>
