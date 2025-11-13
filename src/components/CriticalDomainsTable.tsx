@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -15,16 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Trash2,
-  RefreshCw,
-  AlertTriangle,
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  Mail,
-  Link as LinkIcon,
-} from "lucide-react";
+import { Trash2, AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, Mail, Link as LinkIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -35,100 +26,8 @@ interface CriticalDomainsTableProps {
   onDomainsChange: () => void;
 }
 
-// Função de tradução automática EN → PT (MELHORADA)
-function translateAlert(message: string): string {
-  if (!message) return "";
-
-  const translations: Record<string, string> = {
-    // Frases completas específicas (traduzir primeiro - mais específico)
-    "sorry, you will not be able to access the domain": "desculpe, você não poderá acessar o domínio",
-    "as the domain is currently locked": "pois o domínio está atualmente bloqueado",
-    "as the domain is currently": "pois o domínio está atualmente",
-    "domain locked reason:": "motivo do bloqueio:",
-    "domain locked reason": "motivo do bloqueio",
-    "suspended due to fraudulent activity": "suspenso devido a atividade fraudulenta",
-    "suspended by the registry": "suspenso pelo registro",
-    "please refer to the domain": "por favor, consulte o",
-    "please refer to": "por favor, consulte",
-    "please contact": "por favor, entre em contato",
-    "for more information": "para mais informações",
-    "contact us at": "entre em contato em",
-    "you will not be able to access": "você não poderá acessar",
-    "unsuspension lookup tool at": "ferramenta de reativação em",
-    "unsuspension lookup tool": "ferramenta de reativação",
-
-    // Palavras individuais (traduzir depois)
-    sorry: "desculpe",
-    "the domain": "o domínio",
-    domain: "domínio",
-    suspended: "suspenso",
-    locked: "bloqueado",
-    blocked: "bloqueado",
-    expired: "expirado",
-    pending: "pendente",
-    verification: "verificação",
-    required: "necessário",
-    abuse: "abuso",
-    fraud: "fraude",
-    fraudulent: "fraudulenta",
-    activity: "atividade",
-    "domain name": "nome do domínio",
-    registrar: "registrador",
-    registry: "registro",
-    "legal and abuse": "jurídico e abuso",
-    legalandabuse: "jurídico e abuso",
-    "lookup tool": "ferramenta de consulta",
-    unsuspension: "reativação",
-    "refer to": "consulte",
-    please: "por favor",
-    "by the": "pelo",
-    tool: "ferramenta",
-    currently: "atualmente",
-    reason: "motivo",
-  };
-
-  let translated = message;
-
-  // Preservar e-mails e links (não traduzir)
-  const emails = message.match(/[\w.-]+@[\w.-]+\.\w+/g) || [];
-  const urls = message.match(/https?:\/\/[^\s]+/g) || [];
-
-  // Substituir temporariamente por placeholders
-  emails.forEach((email, i) => {
-    translated = translated.replace(email, `__EMAIL${i}__`);
-  });
-
-  urls.forEach((url, i) => {
-    translated = translated.replace(url, `__URL${i}__`);
-  });
-
-  // Traduzir (frases completas primeiro, depois palavras)
-  Object.entries(translations)
-    .sort((a, b) => b[0].length - a[0].length) // Mais longas primeiro
-    .forEach(([eng, pt]) => {
-      const regex = new RegExp(eng, "gi");
-      translated = translated.replace(regex, pt);
-    });
-
-  // Restaurar e-mails e links
-  emails.forEach((email, i) => {
-    translated = translated.replace(`__EMAIL${i}__`, email);
-  });
-
-  urls.forEach((url, i) => {
-    translated = translated.replace(`__URL${i}__`, url);
-  });
-
-  // Limpar espaços duplicados
-  translated = translated.replace(/\s+/g, " ").trim();
-
-  // Capitalizar primeira letra
-  translated = translated.charAt(0).toUpperCase() + translated.slice(1);
-
-  return translated;
-}
-
 // Componente para renderizar mensagem com BOTÕES de links e e-mails
+// O texto já vem em português do Supabase, apenas organizamos o conteúdo
 function AlertMessageRenderer({ message }: { message: string }) {
   if (!message) return null;
 
@@ -142,25 +41,20 @@ function AlertMessageRenderer({ message }: { message: string }) {
   // Remover e-mails e links do texto para exibir apenas o texto limpo
   let cleanText = message;
 
-  // Remover URLs
+  // Remover URLs do texto
   urls.forEach((url) => {
     cleanText = cleanText.replace(url, "");
   });
 
-  // Remover e-mails
+  // Remover e-mails do texto
   emails.forEach((email) => {
     cleanText = cleanText.replace(email, "");
   });
 
-  // Limpar espaços duplicados e pontuação órfã
+  // Apenas remover espaços duplicados, mantendo a formatação original
   cleanText = cleanText
-    .replace(/\s+/g, " ")
-    .replace(/\s+\./g, ".")
-    .replace(/\s+,/g, ",")
-    .replace(/\s+:/g, ":")
-    .replace(/\s+\)/g, ")")
-    .replace(/\(\s+/g, "(")
-    .trim();
+    .replace(/\s+/g, " ") // Remove múltiplos espaços
+    .trim(); // Remove espaços no início e fim
 
   return (
     <div className="space-y-5">
@@ -212,8 +106,6 @@ function AlertMessageRenderer({ message }: { message: string }) {
 export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomainsTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [domainToDelete, setDomainToDelete] = useState<any>(null);
-  const [renewLoading, setRenewLoading] = useState<string | null>(null);
-  const [renewalPrices, setRenewalPrices] = useState<Record<string, number>>({});
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
   const [currentAlertMessage, setCurrentAlertMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
@@ -309,9 +201,8 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
 
   const handleAlertClick = (domain: any) => {
     const alertMessage = domain.has_alert || "Status suspenso no registrador.";
-    // Traduzir automaticamente a mensagem
-    const translatedMessage = translateAlert(alertMessage);
-    setCurrentAlertMessage(translatedMessage);
+    // Texto já vem em português do Supabase, não precisa traduzir
+    setCurrentAlertMessage(alertMessage);
     setAlertDialogOpen(true);
   };
 
@@ -353,37 +244,6 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     } catch (error: any) {
       console.error("Erro ao excluir domínio:", error);
       toast.error("Erro ao excluir domínio");
-    }
-  };
-
-  const handleRenewClick = async (domain: any) => {
-    setRenewLoading(domain.id);
-
-    try {
-      // Buscar preço de renovação da Namecheap
-      const { data, error } = await supabase.functions.invoke("namecheap-domains", {
-        body: {
-          action: "get_renewal_price",
-          domainName: domain.domain_name,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.price) {
-        setRenewalPrices((prev) => ({
-          ...prev,
-          [domain.id]: data.price,
-        }));
-        toast.success(`Preço de renovação: $${data.price.toFixed(2)}`);
-      } else {
-        toast.error("Não foi possível obter o preço de renovação");
-      }
-    } catch (error: any) {
-      console.error("Erro ao buscar preço de renovação:", error);
-      toast.error("Erro ao buscar preço de renovação");
-    } finally {
-      setRenewLoading(null);
     }
   };
 
@@ -450,17 +310,6 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                               className="text-yellow-500 hover:text-yellow-600 h-8 w-8 p-0"
                             >
                               <AlertCircle className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {domain.registrar === "Namecheap" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleRenewClick(domain)}
-                              disabled={renewLoading === domain.id}
-                              className="h-8 px-2"
-                            >
-                              <RefreshCw className={`h-3 w-3 ${renewLoading === domain.id ? "animate-spin" : ""}`} />
                             </Button>
                           )}
                           <Button
