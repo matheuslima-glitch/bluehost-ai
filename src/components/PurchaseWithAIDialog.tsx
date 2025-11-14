@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CheckCircle2, XCircle, Clock, Copy, Sparkles } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Clock, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
@@ -113,8 +113,10 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
       setCurrentProgress(progress);
 
-      if (progress.domain_name) {
+      // 🔥 CAPTURAR DOMAIN_NAME
+      if (progress.domain_name && progress.domain_name.trim() !== "") {
         setPurchasedDomain(progress.domain_name);
+        console.log("✅ Domínio capturado:", progress.domain_name);
       }
 
       const percentage = calculateProgress(progress.step);
@@ -165,7 +167,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setLoading(false);
 
     if (success) {
-      // 🔥 FECHAR POPUP DE PROGRESSO E ABRIR POPUP DE SUCESSO
       setShowProgress(false);
       setShowSuccessDialog(true);
     } else {
@@ -245,6 +246,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
             const progress = payload.new as any;
 
+            console.log("📨 Callback recebido:", progress);
+
             updateQueueRef.current.push({
               step: progress.step,
               status: progress.status,
@@ -307,7 +310,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const copyDomain = () => {
     if (purchasedDomain) {
       navigator.clipboard.writeText(purchasedDomain);
-      toast.success("Domínio copiado para a área de transferência!");
+      toast.success("Domínio copiado!");
     }
   };
 
@@ -471,36 +474,36 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         </DialogContent>
       </Dialog>
 
-      {/* 🔥 POPUP DE SUCESSO - APENAS DOMÍNIO + COPIAR */}
+      {/* POPUP - DESIGN INLINE */}
       <Dialog open={showSuccessDialog} onOpenChange={handleSuccessClose}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-2xl">
-              <Sparkles className="h-6 w-6 text-yellow-500" />
-              Domínio Comprado!
-            </DialogTitle>
+            <DialogTitle className="text-xl">Domínio Comprado!</DialogTitle>
             <DialogDescription>Seu novo domínio está pronto para uso</DialogDescription>
           </DialogHeader>
 
-          <div className="py-6 space-y-6">
-            {/* DOMÍNIO EM DESTAQUE */}
-            <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950 dark:to-blue-950 rounded-2xl border-2 border-green-300 dark:border-green-700">
-              <CheckCircle2 className="h-12 w-12 text-green-600 dark:text-green-400 mb-4" />
-              <code className="text-2xl font-bold text-center text-foreground font-mono break-all">
-                {purchasedDomain}
+          <div className="py-6">
+            {/* BOX COM CHECK + DOMÍNIO + BOTÃO COPIAR INLINE */}
+            <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950 dark:to-blue-950 rounded-xl border-2 border-green-300 dark:border-green-700">
+              {/* CHECK VERDE */}
+              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400 flex-shrink-0" />
+
+              {/* DOMÍNIO */}
+              <code className="flex-1 text-xl font-bold font-mono text-foreground break-all">
+                {purchasedDomain || "carregando..."}
               </code>
+
+              {/* BOTÃO COPIAR */}
+              <Button
+                onClick={copyDomain}
+                size="icon"
+                variant="outline"
+                className="flex-shrink-0 h-10 w-10"
+                title="Copiar domínio"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
             </div>
-
-            {/* BOTÃO COPIAR */}
-            <Button onClick={copyDomain} size="lg" className="w-full text-lg h-14">
-              <Copy className="h-5 w-5 mr-2" />
-              Copiar Domínio
-            </Button>
-
-            {/* BOTÃO FECHAR */}
-            <Button onClick={handleSuccessClose} variant="outline" size="lg" className="w-full text-lg h-14">
-              Fechar
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
