@@ -180,43 +180,53 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       // 🔥 BUSCAR DOMAIN_NAME ANTES DE ABRIR POPUP
       const fetchAndShowSuccess = async () => {
         try {
-          console.log("🔍 Buscando domínio do session_id:", currentSessionId);
+          console.log("🔍🔍🔍 INICIANDO BUSCA DO DOMÍNIO");
+          console.log("🔑 Session ID atual:", currentSessionId);
 
-          const { data, error } = await supabase
+          // BUSCA 1: Com todos os dados
+          console.log("📊 Executando busca na tabela domain_purchase_progress...");
+          const { data: allData, error: allError } = await supabase
             .from("domain_purchase_progress")
-            .select("domain_name")
+            .select("*")
             .eq("session_id", currentSessionId)
-            .not("domain_name", "is", null)
-            .order("updated_at", { ascending: false })
-            .limit(1)
-            .single();
+            .order("updated_at", { ascending: false });
 
-          console.log("📊 Resultado da busca:", data, error);
+          console.log("📦 TODOS OS REGISTROS DA SESSION:", allData);
+          console.log("❌ Erro (se houver):", allError);
 
-          if (data?.domain_name) {
-            console.log("✅✅✅ DOMÍNIO ENCONTRADO:", data.domain_name);
-            setPurchasedDomain(data.domain_name);
-          } else {
-            console.log("❌ Domínio não encontrado, tentando sem filter...");
+          if (allData && allData.length > 0) {
+            console.log("✅ Encontrou", allData.length, "registros");
+            console.log("🔍 Procurando domain_name...");
 
-            // Tenta buscar sem filtro de null
-            const { data: data2 } = await supabase
-              .from("domain_purchase_progress")
-              .select("domain_name")
-              .eq("session_id", currentSessionId)
-              .order("updated_at", { ascending: false })
-              .limit(1)
-              .single();
+            // Procura o primeiro com domain_name não-null
+            const recordWithDomain = allData.find((record) => record.domain_name && record.domain_name.trim() !== "");
 
-            console.log("📊 Segunda tentativa:", data2);
-
-            if (data2?.domain_name) {
-              console.log("✅✅✅ DOMÍNIO ENCONTRADO (2ª tentativa):", data2.domain_name);
-              setPurchasedDomain(data2.domain_name);
+            if (recordWithDomain) {
+              console.log("✅✅✅ DOMÍNIO ENCONTRADO:", recordWithDomain.domain_name);
+              console.log("📝 Registro completo:", recordWithDomain);
+              setPurchasedDomain(recordWithDomain.domain_name);
+            } else {
+              console.log("❌ Nenhum registro tem domain_name preenchido");
+              console.log(
+                "📋 Domain_names encontrados:",
+                allData.map((r) => r.domain_name),
+              );
             }
+          } else {
+            console.log("❌ Nenhum registro encontrado para session_id:", currentSessionId);
+            console.log("💡 Verificando se session_id existe na tabela...");
+
+            // Busca sem filtro para ver se há algum registro recente
+            const { data: recentData } = await supabase
+              .from("domain_purchase_progress")
+              .select("session_id, domain_name, updated_at")
+              .order("updated_at", { ascending: false })
+              .limit(5);
+
+            console.log("📋 Últimos 5 registros da tabela:", recentData);
           }
         } catch (err) {
-          console.error("❌ Erro ao buscar domain:", err);
+          console.error("❌❌❌ ERRO NA BUSCA:", err);
         }
 
         setShowProgress(false);
