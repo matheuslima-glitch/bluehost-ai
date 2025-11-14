@@ -36,6 +36,8 @@ const STEP_LABELS: { [key: string]: string } = {
 const WORDPRESS_STEPS = ["generating", "checking", "searching", "purchasing", "nameservers", "cloudflare", "completed"];
 const ATOMICAT_STEPS = ["generating", "checking", "searching", "purchasing", "completed"];
 
+const TIMEOUT_SECONDS = 90000; // 90 segundos
+
 export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: PurchaseWithAIDialogProps) {
   const [quantity, setQuantity] = useState<number>(1);
   const [niche, setNiche] = useState("");
@@ -57,7 +59,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
   }, [open]);
 
-  // Cleanup
   useEffect(() => {
     return () => {
       if (channelRef.current) {
@@ -84,6 +85,16 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     return Math.round((currentStepIndex / steps.length) * 100);
   };
 
+  const resetTimeout = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      finishProcess(false, "O processo não respondeu em 90 segundos. Verifique se há erros ou tente novamente.");
+    }, TIMEOUT_SECONDS);
+  };
+
   const finishProcess = (success: boolean, message?: string) => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -106,7 +117,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         resetForm();
       }, 2000);
     } else {
-      toast.error(message || "Erro no processo");
+      toast.error(message || "Erro no processo", { duration: 5000 });
     }
   };
 
@@ -118,13 +129,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
     setLoading(true);
 
-    // Limpar canal anterior
     if (channelRef.current) {
       channelRef.current.unsubscribe();
       channelRef.current = null;
     }
 
-    // Limpar timeout anterior
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -153,28 +162,25 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
       const sessionId = data.sessionId;
 
-      // Mostrar progresso
       setShowProgress(true);
       setCurrentProgress(null);
       setProgressPercentage(0);
 
-      // Timeout de segurança (5 minutos)
-      timeoutRef.current = setTimeout(() => {
-        finishProcess(false, "Processo demorou muito tempo. Tente novamente.");
-      }, 300000);
+      resetTimeout();
 
-      // 🔥 INSCREVER NO REALTIME
       const channel = supabase
         .channel(`purchase-progress-${sessionId}`)
         .on(
           "postgres_changes",
           {
-            event: "*", // INSERT e UPDATE
+            event: "*",
             schema: "public",
             table: "domain_purchase_progress",
             filter: `session_id=eq.${sessionId}`,
           },
           (payload) => {
+            resetTimeout();
+
             const progress = payload.new as any;
 
             setCurrentProgress({
@@ -187,12 +193,10 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             const percentage = calculateProgress(progress.step, progress.status);
             setProgressPercentage(percentage);
 
-            // Verificar conclusão
             if (progress.step === "completed" && progress.status === "completed") {
               finishProcess(true, progress.message);
             }
 
-            // Verificar erro
             if (progress.status === "error") {
               finishProcess(false, progress.message || "Erro no processo");
             }
