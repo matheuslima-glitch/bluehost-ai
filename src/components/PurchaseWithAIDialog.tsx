@@ -8,13 +8,13 @@ import { Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface PurchaseProgress {
   step: string;
-  status: "pending" | "in_progress" | "completed" | "error";
+  status: "in_progress" | "completed" | "error";
   message: string;
-  timestamp: string;
-  errorDetails?: string;
+  error_details?: string;
 }
 
 interface PurchaseWithAIDialogProps {
@@ -23,7 +23,6 @@ interface PurchaseWithAIDialogProps {
   onSuccess: () => void;
 }
 
-// ✅ TEXTOS CORRIGIDOS - UTF-8 OK
 const STEP_LABELS: { [key: string]: string } = {
   generating: "Gerando domínios com IA",
   checking: "Verificando disponibilidade",
@@ -43,16 +42,16 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const [language, setLanguage] = useState("portuguese");
   const [platform, setPlatform] = useState<"wordpress" | "atomicat">("wordpress");
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState<Map<string, PurchaseProgress>>(new Map());
+  const [currentProgress, setCurrentProgress] = useState<PurchaseProgress | null>(null);
   const [showProgress, setShowProgress] = useState(false);
   const [progressPercentage, setProgressPercentage] = useState(0);
 
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (open) {
-      setProgress(new Map());
+      setCurrentProgress(null);
       setProgressPercentage(0);
       setShowProgress(false);
     }
@@ -61,9 +60,9 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   // Cleanup
   useEffect(() => {
     return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
+      if (channelRef.current) {
+        channelRef.current.unsubscribe();
+        channelRef.current = null;
       }
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -72,67 +71,34 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     };
   }, []);
 
-  const addProgressStep = (
-    step: string,
-    status: PurchaseProgress["status"],
-    message: string,
-    errorDetails?: string,
-  ) => {
-    console.log(`🎯 [addProgressStep] step=${step}, status=${status}`);
+  const calculateProgress = (step: string, status: string) => {
+    const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
+    const currentStepIndex = steps.indexOf(step);
 
-    setProgress((prev) => {
-      const newProgress = new Map(prev);
-      newProgress.set(step, {
-        step,
-        status,
-        message,
-        timestamp: new Date().toISOString(),
-        errorDetails,
-      });
+    if (currentStepIndex === -1) return 0;
 
-      console.log(`🗺️ Map size: ${newProgress.size}`);
+    if (status === "completed") {
+      return Math.round(((currentStepIndex + 1) / steps.length) * 100);
+    }
 
-      // Calcular progresso
-      const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
-      let completedSteps = 0;
-
-      steps.forEach((stepKey) => {
-        const stepProgress = newProgress.get(stepKey);
-        if (stepProgress?.status === "completed") {
-          completedSteps++;
-        }
-      });
-
-      const percentage = Math.round((completedSteps / steps.length) * 100);
-      console.log(`📊 Progresso: ${completedSteps}/${steps.length} = ${percentage}%`);
-      setProgressPercentage(percentage);
-
-      return newProgress;
-    });
+    return Math.round((currentStepIndex / steps.length) * 100);
   };
 
-  // 🔥 NOVA FUNÇÃO: Finalizar processo (sucesso ou erro)
   const finishProcess = (success: boolean, message?: string) => {
-    console.log(`🏁 Finalizando processo: ${success ? "SUCESSO" : "ERRO"}`);
-
-    // Limpar timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
 
-    // Fechar EventSource
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    if (channelRef.current) {
+      channelRef.current.unsubscribe();
+      channelRef.current = null;
     }
 
-    // Resetar loading IMEDIATAMENTE
     setLoading(false);
 
     if (success) {
       toast.success(message || "Domínios comprados e configurados com sucesso!");
-
       setTimeout(() => {
         setShowProgress(false);
         onOpenChange(false);
@@ -152,11 +118,10 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
     setLoading(true);
 
-    // Fechar EventSource anterior
-    if (eventSourceRef.current) {
-      console.log("🧹 Fechando EventSource anterior");
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    // Limpar canal anterior
+    if (channelRef.current) {
+      channelRef.current.unsubscribe();
+      channelRef.current = null;
     }
 
     // Limpar timeout anterior
@@ -166,14 +131,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
 
     try {
-      console.log("🚀 Iniciando compra...");
-
       const { data, error } = await supabase.functions.invoke("purchase-domain-hub", {
         body: { niche, quantity, language, platform },
       });
 
       if (error) {
-        console.error("❌ Erro:", error);
         if (error.message?.includes("insufficient_balance") || error.message?.includes("Saldo insuficiente")) {
           toast.error(
             "Saldo insuficiente! Adicione saldo para continuar com a compra de domínios. Dica: U$1 dólar para .online ou U$14+ dólares para .com",
@@ -185,82 +147,61 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         throw error;
       }
 
-      if (!data?.sessionId || !data?.streamUrl) {
+      if (!data?.sessionId) {
         throw new Error("Resposta inválida");
       }
 
-      console.log("✅ Sessão:", data.sessionId);
-      console.log("🔗 Stream:", data.streamUrl);
+      const sessionId = data.sessionId;
 
       // Mostrar progresso
       setShowProgress(true);
-      setProgress(new Map());
+      setCurrentProgress(null);
       setProgressPercentage(0);
 
-      // 🔥 TIMEOUT DE SEGURANÇA: 5 minutos
+      // Timeout de segurança (5 minutos)
       timeoutRef.current = setTimeout(() => {
-        console.log("⏰ TIMEOUT! Processo demorou muito (5 minutos)");
         finishProcess(false, "Processo demorou muito tempo. Tente novamente.");
-      }, 300000); // 5 minutos
+      }, 300000);
 
-      // Criar EventSource
-      console.log("🌊 Criando EventSource...");
-      const es = new EventSource(data.streamUrl);
-      eventSourceRef.current = es;
+      // 🔥 INSCREVER NO REALTIME
+      const channel = supabase
+        .channel(`purchase-progress-${sessionId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*", // INSERT e UPDATE
+            schema: "public",
+            table: "domain_purchase_progress",
+            filter: `session_id=eq.${sessionId}`,
+          },
+          (payload) => {
+            const progress = payload.new as any;
 
-      es.addEventListener("open", () => {
-        console.log("✅ ✅ ✅ SSE CONECTADO!");
-        console.log("📡 ReadyState:", es.readyState);
-      });
+            setCurrentProgress({
+              step: progress.step,
+              status: progress.status,
+              message: progress.message,
+              error_details: progress.error_details,
+            });
 
-      es.addEventListener("message", (event) => {
-        console.log("📨 📨 📨 MENSAGEM SSE RECEBIDA!");
-        console.log("📦 Dados brutos:", event.data);
+            const percentage = calculateProgress(progress.step, progress.status);
+            setProgressPercentage(percentage);
 
-        try {
-          // Ignorar keep-alive
-          if (event.data.startsWith(":") || event.data.trim() === "") {
-            console.log("⏭️ Keep-alive");
-            return;
-          }
+            // Verificar conclusão
+            if (progress.step === "completed" && progress.status === "completed") {
+              finishProcess(true, progress.message);
+            }
 
-          const eventData = JSON.parse(event.data);
-          console.log("✅ JSON parseado:", eventData);
+            // Verificar erro
+            if (progress.status === "error") {
+              finishProcess(false, progress.message || "Erro no processo");
+            }
+          },
+        )
+        .subscribe();
 
-          if (eventData.step && eventData.status && eventData.message) {
-            console.log(`🎯 Atualizando UI: ${eventData.step} → ${eventData.status}`);
-
-            addProgressStep(eventData.step, eventData.status, eventData.message, eventData.errorDetails);
-          }
-
-          // 🔥 VERIFICAR CONCLUSÃO
-          if (eventData.step === "completed" && eventData.status === "completed") {
-            console.log("🎉 PROCESSO CONCLUÍDO!");
-            finishProcess(true, eventData.message);
-            return;
-          }
-
-          // 🔥 VERIFICAR ERRO
-          if (eventData.status === "error") {
-            console.error("❌ Erro no processo:", eventData);
-            finishProcess(false, eventData.message || "Erro no processo");
-            return;
-          }
-        } catch (error) {
-          console.error("❌ Erro ao processar:", error);
-          console.error("📦 Dados:", event.data);
-        }
-      });
-
-      es.addEventListener("error", (error) => {
-        console.error("❌ ❌ ❌ ERRO SSE!");
-        console.error("📦 Error:", error);
-        console.error("📡 ReadyState:", es.readyState);
-
-        finishProcess(false, "Erro na conexão com o servidor");
-      });
+      channelRef.current = channel;
     } catch (error: any) {
-      console.error("❌ Erro geral:", error);
       toast.error(error.message || "Erro ao processar compra");
       setLoading(false);
       setShowProgress(false);
@@ -270,18 +211,16 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const resetForm = () => {
     setQuantity(1);
     setNiche("");
-    setProgress(new Map());
+    setCurrentProgress(null);
     setProgressPercentage(0);
     setShowProgress(false);
   };
 
-  // 🔥 HANDLE CLOSE MELHORADO
   const handleClose = () => {
-    // Se NÃO estiver carregando, pode fechar normalmente
     if (!loading) {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
+      if (channelRef.current) {
+        channelRef.current.unsubscribe();
+        channelRef.current = null;
       }
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -292,18 +231,16 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       return;
     }
 
-    // Se estiver carregando, perguntar se quer cancelar
     const confirmCancel = confirm("O processo ainda está em andamento. Deseja realmente cancelar?");
 
     if (confirmCancel) {
-      console.log("🛑 Usuário cancelou o processo");
       finishProcess(false, "Processo cancelado pelo usuário");
       onOpenChange(false);
       resetForm();
     }
   };
 
-  const getStatusIcon = (status: PurchaseProgress["status"]) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
         return <CheckCircle2 className="h-5 w-5 text-blue-500" />;
@@ -315,8 +252,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         return <Clock className="h-5 w-5 text-gray-400" />;
     }
   };
-
-  const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -412,47 +347,36 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             </div>
 
             <div className="space-y-2">
-              {progress.size === 0 && (
+              {!currentProgress && (
                 <div className="text-center py-8 text-gray-500 text-sm">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                   Aguardando início do processo...
                 </div>
               )}
 
-              {steps.map((stepKey) => {
-                const progressItem = progress.get(stepKey);
-                if (!progressItem) return null;
-
-                const status = progressItem.status;
-                const stepLabel = STEP_LABELS[stepKey] || stepKey;
-
-                return (
-                  <div
-                    key={stepKey}
-                    className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
-                      status === "completed"
-                        ? "bg-blue-50 border-blue-200"
-                        : status === "error"
-                          ? "bg-red-50 border-red-200"
-                          : status === "in_progress"
-                            ? "bg-blue-50 border-blue-200"
-                            : "bg-gray-50 border-gray-200"
-                    }`}
-                  >
-                    <div className="mt-0.5">{getStatusIcon(status)}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{stepLabel}</p>
-                      {progressItem.message && <p className="text-xs text-gray-600 mt-1">{progressItem.message}</p>}
-                      {status === "error" && progressItem.errorDetails && (
-                        <p className="text-xs text-red-600 mt-1 font-medium">{progressItem.errorDetails}</p>
-                      )}
-                    </div>
+              {currentProgress && (
+                <div
+                  className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
+                    currentProgress.status === "completed"
+                      ? "bg-blue-50 border-blue-200"
+                      : currentProgress.status === "error"
+                        ? "bg-red-50 border-red-200"
+                        : "bg-blue-50 border-blue-200"
+                  }`}
+                >
+                  <div className="mt-0.5">{getStatusIcon(currentProgress.status)}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{STEP_LABELS[currentProgress.step] || currentProgress.step}</p>
+                    {currentProgress.message && <p className="text-xs text-gray-600 mt-1">{currentProgress.message}</p>}
+                    {currentProgress.status === "error" && currentProgress.error_details && (
+                      <p className="text-xs text-red-600 mt-1 font-medium">{currentProgress.error_details}</p>
+                    )}
                   </div>
-                );
-              })}
+                </div>
+              )}
             </div>
 
-            {Array.from(progress.values()).some((p) => p.status === "error") && (
+            {currentProgress?.status === "error" && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <div className="flex items-center gap-2 text-red-700">
                   <XCircle className="h-5 w-5" />
