@@ -37,6 +37,7 @@ const WORDPRESS_STEPS = ["generating", "checking", "searching", "purchasing", "n
 const ATOMICAT_STEPS = ["generating", "checking", "searching", "purchasing", "completed"];
 
 const TIMEOUT_SECONDS = 90000;
+const MIN_DISPLAY_TIME = 800; // Tempo mínimo para exibir cada step (800ms)
 
 export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: PurchaseWithAIDialogProps) {
   const [quantity, setQuantity] = useState<number>(1);
@@ -50,12 +51,18 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const updateQueueRef = useRef<PurchaseProgress[]>([]);
+  const processingRef = useRef<boolean>(false);
+  const lastUpdateTimeRef = useRef<number>(0);
 
   useEffect(() => {
     if (open) {
       setCurrentProgress(null);
       setProgressPercentage(0);
       setShowProgress(false);
+      updateQueueRef.current = [];
+      processingRef.current = false;
+      lastUpdateTimeRef.current = 0;
     }
   }, [open]);
 
@@ -78,10 +85,55 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
     if (currentStepIndex === -1) return 0;
 
-    // Cada step completo adiciona sua porcentagem
-    // Ex: WordPress tem 7 steps, cada um vale ~14.3%
     const percentage = Math.round(((currentStepIndex + 1) / steps.length) * 100);
     return percentage;
+  };
+
+  // 🔥 PROCESSAR FILA DE UPDATES COM DELAY MÍNIMO
+  const processUpdateQueue = async () => {
+    if (processingRef.current || updateQueueRef.current.length === 0) {
+      return;
+    }
+
+    processingRef.current = true;
+
+    while (updateQueueRef.current.length > 0) {
+      const now = Date.now();
+      const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
+
+      // Se não passou o tempo mínimo, aguardar
+      if (timeSinceLastUpdate < MIN_DISPLAY_TIME) {
+        await new Promise((resolve) => setTimeout(resolve, MIN_DISPLAY_TIME - timeSinceLastUpdate));
+      }
+
+      const progress = updateQueueRef.current.shift()!;
+
+      setCurrentProgress(progress);
+
+      const percentage = calculateProgress(progress.step);
+      setProgressPercentage(percentage);
+
+      lastUpdateTimeRef.current = Date.now();
+
+      // Verificar conclusão
+      if (progress.step === "completed" && progress.status === "completed") {
+        setProgressPercentage(100);
+        updateQueueRef.current = []; // Limpar fila
+        processingRef.current = false;
+        finishProcess(true, progress.message);
+        return;
+      }
+
+      // Verificar erro
+      if (progress.status === "error") {
+        updateQueueRef.current = []; // Limpar fila
+        processingRef.current = false;
+        finishProcess(false, progress.message || "Erro no processo");
+        return;
+      }
+    }
+
+    processingRef.current = false;
   };
 
   const resetTimeout = () => {
@@ -119,7 +171,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       }, 2000);
     } else {
       toast.error(message || "Erro no processo", { duration: 5000 });
-      // 🔥 OCULTAR PROGRESSO APÓS TIMEOUT/ERRO
       setTimeout(() => {
         setShowProgress(false);
         setCurrentProgress(null);
@@ -172,6 +223,9 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       setShowProgress(true);
       setCurrentProgress(null);
       setProgressPercentage(0);
+      updateQueueRef.current = [];
+      processingRef.current = false;
+      lastUpdateTimeRef.current = Date.now();
 
       resetTimeout();
 
@@ -190,25 +244,16 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
             const progress = payload.new as any;
 
-            setCurrentProgress({
+            // 🔥 ADICIONAR À FILA EM VEZ DE ATUALIZAR IMEDIATAMENTE
+            updateQueueRef.current.push({
               step: progress.step,
               status: progress.status,
               message: progress.message,
               error_details: progress.error_details,
             });
 
-            // 🔥 CALCULAR PROGRESSO BASEADO NO STEP
-            const percentage = calculateProgress(progress.step);
-            setProgressPercentage(percentage);
-
-            if (progress.step === "completed" && progress.status === "completed") {
-              setProgressPercentage(100);
-              finishProcess(true, progress.message);
-            }
-
-            if (progress.status === "error") {
-              finishProcess(false, progress.message || "Erro no processo");
-            }
+            // Iniciar processamento da fila
+            processUpdateQueue();
           },
         )
         .subscribe();
