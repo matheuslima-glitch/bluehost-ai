@@ -51,6 +51,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const [progressPercentage, setProgressPercentage] = useState(0);
   const [purchasedDomain, setPurchasedDomain] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -111,12 +112,21 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
       const progress = updateQueueRef.current.shift()!;
 
+      console.log("🎯 Processando progress da fila:", progress);
+
       setCurrentProgress(progress);
 
       // 🔥 CAPTURAR DOMAIN_NAME
+      console.log("🔍 Verificando domain_name...");
+      console.log("🔍 progress.domain_name:", progress.domain_name);
+      console.log("🔍 tipo:", typeof progress.domain_name);
+      console.log("🔍 trim:", progress.domain_name?.trim());
+
       if (progress.domain_name && progress.domain_name.trim() !== "") {
+        console.log("✅✅✅ DOMÍNIO CAPTURADO:", progress.domain_name);
         setPurchasedDomain(progress.domain_name);
-        console.log("✅ Domínio capturado:", progress.domain_name);
+      } else {
+        console.log("❌ Domínio está vazio ou null");
       }
 
       const percentage = calculateProgress(progress.step);
@@ -128,6 +138,32 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         setProgressPercentage(100);
         updateQueueRef.current = [];
         processingRef.current = false;
+
+        // 🔥 BUSCAR DOMAIN_NAME DIRETO DA TABELA
+        console.log("🔍 Buscando domain_name da tabela...");
+        const fetchDomainName = async () => {
+          try {
+            const { data, error } = await supabase
+              .from("domain_purchase_progress")
+              .select("domain_name")
+              .eq("session_id", currentSessionId)
+              .not("domain_name", "is", null)
+              .order("updated_at", { ascending: false })
+              .limit(1)
+              .single();
+
+            if (data?.domain_name) {
+              console.log("✅ Domain encontrado na tabela:", data.domain_name);
+              setPurchasedDomain(data.domain_name);
+            } else {
+              console.log("❌ Domain não encontrado na tabela");
+            }
+          } catch (err) {
+            console.error("❌ Erro ao buscar domain:", err);
+          }
+        };
+
+        fetchDomainName();
         finishProcess(true, progress.message);
         return;
       }
@@ -220,6 +256,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       }
 
       const sessionId = data.sessionId;
+      setCurrentSessionId(sessionId);
 
       setShowProgress(true);
       setCurrentProgress(null);
@@ -242,11 +279,21 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             filter: `session_id=eq.${sessionId}`,
           },
           (payload) => {
+            console.log("🔥🔥🔥 REALTIME DISPAROU!");
+            console.log("🔥 Payload completo:", payload);
+            console.log("🔥 payload.new:", payload.new);
+
             resetTimeout();
 
             const progress = payload.new as any;
 
-            console.log("📨 Callback recebido:", progress);
+            console.log("📨 Progress object:", progress);
+            console.log("📨 Step:", progress.step);
+            console.log("📨 Status:", progress.status);
+            console.log("📨 Message:", progress.message);
+            console.log("📨 domain_name:", progress.domain_name);
+            console.log("📨 domain_name type:", typeof progress.domain_name);
+            console.log("📨 domain_name length:", progress.domain_name?.length);
 
             updateQueueRef.current.push({
               step: progress.step,
@@ -256,10 +303,14 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               domain_name: progress.domain_name,
             });
 
+            console.log("📦 Adicionado à fila. Tamanho da fila:", updateQueueRef.current.length);
+
             processUpdateQueue();
           },
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log("🔗 Realtime status:", status);
+        });
 
       channelRef.current = channel;
     } catch (error: any) {
@@ -277,6 +328,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setShowProgress(false);
     setPurchasedDomain(null);
     setShowSuccessDialog(false);
+    setCurrentSessionId(null);
   };
 
   const handleClose = () => {
@@ -474,7 +526,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         </DialogContent>
       </Dialog>
 
-      {/* POPUP - DESIGN INLINE */}
+      {/* POPUP DE SUCESSO - DESIGN INLINE */}
       <Dialog open={showSuccessDialog} onOpenChange={handleSuccessClose}>
         <DialogContent className="max-w-md">
           <DialogHeader>
