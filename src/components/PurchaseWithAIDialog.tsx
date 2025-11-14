@@ -177,56 +177,30 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setLoading(false);
 
     if (success) {
-      // 🔥 BUSCAR DOMAIN_NAME ANTES DE ABRIR POPUP
+      // 🔥 BUSCAR ÚLTIMO DOMÍNIO COMPRADO (independente de session)
       const fetchAndShowSuccess = async () => {
         try {
-          console.log("🔍🔍🔍 INICIANDO BUSCA DO DOMÍNIO");
-          console.log("🔑 Session ID atual:", currentSessionId);
+          console.log("🔍 Buscando último domínio comprado...");
 
-          // BUSCA 1: Com todos os dados
-          console.log("📊 Executando busca na tabela domain_purchase_progress...");
-          const { data: allData, error: allError } = await supabase
+          // Busca o registro mais recente com domain_name não-null
+          const { data, error } = await supabase
             .from("domain_purchase_progress")
-            .select("*")
-            .eq("session_id", currentSessionId)
-            .order("updated_at", { ascending: false });
+            .select("domain_name, session_id, updated_at")
+            .not("domain_name", "is", null)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .single();
 
-          console.log("📦 TODOS OS REGISTROS DA SESSION:", allData);
-          console.log("❌ Erro (se houver):", allError);
+          console.log("📊 Resultado:", data, error);
 
-          if (allData && allData.length > 0) {
-            console.log("✅ Encontrou", allData.length, "registros");
-            console.log("🔍 Procurando domain_name...");
-
-            // Procura o primeiro com domain_name não-null
-            const recordWithDomain = allData.find((record) => record.domain_name && record.domain_name.trim() !== "");
-
-            if (recordWithDomain) {
-              console.log("✅✅✅ DOMÍNIO ENCONTRADO:", recordWithDomain.domain_name);
-              console.log("📝 Registro completo:", recordWithDomain);
-              setPurchasedDomain(recordWithDomain.domain_name);
-            } else {
-              console.log("❌ Nenhum registro tem domain_name preenchido");
-              console.log(
-                "📋 Domain_names encontrados:",
-                allData.map((r) => r.domain_name),
-              );
-            }
+          if (data?.domain_name) {
+            console.log("✅✅✅ DOMÍNIO ENCONTRADO:", data.domain_name);
+            setPurchasedDomain(data.domain_name);
           } else {
-            console.log("❌ Nenhum registro encontrado para session_id:", currentSessionId);
-            console.log("💡 Verificando se session_id existe na tabela...");
-
-            // Busca sem filtro para ver se há algum registro recente
-            const { data: recentData } = await supabase
-              .from("domain_purchase_progress")
-              .select("session_id, domain_name, updated_at")
-              .order("updated_at", { ascending: false })
-              .limit(5);
-
-            console.log("📋 Últimos 5 registros da tabela:", recentData);
+            console.log("❌ Nenhum domínio encontrado");
           }
         } catch (err) {
-          console.error("❌❌❌ ERRO NA BUSCA:", err);
+          console.error("❌ Erro:", err);
         }
 
         setShowProgress(false);
@@ -270,10 +244,9 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
       if (error) {
         if (error.message?.includes("insufficient_balance") || error.message?.includes("Saldo insuficiente")) {
-          toast.error(
-            "Saldo insuficiente! Adicione saldo para continuar com a compra de domínios. Dica: U$1 dólar para .online ou U$14+ dólares para .com",
-            { duration: 6000 },
-          );
+          toast.error("Saldo insuficiente! Você precisa de no mínimo $10 USD na Namecheap para comprar domínios.", {
+            duration: 6000,
+          });
           setLoading(false);
           return;
         }
