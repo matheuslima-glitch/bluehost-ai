@@ -138,32 +138,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         setProgressPercentage(100);
         updateQueueRef.current = [];
         processingRef.current = false;
-
-        // 🔥 BUSCAR DOMAIN_NAME DIRETO DA TABELA
-        console.log("🔍 Buscando domain_name da tabela...");
-        const fetchDomainName = async () => {
-          try {
-            const { data, error } = await supabase
-              .from("domain_purchase_progress")
-              .select("domain_name")
-              .eq("session_id", currentSessionId)
-              .not("domain_name", "is", null)
-              .order("updated_at", { ascending: false })
-              .limit(1)
-              .single();
-
-            if (data?.domain_name) {
-              console.log("✅ Domain encontrado na tabela:", data.domain_name);
-              setPurchasedDomain(data.domain_name);
-            } else {
-              console.log("❌ Domain não encontrado na tabela");
-            }
-          } catch (err) {
-            console.error("❌ Erro ao buscar domain:", err);
-          }
-        };
-
-        fetchDomainName();
         finishProcess(true, progress.message);
         return;
       }
@@ -203,8 +177,53 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setLoading(false);
 
     if (success) {
-      setShowProgress(false);
-      setShowSuccessDialog(true);
+      // 🔥 BUSCAR DOMAIN_NAME ANTES DE ABRIR POPUP
+      const fetchAndShowSuccess = async () => {
+        try {
+          console.log("🔍 Buscando domínio do session_id:", currentSessionId);
+
+          const { data, error } = await supabase
+            .from("domain_purchase_progress")
+            .select("domain_name")
+            .eq("session_id", currentSessionId)
+            .not("domain_name", "is", null)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .single();
+
+          console.log("📊 Resultado da busca:", data, error);
+
+          if (data?.domain_name) {
+            console.log("✅✅✅ DOMÍNIO ENCONTRADO:", data.domain_name);
+            setPurchasedDomain(data.domain_name);
+          } else {
+            console.log("❌ Domínio não encontrado, tentando sem filter...");
+
+            // Tenta buscar sem filtro de null
+            const { data: data2 } = await supabase
+              .from("domain_purchase_progress")
+              .select("domain_name")
+              .eq("session_id", currentSessionId)
+              .order("updated_at", { ascending: false })
+              .limit(1)
+              .single();
+
+            console.log("📊 Segunda tentativa:", data2);
+
+            if (data2?.domain_name) {
+              console.log("✅✅✅ DOMÍNIO ENCONTRADO (2ª tentativa):", data2.domain_name);
+              setPurchasedDomain(data2.domain_name);
+            }
+          }
+        } catch (err) {
+          console.error("❌ Erro ao buscar domain:", err);
+        }
+
+        setShowProgress(false);
+        setShowSuccessDialog(true);
+      };
+
+      fetchAndShowSuccess();
     } else {
       toast.error(message || "Erro no processo", { duration: 5000 });
       setTimeout(() => {
@@ -526,7 +545,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         </DialogContent>
       </Dialog>
 
-      {/* POPUP DE SUCESSO - DESIGN INLINE */}
+      {/* 🔥 POPUP DE SUCESSO - DESIGN INLINE */}
       <Dialog open={showSuccessDialog} onOpenChange={handleSuccessClose}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -535,7 +554,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
           </DialogHeader>
 
           <div className="py-6">
-            {/* BOX COM CHECK + DOMÍNIO + BOTÃO COPIAR INLINE */}
+            {/* 🔥 BOX COM CHECK + DOMÍNIO + BOTÃO COPIAR INLINE */}
             <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950 dark:to-blue-950 rounded-xl border-2 border-green-300 dark:border-green-700">
               {/* CHECK VERDE */}
               <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400 flex-shrink-0" />
