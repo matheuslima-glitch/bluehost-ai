@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +45,9 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const [progress, setProgress] = useState<Map<string, PurchaseProgress>>(new Map());
   const [showProgress, setShowProgress] = useState(false);
   const [progressPercentage, setProgressPercentage] = useState(0);
-  const [eventSource, setEventSource] = useState<EventSource | null>(null);
+
+  // Usar useRef para EventSource
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -55,15 +57,16 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
   }, [open]);
 
-  // Cleanup do EventSource ao desmontar
+  // Cleanup do EventSource
   useEffect(() => {
     return () => {
-      if (eventSource) {
-        console.log("🧹 Limpando EventSource ao desmontar");
-        eventSource.close();
+      if (eventSourceRef.current) {
+        console.log("🧹 Limpando EventSource");
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
       }
     };
-  }, [eventSource]);
+  }, []);
 
   const addProgressStep = (
     step: string,
@@ -71,7 +74,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     message: string,
     errorDetails?: string,
   ) => {
-    console.log(`🔵 [addProgressStep] step=${step}, status=${status}, message=${message}`);
+    console.log(`🎯 [addProgressStep] step=${step}, status=${status}`);
 
     setProgress((prev) => {
       const newProgress = new Map(prev);
@@ -83,13 +86,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         errorDetails,
       });
 
-      console.log(`🗺️ [Map atualizado] Size: ${newProgress.size}, Keys:`, Array.from(newProgress.keys()));
+      console.log(`🗺️ Map size: ${newProgress.size}`);
 
       // Calcular progresso
       const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
-      const totalSteps = steps.length;
-
       let completedSteps = 0;
+
       steps.forEach((stepKey) => {
         const stepProgress = newProgress.get(stepKey);
         if (stepProgress?.status === "completed") {
@@ -97,8 +99,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         }
       });
 
-      const percentage = Math.round((completedSteps / totalSteps) * 100);
-      console.log(`📊 [Progresso calculado] ${completedSteps}/${totalSteps} = ${percentage}%`);
+      const percentage = Math.round((completedSteps / steps.length) * 100);
+      console.log(`📊 Progresso: ${completedSteps}/${steps.length} = ${percentage}%`);
       setProgressPercentage(percentage);
 
       return newProgress;
@@ -114,101 +116,78 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setLoading(true);
 
     // Fechar EventSource anterior
-    if (eventSource) {
+    if (eventSourceRef.current) {
       console.log("🧹 Fechando EventSource anterior");
-      eventSource.close();
-      setEventSource(null);
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
 
     try {
-      console.log("🚀 [1/5] Iniciando compra de domínios...");
-      console.log("📝 Parâmetros:", { niche, quantity, language, platform });
-
-      // Chamar Edge Function
-      console.log("📞 [2/5] Chamando Edge Function purchase-domain-hub...");
+      console.log("🚀 Iniciando compra...");
 
       const { data, error } = await supabase.functions.invoke("purchase-domain-hub", {
-        body: {
-          niche,
-          quantity,
-          language,
-          platform,
-        },
+        body: { niche, quantity, language, platform },
       });
 
-      console.log("📥 [3/5] Resposta recebida:", { data, error });
-
-      // Verificar erro de saldo
       if (error) {
-        console.error("❌ Erro na Edge Function:", error);
-
+        console.error("❌ Erro:", error);
         if (error.message?.includes("insufficient_balance") || error.message?.includes("Saldo insuficiente")) {
           toast.error(
             "Saldo insuficiente! Adicione saldo para continuar com a compra de domínios. Dica: U$1 dólar para .online ou U$14+ dólares para .com",
-            {
-              duration: 6000,
-            },
+            { duration: 6000 },
           );
           setLoading(false);
           return;
         }
-
         throw error;
       }
 
       if (!data?.sessionId || !data?.streamUrl) {
-        console.error("❌ Resposta inválida:", data);
-        throw new Error("Resposta inválida da Edge Function");
+        throw new Error("Resposta inválida");
       }
 
-      console.log("✅ [4/5] Sessão criada!");
-      console.log("🎫 Session ID:", data.sessionId);
-      console.log("🔗 Stream URL:", data.streamUrl);
+      console.log("✅ Sessão:", data.sessionId);
+      console.log("🔗 Stream:", data.streamUrl);
 
-      // Mostrar popup de progresso
+      // Mostrar progresso
       setShowProgress(true);
       setProgress(new Map());
       setProgressPercentage(0);
 
-      // Conectar ao SSE
-      console.log("🌊 [5/5] Conectando ao SSE...");
-      console.log("🔗 URL completa:", data.streamUrl);
-
+      // 🔥 CRIAR EVENTSOURCE COM LISTENERS CORRETOS
+      console.log("🌊 Criando EventSource...");
       const es = new EventSource(data.streamUrl);
-      setEventSource(es);
+      eventSourceRef.current = es;
 
-      es.onopen = () => {
-        console.log("✅ ✅ ✅ CONEXÃO SSE ABERTA!");
-        console.log("📡 ReadyState:", es.readyState); // 0=CONNECTING, 1=OPEN, 2=CLOSED
-      };
+      // ✅ LISTENER: onopen
+      es.addEventListener("open", () => {
+        console.log("✅ ✅ ✅ SSE CONECTADO!");
+        console.log("📡 ReadyState:", es.readyState);
+      });
 
-      es.onmessage = (event) => {
-        console.log("📨 📨 📨 EVENTO SSE RECEBIDO!");
-        console.log("📦 event.data:", event.data);
-        console.log("📦 event.type:", event.type);
+      // ✅ LISTENER: onmessage (PRINCIPAL)
+      es.addEventListener("message", (event) => {
+        console.log("📨 📨 📨 MENSAGEM SSE RECEBIDA!");
+        console.log("📦 Dados brutos:", event.data);
 
         try {
           // Ignorar keep-alive
           if (event.data.startsWith(":") || event.data.trim() === "") {
-            console.log("⏭️ Keep-alive ignorado");
+            console.log("⏭️ Keep-alive");
             return;
           }
 
           const eventData = JSON.parse(event.data);
-          console.log("✅ JSON parseado:", JSON.stringify(eventData, null, 2));
+          console.log("✅ JSON parseado:", eventData);
 
-          // Atualizar progresso
           if (eventData.step && eventData.status && eventData.message) {
             console.log(`🎯 Atualizando UI: ${eventData.step} → ${eventData.status}`);
 
             addProgressStep(eventData.step, eventData.status, eventData.message, eventData.errorDetails);
-          } else {
-            console.warn("⚠️ Evento incompleto:", eventData);
           }
 
-          // Verificar conclusão
           if (eventData.step === "completed" && eventData.status === "completed") {
-            console.log("🎉 🎉 🎉 PROCESSO CONCLUÍDO!");
+            console.log("🎉 CONCLUÍDO!");
             toast.success("Domínios comprados e configurados com sucesso!");
 
             setTimeout(() => {
@@ -221,31 +200,29 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             }, 2000);
           }
 
-          // Verificar erro
           if (eventData.status === "error") {
-            console.error("❌ Erro no processo:", eventData);
+            console.error("❌ Erro:", eventData);
             toast.error(eventData.message || "Erro no processo");
             setLoading(false);
           }
         } catch (error) {
-          console.error("❌ Erro ao processar evento SSE:", error);
-          console.error("📦 Dados brutos:", event.data);
+          console.error("❌ Erro ao processar:", error);
+          console.error("📦 Dados:", event.data);
         }
-      };
+      });
 
-      es.onerror = (error) => {
+      // ✅ LISTENER: onerror
+      es.addEventListener("error", (error) => {
         console.error("❌ ❌ ❌ ERRO SSE!");
-        console.error("📦 Error object:", error);
+        console.error("📦 Error:", error);
         console.error("📡 ReadyState:", es.readyState);
-        console.error("🔗 URL:", es.url);
 
-        toast.error("Erro na conexão com o servidor");
+        toast.error("Erro na conexão");
         setLoading(false);
         es.close();
-      };
+      });
     } catch (error: any) {
       console.error("❌ Erro geral:", error);
-      console.error("📦 Error stack:", error.stack);
       toast.error(error.message || "Erro ao processar compra");
       setLoading(false);
       setShowProgress(false);
@@ -266,10 +243,10 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       return;
     }
 
-    if (eventSource) {
+    if (eventSourceRef.current) {
       console.log("🧹 Fechando EventSource");
-      eventSource.close();
-      setEventSource(null);
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
 
     onOpenChange(false);
@@ -290,12 +267,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   };
 
   const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
-
-  // Debug: Mostrar estado atual
-  console.log("🔍 [Render] showProgress:", showProgress);
-  console.log("🔍 [Render] progress.size:", progress.size);
-  console.log("🔍 [Render] progressPercentage:", progressPercentage);
-  console.log("🔍 [Render] progress keys:", Array.from(progress.keys()));
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -392,12 +363,14 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
             <div className="space-y-2">
               {progress.size === 0 && (
-                <div className="text-center py-4 text-gray-500 text-sm">Aguardando início do processo...</div>
+                <div className="text-center py-8 text-gray-500 text-sm">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  Aguardando início do processo...
+                </div>
               )}
 
               {steps.map((stepKey) => {
                 const progressItem = progress.get(stepKey);
-
                 if (!progressItem) return null;
 
                 const status = progressItem.status;
