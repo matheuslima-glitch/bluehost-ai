@@ -36,7 +36,7 @@ const STEP_LABELS: { [key: string]: string } = {
 const WORDPRESS_STEPS = ["generating", "checking", "searching", "purchasing", "nameservers", "cloudflare", "completed"];
 const ATOMICAT_STEPS = ["generating", "checking", "searching", "purchasing", "completed"];
 
-const TIMEOUT_SECONDS = 90000; // 90 segundos
+const TIMEOUT_SECONDS = 90000;
 
 export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: PurchaseWithAIDialogProps) {
   const [quantity, setQuantity] = useState<number>(1);
@@ -72,17 +72,16 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     };
   }, []);
 
-  const calculateProgress = (step: string, status: string) => {
+  const calculateProgress = (step: string) => {
     const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
     const currentStepIndex = steps.indexOf(step);
 
     if (currentStepIndex === -1) return 0;
 
-    if (status === "completed") {
-      return Math.round(((currentStepIndex + 1) / steps.length) * 100);
-    }
-
-    return Math.round((currentStepIndex / steps.length) * 100);
+    // Cada step completo adiciona sua porcentagem
+    // Ex: WordPress tem 7 steps, cada um vale ~14.3%
+    const percentage = Math.round(((currentStepIndex + 1) / steps.length) * 100);
+    return percentage;
   };
 
   const resetTimeout = () => {
@@ -112,12 +111,20 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       toast.success(message || "Domínios comprados e configurados com sucesso!");
       setTimeout(() => {
         setShowProgress(false);
+        setCurrentProgress(null);
+        setProgressPercentage(0);
         onOpenChange(false);
         onSuccess();
         resetForm();
       }, 2000);
     } else {
       toast.error(message || "Erro no processo", { duration: 5000 });
+      // 🔥 OCULTAR PROGRESSO APÓS TIMEOUT/ERRO
+      setTimeout(() => {
+        setShowProgress(false);
+        setCurrentProgress(null);
+        setProgressPercentage(0);
+      }, 3000);
     }
   };
 
@@ -190,10 +197,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               error_details: progress.error_details,
             });
 
-            const percentage = calculateProgress(progress.step, progress.status);
+            // 🔥 CALCULAR PROGRESSO BASEADO NO STEP
+            const percentage = calculateProgress(progress.step);
             setProgressPercentage(percentage);
 
             if (progress.step === "completed" && progress.status === "completed") {
+              setProgressPercentage(100);
               finishProcess(true, progress.message);
             }
 
@@ -247,7 +256,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 className="h-5 w-5 text-blue-500" />;
+        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
       case "error":
         return <XCircle className="h-5 w-5 text-red-500" />;
       case "in_progress":
@@ -344,7 +353,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Progresso Geral</span>
+                <span className="text-muted-foreground">Progresso Geral</span>
                 <span className="font-semibold">{progressPercentage}%</span>
               </div>
               <Progress value={progressPercentage} className="h-3" />
@@ -352,7 +361,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
             <div className="space-y-2">
               {!currentProgress && (
-                <div className="text-center py-8 text-gray-500 text-sm">
+                <div className="text-center py-8 text-muted-foreground text-sm">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                   Aguardando início do processo...
                 </div>
@@ -362,18 +371,24 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                 <div
                   className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
                     currentProgress.status === "completed"
-                      ? "bg-blue-50 border-blue-200"
+                      ? "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800"
                       : currentProgress.status === "error"
-                        ? "bg-red-50 border-red-200"
-                        : "bg-blue-50 border-blue-200"
+                        ? "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800"
+                        : "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800"
                   }`}
                 >
                   <div className="mt-0.5">{getStatusIcon(currentProgress.status)}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{STEP_LABELS[currentProgress.step] || currentProgress.step}</p>
-                    {currentProgress.message && <p className="text-xs text-gray-600 mt-1">{currentProgress.message}</p>}
+                    <p className="font-medium text-sm text-foreground">
+                      {STEP_LABELS[currentProgress.step] || currentProgress.step}
+                    </p>
+                    {currentProgress.message && (
+                      <p className="text-xs text-muted-foreground mt-1">{currentProgress.message}</p>
+                    )}
                     {currentProgress.status === "error" && currentProgress.error_details && (
-                      <p className="text-xs text-red-600 mt-1 font-medium">{currentProgress.error_details}</p>
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                        {currentProgress.error_details}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -381,12 +396,14 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             </div>
 
             {currentProgress?.status === "error" && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-center gap-2 text-red-700">
+              <div className="p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
+                <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
                   <XCircle className="h-5 w-5" />
                   <span className="font-semibold text-sm">Erro no processo</span>
                 </div>
-                <p className="text-xs text-red-600 mt-1">Tente novamente ou verifique as configurações</p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  Tente novamente ou verifique as configurações
+                </p>
               </div>
             )}
           </div>
