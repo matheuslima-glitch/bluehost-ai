@@ -23,173 +23,15 @@ interface PurchaseWithAIDialogProps {
   onSuccess: () => void;
 }
 
-// Traduções
-const TRANSLATIONS = {
-  portuguese: {
-    title: "Compra com IA",
-    description: "Configure os parâmetros para buscar e comprar domínios disponíveis",
-    quantity: "Quantidade de Domínios",
-    niche: "Nicho",
-    nichePlaceholder: "Ex: saúde, tecnologia, finanças...",
-    language: "Idioma",
-    languagePortuguese: "Português",
-    languageEnglish: "Inglês",
-    languageSpanish: "Espanhol",
-    languageGerman: "Alemão",
-    languageFrench: "Francês",
-    platform: "Plataforma",
-    cancel: "Cancelar",
-    search: "Buscar Domínios",
-    processing: "Processando...",
-    progress: "Progresso Geral",
-    errorTitle: "Erro no processo",
-    errorDesc: "Tente novamente ou verifique as configurações",
-    enterNiche: "Por favor, insira o nicho",
-    successMsg: "Domínios comprados e configurados com sucesso!",
-    insufficientBalance:
-      "Saldo insuficiente! Adicione saldo para continuar com a compra de domínios. Dica: U$1 dólar para .online ou U$14+ dólares para .com",
-    steps: {
-      generating: "Gerando domínios com IA",
-      checking: "Verificando disponibilidade",
-      searching: "Buscando domínios baratos",
-      purchasing: "Comprando domínio(s)",
-      nameservers: "Alterando nameservers",
-      cloudflare: "Configurando Cloudflare",
-      completed: "Compra concluída",
-    },
-  },
-  english: {
-    title: "AI Purchase",
-    description: "Configure parameters to search and buy available domains",
-    quantity: "Number of Domains",
-    niche: "Niche",
-    nichePlaceholder: "Ex: health, technology, finance...",
-    language: "Language",
-    languagePortuguese: "Português",
-    languageEnglish: "Inglês",
-    languageSpanish: "Espanhol",
-    languageGerman: "Alemão",
-    languageFrench: "Francês",
-    platform: "Platform",
-    cancel: "Cancel",
-    search: "Search Domains",
-    processing: "Processing...",
-    progress: "Overall Progress",
-    errorTitle: "Process Error",
-    errorDesc: "Please try again or check settings",
-    enterNiche: "Please enter the niche",
-    successMsg: "Domains purchased and configured successfully!",
-    insufficientBalance:
-      "Insufficient balance! Add balance to continue purchasing domains. Tip: U$1 dollar for .online or U$14+ dollars for .com",
-    steps: {
-      generating: "Generating domains with AI",
-      checking: "Checking availability",
-      searching: "Searching for cheap domains",
-      purchasing: "Purchasing domain(s)",
-      nameservers: "Changing nameservers",
-      cloudflare: "Configuring Cloudflare",
-      completed: "Purchase completed",
-    },
-  },
-  spanish: {
-    title: "Compra con IA",
-    description: "Configure los parámetros para buscar y comprar dominios disponibles",
-    quantity: "Cantidad de Dominios",
-    niche: "Nicho",
-    nichePlaceholder: "Ej: salud, tecnología, finanzas...",
-    language: "Idioma",
-    languagePortuguese: "Português",
-    languageEnglish: "Inglês",
-    languageSpanish: "Espanhol",
-    languageGerman: "Alemão",
-    languageFrench: "Francês",
-    platform: "Plataforma",
-    cancel: "Cancelar",
-    search: "Buscar Dominios",
-    processing: "Procesando...",
-    progress: "Progreso General",
-    errorTitle: "Error en el proceso",
-    errorDesc: "Inténtelo de nuevo o verifique la configuración",
-    enterNiche: "Por favor, ingrese el nicho",
-    successMsg: "¡Dominios comprados y configurados con éxito!",
-    insufficientBalance:
-      "¡Saldo insuficiente! Agregue saldo para continuar comprando dominios. Consejo: U$1 dólar para .online o U$14+ dólares para .com",
-    steps: {
-      generating: "Generando dominios con IA",
-      checking: "Verificando disponibilidad",
-      searching: "Buscando dominios baratos",
-      purchasing: "Comprando dominio(s)",
-      nameservers: "Cambiando nameservers",
-      cloudflare: "Configurando Cloudflare",
-      completed: "Compra completada",
-    },
-  },
-  german: {
-    title: "KI-Kauf",
-    description: "Konfigurieren Sie Parameter zum Suchen und Kaufen verfügbarer Domains",
-    quantity: "Anzahl der Domains",
-    niche: "Nische",
-    nichePlaceholder: "Z.B.: Gesundheit, Technologie, Finanzen...",
-    language: "Sprache",
-    languagePortuguese: "Português",
-    languageEnglish: "Inglês",
-    languageSpanish: "Espanhol",
-    languageGerman: "Alemão",
-    languageFrench: "Francês",
-    platform: "Plattform",
-    cancel: "Abbrechen",
-    search: "Domains suchen",
-    processing: "Wird verarbeitet...",
-    progress: "Gesamtfortschritt",
-    errorTitle: "Prozessfehler",
-    errorDesc: "Bitte versuchen Sie es erneut oder überprüfen Sie die Einstellungen",
-    enterNiche: "Bitte geben Sie die Nische ein",
-    successMsg: "Domains erfolgreich gekauft und konfiguriert!",
-    insufficientBalance:
-      "Unzureichendes Guthaben! Fügen Sie Guthaben hinzu, um Domains zu kaufen. Tipp: U$1 Dollar für .online oder U$14+ Dollar für .com",
-    steps: {
-      generating: "Domains mit KI generieren",
-      checking: "Verfügbarkeit prüfen",
-      searching: "Günstige Domains suchen",
-      purchasing: "Domain(s) kaufen",
-      nameservers: "Nameserver ändern",
-      cloudflare: "Cloudflare konfigurieren",
-      completed: "Kauf abgeschlossen",
-    },
-  },
-  french: {
-    title: "Achat avec IA",
-    description: "Configurez les paramètres pour rechercher et acheter des domaines disponibles",
-    quantity: "Nombre de Domaines",
-    niche: "Niche",
-    nichePlaceholder: "Ex: santé, technologie, finance...",
-    language: "Langue",
-    languagePortuguese: "Português",
-    languageEnglish: "Inglês",
-    languageSpanish: "Espanhol",
-    languageGerman: "Alemão",
-    languageFrench: "Francês",
-    platform: "Plateforme",
-    cancel: "Annuler",
-    search: "Rechercher des Domaines",
-    processing: "Traitement...",
-    progress: "Progrès Global",
-    errorTitle: "Erreur de processus",
-    errorDesc: "Veuillez réessayer ou vérifier les paramètres",
-    enterNiche: "Veuillez saisir la niche",
-    successMsg: "Domaines achetés et configurés avec succès!",
-    insufficientBalance:
-      "Solde insuffisant! Ajoutez du solde pour continuer l'achat de domaines. Astuce: U$1 dollar pour .online ou U$14+ dollars pour .com",
-    steps: {
-      generating: "Génération de domaines avec IA",
-      checking: "Vérification de disponibilité",
-      searching: "Recherche de domaines bon marché",
-      purchasing: "Achat de domaine(s)",
-      nameservers: "Changement des serveurs de noms",
-      cloudflare: "Configuration de Cloudflare",
-      completed: "Achat terminé",
-    },
-  },
+// Steps em português
+const STEP_LABELS: { [key: string]: string } = {
+  generating: "Gerando domínios com IA",
+  checking: "Verificando disponibilidade",
+  searching: "Buscando domínios baratos",
+  purchasing: "Comprando domínio(s)",
+  nameservers: "Alterando nameservers",
+  cloudflare: "Configurando Cloudflare",
+  completed: "Compra concluída",
 };
 
 const WORDPRESS_STEPS = ["generating", "checking", "searching", "purchasing", "nameservers", "cloudflare", "completed"];
@@ -198,15 +40,13 @@ const ATOMICAT_STEPS = ["generating", "checking", "searching", "purchasing", "co
 export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: PurchaseWithAIDialogProps) {
   const [quantity, setQuantity] = useState<number>(1);
   const [niche, setNiche] = useState("");
-  const [language, setLanguage] = useState<keyof typeof TRANSLATIONS>("portuguese");
+  const [language, setLanguage] = useState("portuguese");
   const [platform, setPlatform] = useState<"wordpress" | "atomicat">("wordpress");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<Map<string, PurchaseProgress>>(new Map());
   const [showProgress, setShowProgress] = useState(false);
   const [progressPercentage, setProgressPercentage] = useState(0);
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
-
-  const t = TRANSLATIONS[language];
 
   useEffect(() => {
     if (open) {
@@ -216,13 +56,34 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
   }, [open]);
 
+  // 🎯 CALCULAR PORCENTAGEM CORRETAMENTE
+  const calculateProgress = (currentProgress: Map<string, PurchaseProgress>) => {
+    const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
+    const totalSteps = steps.length;
+
+    // Contar quantos steps foram completados
+    let completedSteps = 0;
+    steps.forEach((stepKey) => {
+      const stepProgress = currentProgress.get(stepKey);
+      if (stepProgress?.status === "completed") {
+        completedSteps++;
+      }
+    });
+
+    // Calcular porcentagem: (completados / total) * 100
+    const percentage = Math.round((completedSteps / totalSteps) * 100);
+    console.log(`📊 Progresso: ${completedSteps}/${totalSteps} = ${percentage}%`);
+
+    setProgressPercentage(percentage);
+  };
+
   const addProgressStep = (
     step: string,
     status: PurchaseProgress["status"],
     message: string,
     errorDetails?: string,
   ) => {
-    console.log(`📊 Atualizando progresso: ${step} = ${status}`);
+    console.log(`📊 ✅ Atualizando: ${step} = ${status}`);
 
     setProgress((prev) => {
       const newProgress = new Map(prev);
@@ -233,47 +94,32 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         timestamp: new Date().toISOString(),
         errorDetails,
       });
+
+      // Calcular progresso após atualizar
+      calculateProgress(newProgress);
+
       return newProgress;
     });
-
-    updateProgressPercentage(step, status);
-  };
-
-  const updateProgressPercentage = (step: string, status: PurchaseProgress["status"]) => {
-    const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
-    const currentStepIndex = steps.findIndex((s) => s === step);
-
-    if (currentStepIndex === -1) return;
-
-    if (status === "completed") {
-      const percentage = ((currentStepIndex + 1) / steps.length) * 100;
-      setProgressPercentage(Math.round(percentage));
-    } else if (status === "in_progress") {
-      const percentage = (currentStepIndex / steps.length) * 100;
-      setProgressPercentage(Math.round(percentage));
-    }
   };
 
   const handleGenerate = async () => {
     if (!niche.trim()) {
-      toast.error(t.enterNiche);
+      toast.error("Por favor, insira o nicho");
       return;
     }
 
     setLoading(true);
 
-    // Fechar EventSource anterior se existir
+    // Fechar EventSource anterior
     if (eventSource) {
       eventSource.close();
+      setEventSource(null);
     }
 
     try {
       console.log("🚀 Iniciando compra de domínios...");
 
-      // ═══════════════════════════════════════════════════════════
-      // VALIDAÇÃO DE SALDO INSTANTÂNEA VIA EDGE FUNCTION
-      // ═══════════════════════════════════════════════════════════
-
+      // Chamar Edge Function
       const { data, error } = await supabase.functions.invoke("purchase-domain-hub", {
         body: {
           niche,
@@ -283,20 +129,22 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         },
       });
 
-      // Verificar se é erro de saldo insuficiente
+      // Verificar erro de saldo
       if (error) {
         console.error("❌ Erro:", error);
 
-        // Verificar se é erro de saldo
         if (error.message?.includes("insufficient_balance") || error.message?.includes("Saldo insuficiente")) {
-          toast.error(t.insufficientBalance, {
-            duration: 6000,
-            style: {
-              background: "#FEE2E2",
-              border: "1px solid #FCA5A5",
-              color: "#991B1B",
+          toast.error(
+            "Saldo insuficiente! Adicione saldo para continuar com a compra de domínios. Dica: U$1 dólar para .online ou U$14+ dólares para .com",
+            {
+              duration: 6000,
+              style: {
+                background: "#FEE2E2",
+                border: "1px solid #FCA5A5",
+                color: "#991B1B",
+              },
             },
-          });
+          );
           setLoading(false);
           return;
         }
@@ -305,40 +153,53 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       }
 
       if (!data?.sessionId || !data?.streamUrl) {
+        console.error("❌ Resposta inválida:", data);
         throw new Error("Resposta inválida da Edge Function");
       }
 
-      console.log("✅ Saldo OK! Sessão criada:", data.sessionId);
+      console.log("✅ Sessão criada:", data.sessionId);
+      console.log("🔗 Stream URL:", data.streamUrl);
 
-      // Mostrar progresso
+      // Mostrar popup de progresso
       setShowProgress(true);
       setProgress(new Map());
       setProgressPercentage(0);
 
-      // Conectar ao SSE
+      // 🔥 CONECTAR AO SSE
+      console.log("🔗 Conectando ao SSE...");
       const es = new EventSource(data.streamUrl);
       setEventSource(es);
 
       es.onopen = () => {
-        console.log("✅ Conexão SSE estabelecida");
+        console.log("✅ ✅ ✅ CONEXÃO SSE ESTABELECIDA!");
       };
 
       es.onmessage = (event) => {
+        console.log("📨 📨 📨 EVENTO SSE RECEBIDO:", event.data);
+
         try {
-          console.log("📨 Evento SSE recebido:", event.data);
-
-          const eventData = JSON.parse(event.data);
-          console.log("📊 Dados parseados:", eventData);
-
-          if (eventData.step && eventData.status && eventData.message) {
-            addProgressStep(eventData.step, eventData.status, eventData.message, eventData.errorDetails);
-
-            console.log(`✅ Step ${eventData.step} atualizado para ${eventData.status}`);
+          // Ignorar keep-alive
+          if (event.data.startsWith(":")) {
+            console.log("⏭️ Keep-alive ignorado");
+            return;
           }
 
+          const eventData = JSON.parse(event.data);
+          console.log("📊 Dados parseados:", JSON.stringify(eventData, null, 2));
+
+          // 🎯 ATUALIZAR PROGRESSO
+          if (eventData.step && eventData.status && eventData.message) {
+            console.log(`✅ Atualizando step: ${eventData.step} → ${eventData.status}`);
+
+            addProgressStep(eventData.step, eventData.status, eventData.message, eventData.errorDetails);
+          } else {
+            console.warn("⚠️ Evento sem step/status/message:", eventData);
+          }
+
+          // Verificar conclusão
           if (eventData.step === "completed" && eventData.status === "completed") {
-            console.log("🎉 Processo finalizado com sucesso!");
-            toast.success(t.successMsg);
+            console.log("🎉 🎉 🎉 PROCESSO FINALIZADO!");
+            toast.success("Domínios comprados e configurados com sucesso!");
 
             setTimeout(() => {
               setShowProgress(false);
@@ -350,19 +211,21 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             }, 2000);
           }
 
+          // Verificar erro
           if (eventData.status === "error") {
             console.error("❌ Erro no processo:", eventData);
             toast.error(eventData.message || "Erro no processo");
             setLoading(false);
           }
         } catch (error) {
-          console.error("❌ Erro ao processar evento SSE:", error);
+          console.error("❌ Erro ao processar evento:", error);
+          console.error("Dados brutos:", event.data);
         }
       };
 
       es.onerror = (error) => {
-        console.error("❌ Erro SSE:", error);
-        toast.error("Erro na conexão");
+        console.error("❌ ❌ ❌ ERRO SSE:", error);
+        toast.error("Erro na conexão com o servidor");
         setLoading(false);
         es.close();
       };
@@ -390,6 +253,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
     if (eventSource) {
       eventSource.close();
+      setEventSource(null);
     }
 
     onOpenChange(false);
@@ -415,15 +279,15 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t.title}</DialogTitle>
-          <DialogDescription>{t.description}</DialogDescription>
+          <DialogTitle>Compra com IA</DialogTitle>
+          <DialogDescription>Configure os parâmetros para buscar e comprar domínios disponíveis</DialogDescription>
         </DialogHeader>
 
         {!showProgress ? (
           <div className="space-y-4 py-4">
             {/* Quantidade */}
             <div className="space-y-2">
-              <Label htmlFor="quantity">{t.quantity}</Label>
+              <Label htmlFor="quantity">Quantidade de Domínios</Label>
               <Input
                 id="quantity"
                 type="number"
@@ -437,10 +301,10 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
             {/* Nicho */}
             <div className="space-y-2">
-              <Label htmlFor="niche">{t.niche}</Label>
+              <Label htmlFor="niche">Nicho</Label>
               <Input
                 id="niche"
-                placeholder={t.nichePlaceholder}
+                placeholder="Ex: saúde, tecnologia, finanças..."
                 value={niche}
                 onChange={(e) => setNiche(e.target.value)}
                 disabled={loading}
@@ -449,28 +313,24 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
             {/* Idioma */}
             <div className="space-y-2">
-              <Label htmlFor="language">{t.language}</Label>
-              <Select
-                value={language}
-                onValueChange={(v) => setLanguage(v as keyof typeof TRANSLATIONS)}
-                disabled={loading}
-              >
+              <Label htmlFor="language">Idioma</Label>
+              <Select value={language} onValueChange={setLanguage} disabled={loading}>
                 <SelectTrigger id="language">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="portuguese">{t.languagePortuguese}</SelectItem>
-                  <SelectItem value="english">{t.languageEnglish}</SelectItem>
-                  <SelectItem value="spanish">{t.languageSpanish}</SelectItem>
-                  <SelectItem value="german">{t.languageGerman}</SelectItem>
-                  <SelectItem value="french">{t.languageFrench}</SelectItem>
+                  <SelectItem value="portuguese">Português</SelectItem>
+                  <SelectItem value="english">Inglês</SelectItem>
+                  <SelectItem value="spanish">Espanhol</SelectItem>
+                  <SelectItem value="german">Alemão</SelectItem>
+                  <SelectItem value="french">Francês</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Plataforma */}
             <div className="space-y-2">
-              <Label htmlFor="platform">{t.platform}</Label>
+              <Label htmlFor="platform">Plataforma</Label>
               <Select
                 value={platform}
                 onValueChange={(v: "wordpress" | "atomicat") => setPlatform(v)}
@@ -489,40 +349,41 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             {/* Botões */}
             <div className="flex gap-3 pt-2">
               <Button variant="outline" onClick={handleClose} disabled={loading} className="flex-1">
-                {t.cancel}
+                Cancelar
               </Button>
               <Button onClick={handleGenerate} disabled={loading} className="flex-1">
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t.processing}
+                    Processando...
                   </>
                 ) : (
-                  t.search
+                  "Buscar Domínios"
                 )}
               </Button>
             </div>
           </div>
         ) : (
           <div className="space-y-4 py-4">
-            {/* Barra de progresso geral */}
+            {/* Barra de progresso com cálculo correto */}
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{t.progress}</span>
+                <span className="text-gray-600">Progresso Geral</span>
                 <span className="font-semibold">{progressPercentage}%</span>
               </div>
               <Progress value={progressPercentage} className="h-3" />
             </div>
 
-            {/* Lista de steps */}
+            {/* Lista de steps - em português */}
             <div className="space-y-2">
               {steps.map((stepKey) => {
                 const progressItem = progress.get(stepKey);
 
+                // Só renderiza se já recebeu
                 if (!progressItem) return null;
 
                 const status = progressItem.status;
-                const stepLabel = (t.steps as any)[stepKey] || stepKey;
+                const stepLabel = STEP_LABELS[stepKey] || stepKey;
 
                 return (
                   <div
@@ -550,14 +411,14 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               })}
             </div>
 
-            {/* Mensagem de erro geral */}
+            {/* Mensagem de erro */}
             {Array.from(progress.values()).some((p) => p.status === "error") && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <div className="flex items-center gap-2 text-red-700">
                   <XCircle className="h-5 w-5" />
-                  <span className="font-semibold text-sm">{t.errorTitle}</span>
+                  <span className="font-semibold text-sm">Erro no processo</span>
                 </div>
-                <p className="text-xs text-red-600 mt-1">{t.errorDesc}</p>
+                <p className="text-xs text-red-600 mt-1">Tente novamente ou verifique as configurações</p>
               </div>
             )}
           </div>
