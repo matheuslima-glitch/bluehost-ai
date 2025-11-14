@@ -23,6 +23,7 @@ interface PurchaseWithAIDialogProps {
   onSuccess: () => void;
 }
 
+// ✅ TEXTOS CORRIGIDOS - UTF-8 OK
 const STEP_LABELS: { [key: string]: string } = {
   generating: "Gerando domínios com IA",
   checking: "Verificando disponibilidade",
@@ -46,8 +47,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const [showProgress, setShowProgress] = useState(false);
   const [progressPercentage, setProgressPercentage] = useState(0);
 
-  // Usar useRef para EventSource
   const eventSourceRef = useRef<EventSource | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -57,13 +58,16 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
   }, [open]);
 
-  // Cleanup do EventSource
+  // Cleanup
   useEffect(() => {
     return () => {
       if (eventSourceRef.current) {
-        console.log("🧹 Limpando EventSource");
         eventSourceRef.current.close();
         eventSourceRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     };
   }, []);
@@ -107,6 +111,39 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     });
   };
 
+  // 🔥 NOVA FUNÇÃO: Finalizar processo (sucesso ou erro)
+  const finishProcess = (success: boolean, message?: string) => {
+    console.log(`🏁 Finalizando processo: ${success ? "SUCESSO" : "ERRO"}`);
+
+    // Limpar timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    // Fechar EventSource
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    // Resetar loading IMEDIATAMENTE
+    setLoading(false);
+
+    if (success) {
+      toast.success(message || "Domínios comprados e configurados com sucesso!");
+
+      setTimeout(() => {
+        setShowProgress(false);
+        onOpenChange(false);
+        onSuccess();
+        resetForm();
+      }, 2000);
+    } else {
+      toast.error(message || "Erro no processo");
+    }
+  };
+
   const handleGenerate = async () => {
     if (!niche.trim()) {
       toast.error("Por favor, insira o nicho");
@@ -120,6 +157,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       console.log("🧹 Fechando EventSource anterior");
       eventSourceRef.current.close();
       eventSourceRef.current = null;
+    }
+
+    // Limpar timeout anterior
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
 
     try {
@@ -154,18 +197,22 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       setProgress(new Map());
       setProgressPercentage(0);
 
-      // 🔥 CRIAR EVENTSOURCE COM LISTENERS CORRETOS
+      // 🔥 TIMEOUT DE SEGURANÇA: 5 minutos
+      timeoutRef.current = setTimeout(() => {
+        console.log("⏰ TIMEOUT! Processo demorou muito (5 minutos)");
+        finishProcess(false, "Processo demorou muito tempo. Tente novamente.");
+      }, 300000); // 5 minutos
+
+      // Criar EventSource
       console.log("🌊 Criando EventSource...");
       const es = new EventSource(data.streamUrl);
       eventSourceRef.current = es;
 
-      // ✅ LISTENER: onopen
       es.addEventListener("open", () => {
         console.log("✅ ✅ ✅ SSE CONECTADO!");
         console.log("📡 ReadyState:", es.readyState);
       });
 
-      // ✅ LISTENER: onmessage (PRINCIPAL)
       es.addEventListener("message", (event) => {
         console.log("📨 📨 📨 MENSAGEM SSE RECEBIDA!");
         console.log("📦 Dados brutos:", event.data);
@@ -186,24 +233,18 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             addProgressStep(eventData.step, eventData.status, eventData.message, eventData.errorDetails);
           }
 
+          // 🔥 VERIFICAR CONCLUSÃO
           if (eventData.step === "completed" && eventData.status === "completed") {
-            console.log("🎉 CONCLUÍDO!");
-            toast.success("Domínios comprados e configurados com sucesso!");
-
-            setTimeout(() => {
-              setShowProgress(false);
-              setLoading(false);
-              onOpenChange(false);
-              onSuccess();
-              resetForm();
-              es.close();
-            }, 2000);
+            console.log("🎉 PROCESSO CONCLUÍDO!");
+            finishProcess(true, eventData.message);
+            return;
           }
 
+          // 🔥 VERIFICAR ERRO
           if (eventData.status === "error") {
-            console.error("❌ Erro:", eventData);
-            toast.error(eventData.message || "Erro no processo");
-            setLoading(false);
+            console.error("❌ Erro no processo:", eventData);
+            finishProcess(false, eventData.message || "Erro no processo");
+            return;
           }
         } catch (error) {
           console.error("❌ Erro ao processar:", error);
@@ -211,15 +252,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         }
       });
 
-      // ✅ LISTENER: onerror
       es.addEventListener("error", (error) => {
         console.error("❌ ❌ ❌ ERRO SSE!");
         console.error("📦 Error:", error);
         console.error("📡 ReadyState:", es.readyState);
 
-        toast.error("Erro na conexão");
-        setLoading(false);
-        es.close();
+        finishProcess(false, "Erro na conexão com o servidor");
       });
     } catch (error: any) {
       console.error("❌ Erro geral:", error);
@@ -237,20 +275,32 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setShowProgress(false);
   };
 
+  // 🔥 HANDLE CLOSE MELHORADO
   const handleClose = () => {
-    if (loading) {
-      toast.error("Aguarde o processo finalizar");
+    // Se NÃO estiver carregando, pode fechar normalmente
+    if (!loading) {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      onOpenChange(false);
+      resetForm();
       return;
     }
 
-    if (eventSourceRef.current) {
-      console.log("🧹 Fechando EventSource");
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
+    // Se estiver carregando, perguntar se quer cancelar
+    const confirmCancel = confirm("O processo ainda está em andamento. Deseja realmente cancelar?");
 
-    onOpenChange(false);
-    resetForm();
+    if (confirmCancel) {
+      console.log("🛑 Usuário cancelou o processo");
+      finishProcess(false, "Processo cancelado pelo usuário");
+      onOpenChange(false);
+      resetForm();
+    }
   };
 
   const getStatusIcon = (status: PurchaseProgress["status"]) => {
