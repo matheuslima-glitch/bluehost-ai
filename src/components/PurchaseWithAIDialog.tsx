@@ -23,7 +23,6 @@ interface PurchaseWithAIDialogProps {
   onSuccess: () => void;
 }
 
-// Steps em português
 const STEP_LABELS: { [key: string]: string } = {
   generating: "Gerando domínios com IA",
   checking: "Verificando disponibilidade",
@@ -56,26 +55,15 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
   }, [open]);
 
-  // 🎯 CALCULAR PORCENTAGEM CORRETAMENTE
-  const calculateProgress = (currentProgress: Map<string, PurchaseProgress>) => {
-    const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
-    const totalSteps = steps.length;
-
-    // Contar quantos steps foram completados
-    let completedSteps = 0;
-    steps.forEach((stepKey) => {
-      const stepProgress = currentProgress.get(stepKey);
-      if (stepProgress?.status === "completed") {
-        completedSteps++;
+  // Cleanup do EventSource ao desmontar
+  useEffect(() => {
+    return () => {
+      if (eventSource) {
+        console.log("🧹 Limpando EventSource ao desmontar");
+        eventSource.close();
       }
-    });
-
-    // Calcular porcentagem: (completados / total) * 100
-    const percentage = Math.round((completedSteps / totalSteps) * 100);
-    console.log(`📊 Progresso: ${completedSteps}/${totalSteps} = ${percentage}%`);
-
-    setProgressPercentage(percentage);
-  };
+    };
+  }, [eventSource]);
 
   const addProgressStep = (
     step: string,
@@ -83,7 +71,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     message: string,
     errorDetails?: string,
   ) => {
-    console.log(`📊 ✅ Atualizando: ${step} = ${status}`);
+    console.log(`🔵 [addProgressStep] step=${step}, status=${status}, message=${message}`);
 
     setProgress((prev) => {
       const newProgress = new Map(prev);
@@ -95,8 +83,23 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         errorDetails,
       });
 
-      // Calcular progresso após atualizar
-      calculateProgress(newProgress);
+      console.log(`🗺️ [Map atualizado] Size: ${newProgress.size}, Keys:`, Array.from(newProgress.keys()));
+
+      // Calcular progresso
+      const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
+      const totalSteps = steps.length;
+
+      let completedSteps = 0;
+      steps.forEach((stepKey) => {
+        const stepProgress = newProgress.get(stepKey);
+        if (stepProgress?.status === "completed") {
+          completedSteps++;
+        }
+      });
+
+      const percentage = Math.round((completedSteps / totalSteps) * 100);
+      console.log(`📊 [Progresso calculado] ${completedSteps}/${totalSteps} = ${percentage}%`);
+      setProgressPercentage(percentage);
 
       return newProgress;
     });
@@ -112,14 +115,18 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
     // Fechar EventSource anterior
     if (eventSource) {
+      console.log("🧹 Fechando EventSource anterior");
       eventSource.close();
       setEventSource(null);
     }
 
     try {
-      console.log("🚀 Iniciando compra de domínios...");
+      console.log("🚀 [1/5] Iniciando compra de domínios...");
+      console.log("📝 Parâmetros:", { niche, quantity, language, platform });
 
       // Chamar Edge Function
+      console.log("📞 [2/5] Chamando Edge Function purchase-domain-hub...");
+
       const { data, error } = await supabase.functions.invoke("purchase-domain-hub", {
         body: {
           niche,
@@ -129,20 +136,17 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         },
       });
 
+      console.log("📥 [3/5] Resposta recebida:", { data, error });
+
       // Verificar erro de saldo
       if (error) {
-        console.error("❌ Erro:", error);
+        console.error("❌ Erro na Edge Function:", error);
 
         if (error.message?.includes("insufficient_balance") || error.message?.includes("Saldo insuficiente")) {
           toast.error(
             "Saldo insuficiente! Adicione saldo para continuar com a compra de domínios. Dica: U$1 dólar para .online ou U$14+ dólares para .com",
             {
               duration: 6000,
-              style: {
-                background: "#FEE2E2",
-                border: "1px solid #FCA5A5",
-                color: "#991B1B",
-              },
             },
           );
           setLoading(false);
@@ -157,7 +161,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         throw new Error("Resposta inválida da Edge Function");
       }
 
-      console.log("✅ Sessão criada:", data.sessionId);
+      console.log("✅ [4/5] Sessão criada!");
+      console.log("🎫 Session ID:", data.sessionId);
       console.log("🔗 Stream URL:", data.streamUrl);
 
       // Mostrar popup de progresso
@@ -165,40 +170,45 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       setProgress(new Map());
       setProgressPercentage(0);
 
-      // 🔥 CONECTAR AO SSE
-      console.log("🔗 Conectando ao SSE...");
+      // Conectar ao SSE
+      console.log("🌊 [5/5] Conectando ao SSE...");
+      console.log("🔗 URL completa:", data.streamUrl);
+
       const es = new EventSource(data.streamUrl);
       setEventSource(es);
 
       es.onopen = () => {
-        console.log("✅ ✅ ✅ CONEXÃO SSE ESTABELECIDA!");
+        console.log("✅ ✅ ✅ CONEXÃO SSE ABERTA!");
+        console.log("📡 ReadyState:", es.readyState); // 0=CONNECTING, 1=OPEN, 2=CLOSED
       };
 
       es.onmessage = (event) => {
-        console.log("📨 📨 📨 EVENTO SSE RECEBIDO:", event.data);
+        console.log("📨 📨 📨 EVENTO SSE RECEBIDO!");
+        console.log("📦 event.data:", event.data);
+        console.log("📦 event.type:", event.type);
 
         try {
           // Ignorar keep-alive
-          if (event.data.startsWith(":")) {
+          if (event.data.startsWith(":") || event.data.trim() === "") {
             console.log("⏭️ Keep-alive ignorado");
             return;
           }
 
           const eventData = JSON.parse(event.data);
-          console.log("📊 Dados parseados:", JSON.stringify(eventData, null, 2));
+          console.log("✅ JSON parseado:", JSON.stringify(eventData, null, 2));
 
-          // 🎯 ATUALIZAR PROGRESSO
+          // Atualizar progresso
           if (eventData.step && eventData.status && eventData.message) {
-            console.log(`✅ Atualizando step: ${eventData.step} → ${eventData.status}`);
+            console.log(`🎯 Atualizando UI: ${eventData.step} → ${eventData.status}`);
 
             addProgressStep(eventData.step, eventData.status, eventData.message, eventData.errorDetails);
           } else {
-            console.warn("⚠️ Evento sem step/status/message:", eventData);
+            console.warn("⚠️ Evento incompleto:", eventData);
           }
 
           // Verificar conclusão
           if (eventData.step === "completed" && eventData.status === "completed") {
-            console.log("🎉 🎉 🎉 PROCESSO FINALIZADO!");
+            console.log("🎉 🎉 🎉 PROCESSO CONCLUÍDO!");
             toast.success("Domínios comprados e configurados com sucesso!");
 
             setTimeout(() => {
@@ -218,19 +228,24 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             setLoading(false);
           }
         } catch (error) {
-          console.error("❌ Erro ao processar evento:", error);
-          console.error("Dados brutos:", event.data);
+          console.error("❌ Erro ao processar evento SSE:", error);
+          console.error("📦 Dados brutos:", event.data);
         }
       };
 
       es.onerror = (error) => {
-        console.error("❌ ❌ ❌ ERRO SSE:", error);
+        console.error("❌ ❌ ❌ ERRO SSE!");
+        console.error("📦 Error object:", error);
+        console.error("📡 ReadyState:", es.readyState);
+        console.error("🔗 URL:", es.url);
+
         toast.error("Erro na conexão com o servidor");
         setLoading(false);
         es.close();
       };
     } catch (error: any) {
       console.error("❌ Erro geral:", error);
+      console.error("📦 Error stack:", error.stack);
       toast.error(error.message || "Erro ao processar compra");
       setLoading(false);
       setShowProgress(false);
@@ -252,6 +267,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
 
     if (eventSource) {
+      console.log("🧹 Fechando EventSource");
       eventSource.close();
       setEventSource(null);
     }
@@ -275,6 +291,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
   const steps = platform === "wordpress" ? WORDPRESS_STEPS : ATOMICAT_STEPS;
 
+  // Debug: Mostrar estado atual
+  console.log("🔍 [Render] showProgress:", showProgress);
+  console.log("🔍 [Render] progress.size:", progress.size);
+  console.log("🔍 [Render] progressPercentage:", progressPercentage);
+  console.log("🔍 [Render] progress keys:", Array.from(progress.keys()));
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -285,7 +307,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
         {!showProgress ? (
           <div className="space-y-4 py-4">
-            {/* Quantidade */}
             <div className="space-y-2">
               <Label htmlFor="quantity">Quantidade de Domínios</Label>
               <Input
@@ -299,7 +320,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               />
             </div>
 
-            {/* Nicho */}
             <div className="space-y-2">
               <Label htmlFor="niche">Nicho</Label>
               <Input
@@ -311,7 +331,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               />
             </div>
 
-            {/* Idioma */}
             <div className="space-y-2">
               <Label htmlFor="language">Idioma</Label>
               <Select value={language} onValueChange={setLanguage} disabled={loading}>
@@ -328,7 +347,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               </Select>
             </div>
 
-            {/* Plataforma */}
             <div className="space-y-2">
               <Label htmlFor="platform">Plataforma</Label>
               <Select
@@ -346,7 +364,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               </Select>
             </div>
 
-            {/* Botões */}
             <div className="flex gap-3 pt-2">
               <Button variant="outline" onClick={handleClose} disabled={loading} className="flex-1">
                 Cancelar
@@ -365,7 +382,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
           </div>
         ) : (
           <div className="space-y-4 py-4">
-            {/* Barra de progresso com cálculo correto */}
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Progresso Geral</span>
@@ -374,12 +390,14 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               <Progress value={progressPercentage} className="h-3" />
             </div>
 
-            {/* Lista de steps - em português */}
             <div className="space-y-2">
+              {progress.size === 0 && (
+                <div className="text-center py-4 text-gray-500 text-sm">Aguardando início do processo...</div>
+              )}
+
               {steps.map((stepKey) => {
                 const progressItem = progress.get(stepKey);
 
-                // Só renderiza se já recebeu
                 if (!progressItem) return null;
 
                 const status = progressItem.status;
@@ -411,7 +429,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               })}
             </div>
 
-            {/* Mensagem de erro */}
             {Array.from(progress.values()).some((p) => p.status === "error") && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <div className="flex items-center gap-2 text-red-700">
