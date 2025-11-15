@@ -297,7 +297,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         .subscribe();
 
       channelRef.current = channel;
-
     } catch (error: any) {
       console.error("Erro fatal no handleGenerate:", error);
       toast.error(error.message || "Erro ao processar compra");
@@ -426,7 +425,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                 >
                   <SelectTrigger id="platform">
                     <SelectValue />
-                  </TSelectTrigger>
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="wordpress">WordPress</SelectItem>
                     <SelectItem value="atomicat">AtomiCat</SelectItem>
