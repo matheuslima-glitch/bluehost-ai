@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,21 +112,10 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
       const progress = updateQueueRef.current.shift()!;
 
-      console.log("🎯 Processando progress da fila:", progress);
-
       setCurrentProgress(progress);
 
-      // 🔥 CAPTURAR DOMAIN_NAME
-      console.log("🔍 Verificando domain_name...");
-      console.log("🔍 progress.domain_name:", progress.domain_name);
-      console.log("🔍 tipo:", typeof progress.domain_name);
-      console.log("🔍 trim:", progress.domain_name?.trim());
-
       if (progress.domain_name && progress.domain_name.trim() !== "") {
-        console.log("✅✅✅ DOMÍNIO CAPTURADO:", progress.domain_name);
         setPurchasedDomain(progress.domain_name);
-      } else {
-        console.log("❌ Domínio está vazio ou null");
       }
 
       const percentage = calculateProgress(progress.step);
@@ -177,12 +166,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setLoading(false);
 
     if (success) {
-      // 🔥 BUSCAR ÚLTIMO DOMÍNIO COMPRADO (independente de session)
       const fetchAndShowSuccess = async () => {
         try {
-          console.log("🔍 Buscando último domínio comprado...");
-
-          // Busca o registro mais recente com domain_name não-null
           const { data, error } = await supabase
             .from("domain_purchase_progress")
             .select("domain_name, session_id, updated_at")
@@ -191,16 +176,13 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             .limit(1)
             .single();
 
-          console.log("📊 Resultado:", data, error);
-
           if (data?.domain_name) {
-            console.log("✅✅✅ DOMÍNIO ENCONTRADO:", data.domain_name);
             setPurchasedDomain(data.domain_name);
           } else {
-            console.log("❌ Nenhum domínio encontrado");
+            // Silenciosamente falha, o 'purchasedDomain' do realtime deve bastar
           }
         } catch (err) {
-          console.error("❌ Erro:", err);
+          console.error("Erro ao buscar último domínio:", err);
         }
 
         setShowProgress(false);
@@ -231,43 +213,59 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       channelRef.current.unsubscribe();
       channelRef.current = null;
     }
-
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
 
+    setShowProgress(true);
+    setCurrentProgress(null);
+    setProgressPercentage(0);
+    setPurchasedDomain(null);
+    updateQueueRef.current = [];
+    processingRef.current = false;
+    lastUpdateTimeRef.current = Date.now();
+
     try {
-      const { data, error } = await supabase.functions.invoke("purchase-domain-hub", {
+      // ETAPA 1: VERIFICAR SALDO
+      const { error: balanceError } = await supabase.functions.invoke("check-balance");
+
+      if (balanceError) {
+        let errorMessage = "Erro ao verificar saldo.";
+        try {
+          const errorBody = JSON.parse(balanceError.message);
+          if (errorBody.error === "insufficient_balance") {
+            errorMessage = errorBody.message;
+          } else {
+            errorMessage = errorBody.error || errorBody.message;
+          }
+        } catch (e) {
+          errorMessage = balanceError.message;
+        }
+
+        toast.error(errorMessage, { duration: 6000 });
+        setLoading(false);
+        setShowProgress(false);
+        return;
+      }
+
+      // ETAPA 2: INICIAR A COMPRA
+      const { data: purchaseData, error: purchaseError } = await supabase.functions.invoke("purchase-domain-hub", {
         body: { niche, quantity, language, platform },
       });
 
-      if (error) {
-        if (error.message?.includes("insufficient_balance") || error.message?.includes("Saldo insuficiente")) {
-          toast.error("Saldo insuficiente! Você precisa de no mínimo $10 USD na Namecheap para comprar domínios.", {
-            duration: 6000,
-          });
-          setLoading(false);
-          return;
-        }
-        throw error;
+      if (purchaseError) {
+        throw new Error(`Erro ao iniciar a compra: ${purchaseError.message}`);
       }
 
-      if (!data?.sessionId) {
-        throw new Error("Resposta inválida");
+      if (!purchaseData?.sessionId) {
+        throw new Error("Resposta inválida do servidor ao iniciar a compra.");
       }
 
-      const sessionId = data.sessionId;
+      const sessionId = purchaseData.sessionId;
       setCurrentSessionId(sessionId);
 
-      setShowProgress(true);
-      setCurrentProgress(null);
-      setProgressPercentage(0);
-      setPurchasedDomain(null);
-      updateQueueRef.current = [];
-      processingRef.current = false;
-      lastUpdateTimeRef.current = Date.now();
-
+      // ETAPA 3: INSCREVER NO REALTIME
       resetTimeout();
 
       const channel = supabase
@@ -281,21 +279,9 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
             filter: `session_id=eq.${sessionId}`,
           },
           (payload) => {
-            console.log("🔥🔥🔥 REALTIME DISPAROU!");
-            console.log("🔥 Payload completo:", payload);
-            console.log("🔥 payload.new:", payload.new);
-
             resetTimeout();
 
             const progress = payload.new as any;
-
-            console.log("📨 Progress object:", progress);
-            console.log("📨 Step:", progress.step);
-            console.log("📨 Status:", progress.status);
-            console.log("📨 Message:", progress.message);
-            console.log("📨 domain_name:", progress.domain_name);
-            console.log("📨 domain_name type:", typeof progress.domain_name);
-            console.log("📨 domain_name length:", progress.domain_name?.length);
 
             updateQueueRef.current.push({
               step: progress.step,
@@ -305,17 +291,14 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
               domain_name: progress.domain_name,
             });
 
-            console.log("📦 Adicionado à fila. Tamanho da fila:", updateQueueRef.current.length);
-
             processUpdateQueue();
           },
         )
-        .subscribe((status) => {
-          console.log("🔗 Realtime status:", status);
-        });
+        .subscribe();
 
       channelRef.current = channel;
     } catch (error: any) {
+      console.error("Erro fatal no handleGenerate:", error);
       toast.error(error.message || "Erro ao processar compra");
       setLoading(false);
       setShowProgress(false);
@@ -443,6 +426,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                   <SelectTrigger id="platform">
                     <SelectValue />
                   </SelectTrigger>
+                  {/* CORREÇÃO ESTAVA AQUI */}
                   <SelectContent>
                     <SelectItem value="wordpress">WordPress</SelectItem>
                     <SelectItem value="atomicat">AtomiCat</SelectItem>
@@ -490,7 +474,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                       currentProgress.status === "completed"
                         ? "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800"
                         : currentProgress.status === "error"
-                          ? "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800"
+                          ? // CORREÇÃO ESTAVA AQUI
+                            "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800"
                           : "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800"
                     }`}
                   >
@@ -528,7 +513,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         </DialogContent>
       </Dialog>
 
-      {/*  POPUP - DESIGN INLINE */}
+      {/* POPUP DE SUCESSO */}
       <Dialog open={showSuccessDialog} onOpenChange={handleSuccessClose}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -537,17 +522,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
           </DialogHeader>
 
           <div className="py-6">
-            {/* BOX COM CHECK + DOMÍNIO + BOTÃO COPIAR INLINE */}
             <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950 dark:to-blue-950 rounded-xl border-2 border-green-300 dark:border-green-700">
-              {/* CHECK VERDE */}
               <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400 flex-shrink-0" />
-
-              {/* DOMÍNIO */}
               <code className="flex-1 text-xl font-bold font-mono text-foreground break-all">
                 {purchasedDomain || "carregando..."}
               </code>
-
-              {/* BOTÃO COPIAR */}
               <Button
                 onClick={copyDomain}
                 size="icon"
