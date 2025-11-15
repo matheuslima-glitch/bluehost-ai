@@ -426,7 +426,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                   <SelectTrigger id="platform">
                     <SelectValue />
                   </SelectTrigger>
-                  {/* CORREÇÃO ESTAVA AQUI */}
+
                   <SelectContent>
                     <SelectItem value="wordpress">WordPress</SelectItem>
                     <SelectItem value="atomicat">AtomiCat</SelectItem>
