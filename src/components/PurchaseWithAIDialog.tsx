@@ -426,7 +426,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                 >
                   <SelectTrigger id="platform">
                     <SelectValue />
-                  </SelectTrigger>
+                  </TSelectTrigger>
                   <SelectContent>
                     <SelectItem value="wordpress">WordPress</SelectItem>
                     <SelectItem value="atomicat">AtomiCat</SelectItem>
@@ -473,7 +473,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                     className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
                       currentProgress.status === "completed"
                         ? "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800"
-                        s: currentProgress.status === "error"
+                        : currentProgress.status === "error" // <--- CORREÇÃO ESTÁ AQUI
                           ? "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800"
                           : "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800"
                     }`}
