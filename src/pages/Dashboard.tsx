@@ -237,9 +237,9 @@ export default function Dashboard() {
       const statusCheck = await checkIntegrationsStatus();
       setIntegrationStatus(statusCheck);
 
-      try {
+      try { //BUSCAR O SALDO
         await fetch("https://domainhub-backend.onrender.com/api/balance/sync", {
-          method: "POST",
+          method: "POST"
           headers: { "Content-Type": "application/json" },
         });
       } catch (webhookError: any) {
