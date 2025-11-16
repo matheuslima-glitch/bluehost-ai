@@ -63,19 +63,17 @@ export default function Dashboard() {
     loadUserName();
   }, []);
 
-  // Buscar nome do usuário
   const loadUserName = async () => {
     if (!user?.id) return;
 
     const { data } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
 
     if (data?.full_name) {
-      const name = data.full_name.split(" ")[0]; // Pegar primeiro nome
+      const name = data.full_name.split(" ")[0];
       setFirstName(name);
     }
   };
 
-  // CORREÇÃO 1: Função para verificar se as integrações estão configuradas
   const checkIntegrationsStatus = async () => {
     const status = {
       namecheap: false,
@@ -83,7 +81,6 @@ export default function Dashboard() {
       cloudflare: false,
     };
 
-    // Verificar Namecheap: se existe saldo, está configurado
     try {
       const { data: balanceData } = await supabase
         .from("namecheap_balance")
@@ -97,29 +94,23 @@ export default function Dashboard() {
       console.error("Erro ao verificar status Namecheap:", error);
     }
 
-    // Verificar Cloudflare: fazer chamada de teste
     try {
       const { data, error } = await supabase.functions.invoke("cloudflare-integration", {
         body: { action: "zones" },
       });
 
-      // Se não houver erro de credenciais, está configurado
       status.cloudflare = !error || (error && !error.message.includes("credentials not configured"));
     } catch (error: any) {
-      // Se o erro não for de credenciais faltantes, considera configurado
       status.cloudflare = !error?.message?.includes("credentials not configured");
     }
 
-    // Verificar cPanel: fazer chamada de teste
     try {
       const { data, error } = await supabase.functions.invoke("cpanel-integration", {
         body: { action: "domains" },
       });
 
-      // Se não houver erro de credenciais, está configurado
       status.cpanel = !error || (error && !error.message.includes("credentials not configured"));
     } catch (error: any) {
-      // Se o erro não for de credenciais faltantes, considera configurado
       status.cpanel = !error?.message?.includes("credentials not configured");
     }
 
@@ -128,7 +119,6 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      // CORREÇÃO 2: Função para buscar TODOS os domínios sem limite usando paginação recursiva
       const fetchAllDomains = async () => {
         let allDomains: any[] = [];
         let from = 0;
@@ -147,7 +137,6 @@ export default function Dashboard() {
             allDomains = [...allDomains, ...data];
             from += pageSize;
 
-            // Se retornou menos que o pageSize, chegamos ao fim
             if (data.length < pageSize) {
               hasMore = false;
             }
@@ -159,7 +148,6 @@ export default function Dashboard() {
         return allDomains;
       };
 
-      // Busca todos os domínios
       const domainsData = await fetchAllDomains();
       setDomains(domainsData || []);
 
@@ -195,7 +183,6 @@ export default function Dashboard() {
       setStats(stats);
       setIntegrations(integrationCounts);
 
-      // CORREÇÃO: Buscar dados de analytics_geral (soma de todos os domínios)
       const { data: analyticsGeralData, error: analyticsGeralError } = await supabase
         .from("analytics_geral")
         .select("*")
@@ -203,63 +190,63 @@ export default function Dashboard() {
         .single();
 
       if (!analyticsGeralError && analyticsGeralData) {
-        // Calcular total de visitas (converter bigint para number)
         const totalVisitsFromDB = Number(analyticsGeralData.annual_visits) || 0;
         setTotalVisits(totalVisitsFromDB);
 
-        // Gerar dados dos últimos 12 meses (mix de _py e _cy)
-        const currentMonth = new Date().getMonth(); // 0-11
-        const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-        const monthKeys = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+        const monthsMapping: { [key: string]: string } = {
+          jan: "Jan",
+          feb: "Fev",
+          mar: "Mar",
+          apr: "Abr",
+          may: "Mai",
+          jun: "Jun",
+          jul: "Jul",
+          aug: "Ago",
+          sep: "Set",
+          oct: "Out",
+          nov: "Nov",
+          dec: "Dez",
+        };
 
-        const last12Months = [];
+        const monthlyData = [];
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
 
-        // Gerar últimos 12 meses (de 11 meses atrás até mês atual)
         for (let i = 11; i >= 0; i--) {
-          const monthIndex = (currentMonth - i + 12) % 12;
-          const monthKey = monthKeys[monthIndex];
-          const monthName = monthNames[monthIndex];
+          const targetDate = new Date(currentYear, currentMonth - i, 1);
+          const monthIndex = targetDate.getMonth();
+          const year = targetDate.getFullYear();
+          const isCurrentYear = year === currentYear;
 
-          // Determinar se usa _py (ano anterior) ou _cy (ano atual)
-          const isPreviousYear = i > currentMonth;
-          const suffix = isPreviousYear ? "_py" : "_cy";
-          const fieldName = `${monthKey}${suffix}`;
+          const monthKey = Object.keys(monthsMapping)[monthIndex];
+          const suffix = isCurrentYear ? "_cy" : "_py";
+          const columnName = `${monthKey}${suffix}`;
 
-          // Pegar valor JÁ SOMADO de analytics_geral
-          const visits = Number(analyticsGeralData[fieldName]) || 0;
+          const visits = Number(analyticsGeralData[columnName]) || 0;
 
-          last12Months.push({
-            mes: monthName,
+          monthlyData.push({
+            mes: `${monthsMapping[monthKey]}/${year.toString().slice(-2)}`,
             visitas: visits,
           });
         }
 
-        setMonthlyVisitsData(last12Months);
-      } else {
-        // Se não houver dados, zerar tudo
-        setTotalVisits(0);
-        setMonthlyVisitsData([]);
+        setMonthlyVisitsData(monthlyData);
       }
 
-      // [INÍCIO DA LÓGICA IMPLEMENTADA]
-      // Aciona o webhook do n8n para atualizar o saldo da Namecheap em tempo real
+      const statusCheck = await checkIntegrationsStatus();
+      setIntegrationStatus(statusCheck);
+
       try {
         await fetch("https://domainhub-backend.onrender.com/api/balance/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source: "dashboard_reload" }), // Corpo opcional
         });
-
-        // Se a chamada foi bem-sucedida, o n8n (em tese) já atualizou o banco.
       } catch (webhookError: any) {
-        // Se o webhook falhar, apenas registra o aviso no console e continua.
-        // O sistema irá carregar o último saldo salvo no banco.
-        console.warn("Aviso: O webhook de atualização de saldo do n8n falhou.", webhookError.message);
+        console.warn("Aviso: Falha ao atualizar saldo.", webhookError.message);
         toast.warning("Não foi possível atualizar o saldo em tempo real. Carregando último valor salvo.");
       }
-      // [FIM DA LÓGICA IMPLEMENTADA]
 
-      // Load Namecheap balance from database (agora atualizado pelo n8n)
       const { data: balanceData, error: balanceError } = await supabase
         .from("namecheap_balance")
         .select("*")
@@ -274,185 +261,124 @@ export default function Dashboard() {
         });
       }
 
-      // Load expired domains from Namecheap API
-      try {
-        const { data: expiredData, error: expiredError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "EXPIRED" },
-        });
+      const { count: expiredCount } = await supabase
+        .from("domains")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "expired");
+      setExpiredDomains(expiredCount || 0);
 
-        if (!expiredError && expiredData?.domains) {
-          console.log("Domínios expirados:", expiredData.domains);
-          setExpiredDomains(expiredData.domains.length);
-        } else {
-          console.error("Erro ao carregar domínios expirados:", expiredError);
-        }
-      } catch (expiredErr) {
-        console.error("Error loading expired domains:", expiredErr);
-      }
+      const { count: expiringCount } = await supabase
+        .from("domains")
+        .select("*", { count: "exact", head: true })
+        .gte("expiration_date", now.toISOString())
+        .lte("expiration_date", thirtyDaysFromNow.toISOString());
+      setExpiringDomains(expiringCount || 0);
 
-      // Load expiring domains from Namecheap API
-      try {
-        const { data: expiringData, error: expiringError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "EXPIRING" },
-        });
+      const { count: criticalCount } = await supabase
+        .from("domains")
+        .select("*", { count: "exact", head: true })
+        .gte("expiration_date", now.toISOString())
+        .lte("expiration_date", fifteenDaysFromNow.toISOString());
+      setCriticalDomains(criticalCount || 0);
 
-        if (!expiringError && expiringData?.domains) {
-          console.log("Domínios expirando:", expiringData.domains);
-          setExpiringDomains(expiringData.domains.length);
+      const { count: suspendedCount } = await supabase
+        .from("domains")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "suspended");
+      setSuspendedDomains(suspendedCount || 0);
 
-          // Filter critical domains (expiring in 15 days)
-          const now = new Date();
-          const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
-
-          const critical = expiringData.domains.filter((d: any) => {
-            const expDate = new Date(d.expirationDate);
-            return expDate <= fifteenDaysFromNow;
-          });
-
-          console.log("Domínios críticos (15 dias):", critical);
-          setCriticalDomains(critical.length);
-        } else {
-          console.error("Erro ao carregar domínios expirando:", expiringError);
-        }
-      } catch (expiringErr) {
-        console.error("Error loading expiring domains:", expiringErr);
-      }
-
-      // Load suspended domains from Namecheap API (they might be in the all domains list)
-      try {
-        const { data: allDomainsData, error: allDomainsError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list" },
-        });
-
-        if (!allDomainsError && allDomainsData?.domains) {
-          // Namecheap doesn't have a direct "suspended" status
-          // We need to check the domains in the database that have suspended status
-          const suspendedCount = domainsData?.filter((d) => d.status === "suspended").length || 0;
-          console.log("Domínios suspensos:", suspendedCount);
-          setSuspendedDomains(suspendedCount);
-        }
-      } catch (suspendedErr) {
-        console.error("Error loading suspended domains:", suspendedErr);
-        // Fallback to database count
-        const suspendedCount = domainsData?.filter((d) => d.status === "suspended").length || 0;
-        setSuspendedDomains(suspendedCount);
-      }
-
-      // Load alert domains from Namecheap API
-      try {
-        const { data: alertData, error: alertError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "ALERT" },
-        });
-
-        if (!alertError && alertData?.domains) {
-          console.log("Domínios com alerta:", alertData.domains);
-          setAlertDomains(alertData.domains.length);
-        } else {
-          console.error("Erro ao carregar domínios com alerta:", alertError);
-        }
-      } catch (alertErr) {
-        console.error("Error loading alert domains:", alertErr);
-      }
-
-      // CORREÇÃO 3: Verificar status das integrações de forma correta
-      const integrationsStatus = await checkIntegrationsStatus();
-      setIntegrationStatus(integrationsStatus);
+      const totalAlerts = (expiredCount || 0) + (criticalCount || 0) + (suspendedCount || 0);
+      setAlertDomains(totalAlerts);
     } catch (error: any) {
-      console.error("Dashboard load error:", error);
       toast.error("Erro ao carregar dados do dashboard");
+      console.error("Dashboard error:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const pieData = [
-    { name: "Ativos", value: stats.active, color: "#22c55e" },
-    { name: "Expirando", value: stats.expiring, color: "#eab308" },
+    { name: "Ativos", value: stats.active, color: "#10b981" },
+    { name: "Expirando", value: stats.expiring, color: "#f59e0b" },
     { name: "Expirados", value: stats.expired, color: "#ef4444" },
-    { name: "Suspensos", value: stats.suspended, color: "#f97316" },
+    { name: "Suspensos", value: stats.suspended, color: "#8b5cf6" },
   ];
 
   const barData = [
-    { name: "Atomicat", dominios: domains?.filter((d) => d.platform === "atomicat").length || 0 },
-    { name: "Wordpress", dominios: domains?.filter((d) => d.platform === "wordpress").length || 0 },
+    { name: "Namecheap", dominios: integrations.namecheap },
+    { name: "Cloudflare", dominios: integrations.cloudflare },
+    { name: "cPanel", dominios: integrations.cpanel },
   ];
 
   if (loading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Alerta de Domínios Críticos */}
-      <CriticalDomainsAlert suspendedCount={stats.suspended} expiredCount={stats.expired} />
-
+    <div className="space-y-8 p-8">
       <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold">Olá{firstName ? `, ${firstName}` : ""}!</h1>
-          <p className="text-muted-foreground mt-2">Visão completa de todos os seus domínios</p>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{firstName ? `Olá, ${firstName}!` : "Dashboard"}</h1>
+          <p className="text-muted-foreground">Visão geral dos seus domínios e integrações</p>
         </div>
+        <Button onClick={loadDashboardData} variant="outline">
+          Atualizar Dados
+        </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      {alertDomains > 0 && <CriticalDomainsAlert count={alertDomains} />}
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Domínios</CardTitle>
             <Globe className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">{stats.active} ativos</p>
+            <p className="text-xs text-muted-foreground">Todos os domínios cadastrados</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Expirados</CardTitle>
-            <XCircle className="h-4 w-4 text-destructive" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Domínios Ativos</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.expired}</div>
-            <p className="text-xs text-muted-foreground mt-1">Domínios expirados</p>
+            <div className="text-2xl font-bold text-green-500">{stats.active}</div>
+            <p className="text-xs text-muted-foreground">Operacionais e validados</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Expirando em Breve</CardTitle>
-            <Clock className="h-4 w-4 text-warning" />
+            <Clock className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.expiring}</div>
-            <p className="text-xs text-muted-foreground mt-1">Próximos 30 dias</p>
+            <div className="text-2xl font-bold text-amber-500">{stats.expiring}</div>
+            <p className="text-xs text-muted-foreground">Próximos 30 dias</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Críticos</CardTitle>
-            <AlertCircle className="h-4 w-4 text-destructive" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Visitas Totais</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.critical}</div>
-            <p className="text-xs text-muted-foreground mt-1">Próximos 15 dias</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Suspensos</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.suspended}</div>
-            <p className="text-xs text-muted-foreground mt-1">Verificar pendências</p>
+            <div className="text-2xl font-bold">{totalVisits.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">No ano atual</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Integration Status */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -487,8 +413,6 @@ export default function Dashboard() {
                   )}
                   <div>
                     <p className="text-sm font-medium">cPanel</p>
-                    {/* LINHA REMOVIDA ABAIXO */}
-                    {/* <p className="text-xs text-muted-foreground">{integrations.cpanel} domínios</p> */}
                   </div>
                 </div>
                 <Badge variant={integrationStatus.cpanel ? "default" : "destructive"}>
@@ -505,8 +429,6 @@ export default function Dashboard() {
                   )}
                   <div>
                     <p className="text-sm font-medium">Cloudflare</p>
-                    {/* LINHA REMOVIDA ABAIXO */}
-                    {/* <p className="text-xs text-muted-foreground">{integrations.cloudflare} zonas</p> */}
                   </div>
                 </div>
                 <Badge variant={integrationStatus.cloudflare ? "default" : "destructive"}>
@@ -517,7 +439,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Namecheap Balance */}
         <Card className="shadow-md border-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -574,12 +495,10 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Critical Domains Management Table */}
       <div data-critical-domains-table className="critical-domains-table scroll-mt-4">
         <CriticalDomainsTable domains={domains} onDomainsChange={loadDashboardData} />
       </div>
 
-      {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -632,7 +551,6 @@ export default function Dashboard() {
                 <XAxis dataKey="mes" />
                 <YAxis
                   tickFormatter={(value) => {
-                    // Formatar números grandes de forma legível
                     if (value >= 1000000) {
                       return `${(value / 1000000).toFixed(1)}M`;
                     } else if (value >= 1000) {
