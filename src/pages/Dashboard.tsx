@@ -244,11 +244,8 @@ export default function Dashboard() {
       // [INÍCIO DA LÓGICA IMPLEMENTADA]
       // Aciona o webhook do n8n para atualizar o saldo da Namecheap em tempo real
       try {
-        // Dispara a requisição para o webhook e aguarda a conclusão (await).
-        // Isso assume que seu webhook do n8n aguarda a automação terminar
-        // antes de retornar uma resposta.
-        await fetch("https://webhook.institutoexperience.com/webhook/c7e64a34-5304-46fe-940f-0028ce48d81b", {
-          method: "POST", // Webhooks geralmente usam POST
+        await fetch("https://domainhub-backend.onrender.com/api/balance/sync", {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ source: "dashboard_reload" }), // Corpo opcional
         });
