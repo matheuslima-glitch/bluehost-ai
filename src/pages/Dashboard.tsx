@@ -193,57 +193,43 @@ export default function Dashboard() {
         const totalVisitsFromDB = Number(analyticsGeralData.annual_visits) || 0;
         setTotalVisits(totalVisitsFromDB);
 
-        const monthsMapping: { [key: string]: string } = {
-          jan: "Jan",
-          feb: "Fev",
-          mar: "Mar",
-          apr: "Abr",
-          may: "Mai",
-          jun: "Jun",
-          jul: "Jul",
-          aug: "Ago",
-          sep: "Set",
-          oct: "Out",
-          nov: "Nov",
-          dec: "Dez",
-        };
+        const currentMonth = new Date().getMonth();
+        const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+        const monthKeys = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
-        const monthlyData = [];
-        const currentDate = new Date();
-        const currentMonth = currentDate.getMonth();
-        const currentYear = currentDate.getFullYear();
+        const last12Months = [];
 
         for (let i = 11; i >= 0; i--) {
-          const targetDate = new Date(currentYear, currentMonth - i, 1);
-          const monthIndex = targetDate.getMonth();
-          const year = targetDate.getFullYear();
-          const isCurrentYear = year === currentYear;
+          const monthIndex = (currentMonth - i + 12) % 12;
+          const monthKey = monthKeys[monthIndex];
+          const monthName = monthNames[monthIndex];
 
-          const monthKey = Object.keys(monthsMapping)[monthIndex];
-          const suffix = isCurrentYear ? "_cy" : "_py";
-          const columnName = `${monthKey}${suffix}`;
+          const isPreviousYear = i > currentMonth;
+          const suffix = isPreviousYear ? "_py" : "_cy";
+          const fieldName = `${monthKey}${suffix}`;
 
-          const visits = Number(analyticsGeralData[columnName]) || 0;
+          const visits = Number(analyticsGeralData[fieldName]) || 0;
 
-          monthlyData.push({
-            mes: `${monthsMapping[monthKey]}/${year.toString().slice(-2)}`,
+          last12Months.push({
+            mes: monthName,
             visitas: visits,
           });
         }
 
-        setMonthlyVisitsData(monthlyData);
+        setMonthlyVisitsData(last12Months);
+      } else {
+        setTotalVisits(0);
+        setMonthlyVisitsData([]);
       }
 
-      const statusCheck = await checkIntegrationsStatus();
-      setIntegrationStatus(statusCheck);
-
-      try { //**BUSCAR O SALDO**//
+      try {
         await fetch("https://domainhub-backend.onrender.com/api/balance/sync", {
-          method: "POST"
+          method: "POST",
           headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source: "dashboard_reload" }),
         });
       } catch (webhookError: any) {
-        console.warn("Aviso: Falha ao atualizar saldo.", webhookError.message);
+        console.warn("Aviso: O webhook de atualização de saldo do n8n falhou.", webhookError.message);
         toast.warning("Não foi possível atualizar o saldo em tempo real. Carregando último valor salvo.");
       }
 
@@ -261,119 +247,168 @@ export default function Dashboard() {
         });
       }
 
-      const { count: expiredCount } = await supabase
-        .from("domains")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "expired");
-      setExpiredDomains(expiredCount || 0);
+      try {
+        const { data: expiredData, error: expiredError } = await supabase.functions.invoke("namecheap-domains", {
+          body: { action: "list_domains", listType: "EXPIRED" },
+        });
 
-      const { count: expiringCount } = await supabase
-        .from("domains")
-        .select("*", { count: "exact", head: true })
-        .gte("expiration_date", now.toISOString())
-        .lte("expiration_date", thirtyDaysFromNow.toISOString());
-      setExpiringDomains(expiringCount || 0);
+        if (!expiredError && expiredData?.domains) {
+          console.log("Domínios expirados:", expiredData.domains);
+          setExpiredDomains(expiredData.domains.length);
+        } else {
+          console.error("Erro ao carregar domínios expirados:", expiredError);
+        }
+      } catch (expiredErr) {
+        console.error("Error loading expired domains:", expiredErr);
+      }
 
-      const { count: criticalCount } = await supabase
-        .from("domains")
-        .select("*", { count: "exact", head: true })
-        .gte("expiration_date", now.toISOString())
-        .lte("expiration_date", fifteenDaysFromNow.toISOString());
-      setCriticalDomains(criticalCount || 0);
+      try {
+        const { data: expiringData, error: expiringError } = await supabase.functions.invoke("namecheap-domains", {
+          body: { action: "list_domains", listType: "EXPIRING" },
+        });
 
-      const { count: suspendedCount } = await supabase
-        .from("domains")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "suspended");
-      setSuspendedDomains(suspendedCount || 0);
+        if (!expiringError && expiringData?.domains) {
+          console.log("Domínios expirando:", expiringData.domains);
+          setExpiringDomains(expiringData.domains.length);
 
-      const totalAlerts = (expiredCount || 0) + (criticalCount || 0) + (suspendedCount || 0);
-      setAlertDomains(totalAlerts);
+          const now = new Date();
+          const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+
+          const critical = expiringData.domains.filter((d: any) => {
+            const expDate = new Date(d.expirationDate);
+            return expDate <= fifteenDaysFromNow;
+          });
+
+          console.log("Domínios críticos (15 dias):", critical);
+          setCriticalDomains(critical.length);
+        } else {
+          console.error("Erro ao carregar domínios expirando:", expiringError);
+        }
+      } catch (expiringErr) {
+        console.error("Error loading expiring domains:", expiringErr);
+      }
+
+      try {
+        const { data: allDomainsData, error: allDomainsError } = await supabase.functions.invoke("namecheap-domains", {
+          body: { action: "list" },
+        });
+
+        if (!allDomainsError && allDomainsData?.domains) {
+          const suspendedCount = domainsData?.filter((d) => d.status === "suspended").length || 0;
+          console.log("Domínios suspensos:", suspendedCount);
+          setSuspendedDomains(suspendedCount);
+        }
+      } catch (suspendedErr) {
+        console.error("Error loading suspended domains:", suspendedErr);
+        const suspendedCount = domainsData?.filter((d) => d.status === "suspended").length || 0;
+        setSuspendedDomains(suspendedCount);
+      }
+
+      try {
+        const { data: alertData, error: alertError } = await supabase.functions.invoke("namecheap-domains", {
+          body: { action: "list_domains", listType: "ALERT" },
+        });
+
+        if (!alertError && alertData?.domains) {
+          console.log("Domínios com alerta:", alertData.domains);
+          setAlertDomains(alertData.domains.length);
+        } else {
+          console.error("Erro ao carregar domínios com alerta:", alertError);
+        }
+      } catch (alertErr) {
+        console.error("Error loading alert domains:", alertErr);
+      }
+
+      const integrationsStatus = await checkIntegrationsStatus();
+      setIntegrationStatus(integrationsStatus);
     } catch (error: any) {
+      console.error("Dashboard load error:", error);
       toast.error("Erro ao carregar dados do dashboard");
-      console.error("Dashboard error:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const pieData = [
-    { name: "Ativos", value: stats.active, color: "#10b981" },
-    { name: "Expirando", value: stats.expiring, color: "#f59e0b" },
+    { name: "Ativos", value: stats.active, color: "#22c55e" },
+    { name: "Expirando", value: stats.expiring, color: "#eab308" },
     { name: "Expirados", value: stats.expired, color: "#ef4444" },
-    { name: "Suspensos", value: stats.suspended, color: "#8b5cf6" },
+    { name: "Suspensos", value: stats.suspended, color: "#f97316" },
   ];
 
   const barData = [
-    { name: "Namecheap", dominios: integrations.namecheap },
-    { name: "Cloudflare", dominios: integrations.cloudflare },
-    { name: "cPanel", dominios: integrations.cpanel },
+    { name: "Atomicat", dominios: domains?.filter((d) => d.platform === "atomicat").length || 0 },
+    { name: "Wordpress", dominios: domains?.filter((d) => d.platform === "wordpress").length || 0 },
   ];
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
-    <div className="space-y-8 p-8">
+    <div className="space-y-6">
+      <CriticalDomainsAlert suspendedCount={stats.suspended} expiredCount={stats.expired} />
+
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{firstName ? `Olá, ${firstName}!` : "Dashboard"}</h1>
-          <p className="text-muted-foreground">Visão geral dos seus domínios e integrações</p>
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold">Olá{firstName ? `, ${firstName}` : ""}!</h1>
+          <p className="text-muted-foreground mt-2">Visão completa de todos os seus domínios</p>
         </div>
-        <Button onClick={loadDashboardData} variant="outline">
-          Atualizar Dados
-        </Button>
       </div>
 
-      {alertDomains > 0 && <CriticalDomainsAlert count={alertDomains} />}
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total de Domínios</CardTitle>
             <Globe className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">Todos os domínios cadastrados</p>
+            <p className="text-xs text-muted-foreground mt-1">{stats.active} ativos</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Domínios Ativos</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Expirados</CardTitle>
+            <XCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">{stats.active}</div>
-            <p className="text-xs text-muted-foreground">Operacionais e validados</p>
+            <div className="text-2xl font-bold">{stats.expired}</div>
+            <p className="text-xs text-muted-foreground mt-1">Domínios expirados</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Expirando em Breve</CardTitle>
-            <Clock className="h-4 w-4 text-amber-500" />
+            <Clock className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-500">{stats.expiring}</div>
-            <p className="text-xs text-muted-foreground">Próximos 30 dias</p>
+            <div className="text-2xl font-bold">{stats.expiring}</div>
+            <p className="text-xs text-muted-foreground mt-1">Próximos 30 dias</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Visitas Totais</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Críticos</CardTitle>
+            <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalVisits.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">No ano atual</p>
+            <div className="text-2xl font-bold">{stats.critical}</div>
+            <p className="text-xs text-muted-foreground mt-1">Próximos 15 dias</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Suspensos</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-warning" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.suspended}</div>
+            <p className="text-xs text-muted-foreground mt-1">Verificar pendências</p>
           </CardContent>
         </Card>
       </div>
