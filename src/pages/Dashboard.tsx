@@ -470,7 +470,12 @@ export default function Dashboard() {
                     <XCircle className="h-5 w-5 text-red-500" />
                   )}
                   <div>
-                    <p className="text-sm font-medium">Namecheap</p>
+                    <p
+                      className="text-sm font-medium cursor-pointer"
+                      onClick={() => window.open("https://www.namecheap.com/myaccount/login/?ReturnUrl=%2f", "_blank")}
+                    >
+                      Namecheap
+                    </p>
                   </div>
                 </div>
                 <Badge variant={integrationStatus.namecheap ? "default" : "destructive"}>
@@ -486,7 +491,12 @@ export default function Dashboard() {
                     <XCircle className="h-5 w-5 text-red-500" />
                   )}
                   <div>
-                    <p className="text-sm font-medium">cPanel</p>
+                    <p
+                      className="text-sm font-medium cursor-pointer"
+                      onClick={() => window.open("https://nexus.servidor.net.br:2083/", "_blank")}
+                    >
+                      cPanel
+                    </p>
                     {/* LINHA REMOVIDA ABAIXO */}
                     {/* <p className="text-xs text-muted-foreground">{integrations.cpanel} domínios</p> */}
                   </div>
@@ -504,7 +514,12 @@ export default function Dashboard() {
                     <XCircle className="h-5 w-5 text-red-500" />
                   )}
                   <div>
-                    <p className="text-sm font-medium">Cloudflare</p>
+                    <p
+                      className="text-sm font-medium cursor-pointer"
+                      onClick={() => window.open("https://dash.cloudflare.com/login", "_blank")}
+                    >
+                      Cloudflare
+                    </p>
                     {/* LINHA REMOVIDA ABAIXO */}
                     {/* <p className="text-xs text-muted-foreground">{integrations.cloudflare} zonas</p> */}
                   </div>
