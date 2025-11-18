@@ -336,6 +336,7 @@ export default function DomainManagement() {
                     <SelectItem value="active">Ativo</SelectItem>
                     <SelectItem value="expired">Expirado</SelectItem>
                     <SelectItem value="suspended">Suspenso</SelectItem>
+                    <SelectItem value="deactivated">Desativado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -529,7 +530,9 @@ export default function DomainManagement() {
                     <TableRow key={domain.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
+                          <Globe
+                            className={`h-4 w-4 ${domain.status?.toLowerCase() === "deactivated" ? "text-muted-foreground" : "text-blue-500"}`}
+                          />
                           {domain.domain_name}
                         </div>
                       </TableCell>
