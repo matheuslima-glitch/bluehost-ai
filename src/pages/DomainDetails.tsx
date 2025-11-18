@@ -513,9 +513,13 @@ export default function DomainDetails() {
       expired: { label: "Expirado", className: "bg-red-500 hover:bg-red-600 text-white" },
       pending: { label: "Pendente", className: "bg-blue-500 hover:bg-blue-600 text-white" },
       suspended: { label: "Suspenso", className: "bg-yellow-500 hover:bg-yellow-600 text-white" },
+      desativo: {
+        label: "Desativado",
+        className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700",
+      },
     };
 
-    const config = statusConfig[status] || statusConfig.active;
+    const config = statusConfig[status.toLowerCase()] || statusConfig.active;
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
