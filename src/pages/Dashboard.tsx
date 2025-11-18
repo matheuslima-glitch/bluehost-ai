@@ -209,6 +209,7 @@ export default function Dashboard() {
 
         // Gerar dados dos últimos 12 meses (mix de _py e _cy)
         const currentMonth = new Date().getMonth(); // 0-11
+        const currentYear = new Date().getFullYear();
         const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
         const monthKeys = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
@@ -225,11 +226,15 @@ export default function Dashboard() {
           const suffix = isPreviousYear ? "_py" : "_cy";
           const fieldName = `${monthKey}${suffix}`;
 
+          // Calcular o ano correto para exibição
+          const displayYear = isPreviousYear ? currentYear - 1 : currentYear;
+          const yearShort = displayYear.toString().slice(-2);
+
           // Pegar valor JÁ SOMADO de analytics_geral
           const visits = Number(analyticsGeralData[fieldName]) || 0;
 
           last12Months.push({
-            mes: monthName,
+            mes: `${monthName}/${yearShort}`,
             visitas: visits,
           });
         }
