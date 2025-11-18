@@ -267,13 +267,13 @@ export default function DomainManagement() {
       expired: { label: "Expirado", variant: "destructive" },
       pending: { label: "Pendente", variant: "secondary" },
       suspended: { label: "Suspenso", variant: "warning" },
-      desativo: { label: "Desativado", variant: "secondary" },
+      deactivated: { label: "Desativado", variant: "secondary" },
     };
 
     const config = variants[status.toLowerCase()] || variants.active;
 
     // Se for desativado, usar classe customizada com cinza
-    if (status.toLowerCase() === "desativo") {
+    if (status.toLowerCase() === "deactivated") {
       return <Badge className="bg-gray-400 dark:bg-gray-600">Desativado</Badge>;
     }
 
