@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Trash2, AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, Mail, Link as LinkIcon } from "lucide-react";
+import { Power, AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, Mail, Link as LinkIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -118,6 +118,9 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const criticalDomains = domains.filter((d) => {
     const statusLower = d.status?.toLowerCase() || "";
 
+    // Excluir domínios desligados
+    if (statusLower === "desligado" || statusLower === "disabled" || statusLower === "inactive") return false;
+
     // Incluir expirados e suspensos
     if (statusLower === "expired" || statusLower === "suspended" || statusLower === "suspend") return true;
 
@@ -167,6 +170,11 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const getStatusBadge = (domain: any) => {
     const hasAlert = domain.has_alert;
     const statusLower = domain.status?.toLowerCase() || "";
+
+    // 0. DESLIGADO
+    if (statusLower === "desligado" || statusLower === "disabled" || statusLower === "inactive") {
+      return <Badge className="bg-gray-400 dark:bg-gray-600">Desligado</Badge>;
+    }
 
     // 1. SUSPENSO - Prioridade máxima
     if (statusLower === "suspended" || statusLower === "suspend") {
@@ -233,17 +241,17 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     if (!domainToDelete) return;
 
     try {
-      const { error } = await supabase.from("domains").delete().eq("id", domainToDelete.id);
+      const { error } = await supabase.from("domains").update({ status: "desligado" }).eq("id", domainToDelete.id);
 
       if (error) throw error;
 
-      toast.success("Domínio excluído com sucesso!");
+      toast.success("Domínio desativado com sucesso!");
       setDeleteDialogOpen(false);
       setDomainToDelete(null);
       onDomainsChange();
     } catch (error: any) {
-      console.error("Erro ao excluir domínio:", error);
-      toast.error("Erro ao excluir domínio");
+      console.error("Erro ao desativar domínio:", error);
+      toast.error("Erro ao desativar domínio");
     }
   };
 
@@ -313,12 +321,12 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                             </Button>
                           )}
                           <Button
-                            variant="destructive"
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteClick(domain)}
-                            className="h-8 w-8 p-0"
+                            className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Power className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -366,23 +374,20 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
             <AlertDialogDescription className="space-y-3 text-base">
               <p className="font-semibold">Atenção! Esta ação é irreversível.</p>
               <p>
-                Você está prestes a excluir o domínio <strong>{domainToDelete?.domain_name}</strong> da sua tabela de
+                Você está prestes a desativar o domínio <strong>{domainToDelete?.domain_name}</strong> da sua tabela de
                 gerenciamento.
               </p>
               <p>
-                O domínio será removido apenas do banco de dados interno mas continuará registrado normalmente no
-                provedor da Namecheap até que seja expirado ou renovado diretamente por lá.
+                O domínio será marcado como desligado apenas no banco de dados interno mas continuará registrado
+                normalmente no provedor da Namecheap até que seja expirado ou renovado diretamente por lá.
               </p>
-              <p className="font-semibold">Deseja realmente prosseguir com a exclusão?</p>
+              <p className="font-semibold">Deseja prosseguir com a desativação?</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-blue-500 text-white hover:bg-blue-600">
+              Desativar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

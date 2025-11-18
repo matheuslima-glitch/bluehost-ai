@@ -267,9 +267,22 @@ export default function DomainManagement() {
       expired: { label: "Expirado", variant: "destructive" },
       pending: { label: "Pendente", variant: "secondary" },
       suspended: { label: "Suspenso", variant: "warning" },
+      desligado: { label: "Desligado", variant: "secondary" },
+      disabled: { label: "Desligado", variant: "secondary" },
+      inactive: { label: "Desligado", variant: "secondary" },
     };
 
-    const config = variants[status] || variants.active;
+    const config = variants[status.toLowerCase()] || variants.active;
+
+    // Se for desligado, usar classe customizada com cinza
+    if (
+      status.toLowerCase() === "desligado" ||
+      status.toLowerCase() === "disabled" ||
+      status.toLowerCase() === "inactive"
+    ) {
+      return <Badge className="bg-gray-400 dark:bg-gray-600">{config.label}</Badge>;
+    }
+
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
