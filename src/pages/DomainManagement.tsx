@@ -168,11 +168,19 @@ export default function DomainManagement() {
     }
 
     if (filters.platform) {
-      filtered = filtered.filter((d) => d.platform === filters.platform);
+      if (filters.platform === "empty") {
+        filtered = filtered.filter((d) => d.platform === null);
+      } else {
+        filtered = filtered.filter((d) => d.platform === filters.platform);
+      }
     }
 
     if (filters.traffic_source) {
-      filtered = filtered.filter((d) => d.traffic_source === filters.traffic_source);
+      if (filters.traffic_source === "empty") {
+        filtered = filtered.filter((d) => d.traffic_source === null);
+      } else {
+        filtered = filtered.filter((d) => d.traffic_source === filters.traffic_source);
+      }
     }
 
     if (filters.purchase_date_start) {
@@ -336,6 +344,7 @@ export default function DomainManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="empty">Vazias</SelectItem>
                     {platformOptions.map((platform) => (
                       <SelectItem key={platform} value={platform}>
                         {platform.charAt(0).toUpperCase() + platform.slice(1)}
@@ -356,6 +365,7 @@ export default function DomainManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="empty">Vazias</SelectItem>
                     {trafficSourceOptions.map((source) => (
                       <SelectItem key={source} value={source}>
                         {source.charAt(0).toUpperCase() + source.slice(1)}
