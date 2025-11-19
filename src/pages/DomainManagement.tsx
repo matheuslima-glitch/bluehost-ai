@@ -531,7 +531,16 @@ export default function DomainManagement() {
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <Globe
-                            className={`h-4 w-4 ${domain.status?.toLowerCase() === "deactivated" ? "text-muted-foreground" : "text-blue-500"}`}
+                            className={`h-4 w-4 ${
+                              ["deactivated", "suspended", "expired"].includes(domain.status?.toLowerCase())
+                                ? "text-muted-foreground"
+                                : ""
+                            }`}
+                            style={
+                              !["deactivated", "suspended", "expired"].includes(domain.status?.toLowerCase())
+                                ? { color: "rgb(8, 34, 255)" }
+                                : {}
+                            }
                           />
                           {domain.domain_name}
                         </div>
