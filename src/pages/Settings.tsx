@@ -433,8 +433,8 @@ export default function Settings() {
 
           <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <p className="text-sm text-blue-900 dark:text-blue-100">
-              <strong>💡 Dica:</strong> Escolha um som que chame sua atenção imediatamente. Este alerta será reproduzido
-              toda vez que você acessar o dashboard e houver domínios suspensos ou expirados.
+              <strong>💡 Dica:</strong> Escolha um som que chame sua atenção imediatamente. Ele será reproduzido toda
+              vez que o alerta aparecer e houver domínios suspensos ou expirados na tabela de domínios críticos.
             </p>
           </div>
 
