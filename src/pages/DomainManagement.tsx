@@ -545,7 +545,9 @@ export default function DomainManagement() {
                           {domain.domain_name}
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(domain.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-center">{getStatusBadge(domain.status)}</div>
+                      </TableCell>
                       <TableCell className="text-center">
                         {domain.platform ? (
                           <div className="flex items-center justify-center">
