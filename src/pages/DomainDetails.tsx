@@ -422,7 +422,7 @@ export default function DomainDetails() {
     onSuccess: () => {
       loadDomain();
       toast.success("Nameservers atualizados com sucesso!");
-      toast.info("⏰ A mudança de nameservers pode levar até 48 horas para propagar completamente.", {
+      toast.info("A mudança de nameservers pode levar até 48 horas para propagar completamente.", {
         duration: 6000,
       });
       setIsEditingNameservers(false);
