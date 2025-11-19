@@ -558,22 +558,11 @@ export default function DomainDetails() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; className: string }> = {
-      active: { label: "Ativo", className: "bg-green-500 hover:bg-green-600 text-white" },
-      expired: { label: "Expirado", className: "bg-red-500 hover:bg-red-600 text-white" },
-      pending: { label: "Pendente", className: "bg-blue-500 hover:bg-blue-600 text-white" },
-      suspended: { label: "Suspenso", className: "bg-yellow-500 hover:bg-yellow-600 text-white" },
-      desligado: {
-        label: "Desligado",
-        className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700",
-      },
-      disabled: {
-        label: "Desligado",
-        className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700",
-      },
-      inactive: {
-        label: "Desligado",
-        className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700",
-      },
+      active: { label: "Ativo", className: "bg-green-500 text-white" },
+      expired: { label: "Expirado", className: "bg-red-500 text-white" },
+      pending: { label: "Pendente", className: "bg-blue-500 text-white" },
+      suspended: { label: "Suspenso", className: "bg-yellow-500 text-white" },
+      deactivated: { label: "Desativado", className: "bg-gray-400 text-white dark:bg-gray-600" },
     };
 
     const config = statusConfig[status.toLowerCase()] || statusConfig.active;
@@ -687,9 +676,7 @@ export default function DomainDetails() {
               <div className="space-y-2">
                 <Label>Status do Domínio</Label>
                 <div
-                  className={
-                    domain.manually_deactivated ? "" : "cursor-pointer hover:opacity-80 transition-opacity inline-block"
-                  }
+                  className={domain.manually_deactivated ? "" : "cursor-pointer hover:opacity-80 transition-opacity"}
                   onClick={() => {
                     if (!domain.manually_deactivated) {
                       setDeactivateDialogOpen(true);
