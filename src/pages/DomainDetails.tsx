@@ -39,6 +39,7 @@ import {
   Edit2,
   Info,
   AlertTriangle,
+  Lock,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -684,15 +685,16 @@ export default function DomainDetails() {
                   }}
                   title={
                     domain.manually_deactivated
-                      ? "Status bloqueado - Domínio desativado permanentemente"
+                      ? "Domínio Desativado Permanentemente"
                       : "Clique para desativar o domínio"
                   }
                 >
                   {getStatusBadge(domain.status)}
                 </div>
                 {domain.manually_deactivated && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    🔒 Status bloqueado - Domínio desativado permanentemente
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    <Lock className="h-3 w-3 text-gray-500" />
+                    Domínio Desativado Permanentemente
                   </p>
                 )}
               </div>
