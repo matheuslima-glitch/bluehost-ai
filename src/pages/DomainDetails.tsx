@@ -439,6 +439,8 @@ export default function DomainDetails() {
     if (!domain) return;
 
     try {
+      const oldStatus = domain.status;
+
       const { error } = await supabase
         .from("domains")
         .update({
@@ -452,6 +454,9 @@ export default function DomainDetails() {
       // Atualizar o estado local
       setDomain({ ...domain, status: "deactivated", manually_deactivated: true });
       setDeactivateDialogOpen(false);
+
+      // Log da atividade
+      await logActivity("status_changed", oldStatus, "deactivated");
 
       toast.success("Domínio desativado com sucesso!");
     } catch (error: any) {
