@@ -15,8 +15,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, X, Plus, Trash2, Edit2, Info } from "lucide-react";
+import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, X, Plus, Trash2, Edit2, Info, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, subMonths } from "date-fns";
@@ -39,6 +49,7 @@ interface Domain {
   funnel_id: string | null;
   zone_id: string | null;
   nameservers: string[] | null;
+  manually_deactivated?: boolean | null;
 }
 
 interface ActivityLog {
@@ -74,6 +85,7 @@ export default function DomainDetails() {
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<any[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
 
   // Fetch custom filters from database
   const { data: customFilters = [] } = useQuery({
@@ -409,6 +421,30 @@ export default function DomainDetails() {
     updateNameservers.mutate(nameservers);
   };
 
+  const handleDeactivateDomain = async () => {
+    if (!domain) return;
+
+    try {
+      const { error } = await supabase
+        .from("domains")
+        .update({ 
+          status: "deactivated",
+          manually_deactivated: true 
+        })
+        .eq("id", domain.id);
+
+      if (error) throw error;
+
+      // Atualizar o estado local
+      setDomain({ ...domain, status: "deactivated", manually_deactivated: true });
+      setDeactivateDialogOpen(false);
+      
+      toast.success("Domínio desativado com sucesso!");
+    } catch (error: any) {
+      toast.error("Erro ao desativar domínio: " + error.message);
+    }
+  };
+
   const fetchNamecheapInfo = async () => {
     if (!domain) return;
 
@@ -513,10 +549,9 @@ export default function DomainDetails() {
       expired: { label: "Expirado", className: "bg-red-500 hover:bg-red-600 text-white" },
       pending: { label: "Pendente", className: "bg-blue-500 hover:bg-blue-600 text-white" },
       suspended: { label: "Suspenso", className: "bg-yellow-500 hover:bg-yellow-600 text-white" },
-      deactivated: {
-        label: "Desativado",
-        className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700",
-      },
+      desligado: { label: "Desligado", className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700" },
+      disabled: { label: "Desligado", className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700" },
+      inactive: { label: "Desligado", className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700" },
     };
 
     const config = statusConfig[status.toLowerCase()] || statusConfig.active;
@@ -628,7 +663,22 @@ export default function DomainDetails() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Status do Domínio</Label>
-              <div>{getStatusBadge(domain.status)}</div>
+              <div 
+                className={domain.manually_deactivated ? "" : "cursor-pointer hover:opacity-80 transition-opacity inline-block"}
+                onClick={() => {
+                  if (!domain.manually_deactivated) {
+                    setDeactivateDialogOpen(true);
+                  }
+                }}
+                title={domain.manually_deactivated ? "Status bloqueado - Domínio desativado permanentemente" : "Clique para desativar o domínio"}
+              >
+                {getStatusBadge(domain.status)}
+              </div>
+              {domain.manually_deactivated && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  🔒 Status bloqueado - Domínio desativado permanentemente
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1008,5 +1058,36 @@ export default function DomainDetails() {
         </Card>
       )}
     </div>
+
+    {/* AlertDialog de Desativação */}
+    <AlertDialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-500" />
+            Atenção!
+          </AlertDialogTitle>
+          <AlertDialogDescription className="space-y-3 text-base">
+            <p className="font-semibold">Essa ação é irreversível.</p>
+            <p>
+              Alterar o status do domínio <strong>{domain?.domain_name}</strong> para <strong>DESATIVADO</strong> fará com que ele seja removido/desativado permanentemente.
+            </p>
+            <p>
+              O domínio será marcado como desativado apenas no banco de dados interno mas continuará registrado normalmente no provedor da Namecheap até que seja expirado ou renovado diretamente por lá.
+            </p>
+            <p className="font-semibold text-red-600">Tem certeza de que deseja continuar?</p>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDeactivateDomain}
+            className="bg-red-500 text-white hover:bg-red-600"
+          >
+            Sim, Desativar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
