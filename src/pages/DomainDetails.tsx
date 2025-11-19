@@ -542,7 +542,7 @@ export default function DomainDetails() {
       console.log(`✅ ${dnsTypeLabel} configurado:`, data.data);
 
       toast.success(`${dnsTypeLabel} configurado com sucesso!`);
-      toast.info("⏰ A mudança de nameservers pode levar até 48 horas para propagar completamente.", {
+      toast.info("A mudança de nameservers pode levar até 48 horas para propagar completamente.", {
         duration: 6000,
       });
 
