@@ -68,162 +68,86 @@ export default function DomainManagement() {
     funnel_id: "",
   });
 
-  const ITEMS_PER_PAGE = 20;
-
-  // Fetch custom filters from database
-  const { data: customFilters = [] } = useQuery({
-    queryKey: ["custom-filters", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("custom_filters")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: false });
+  // fetchDomains function
+  const fetchDomains = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.from("domains").select("*").order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
-
-  // Combine default and custom filters
-  const platformOptions = [
-    "wordpress",
-    "atomicat",
-    ...customFilters.filter((f) => f.filter_type === "platform").map((f) => f.filter_value),
-  ];
-
-  const trafficSourceOptions = [
-    "facebook",
-    "google",
-    "native",
-    "outbrain",
-    "taboola",
-    "revcontent",
-    ...customFilters.filter((f) => f.filter_type === "traffic_source").map((f) => f.filter_value),
-  ];
-
-  useEffect(() => {
-    loadDomains();
-  }, []);
-
-  const loadDomains = async () => {
-    try {
-      setRefreshing(true);
-
-      // CORREÇÃO: Buscar TODOS os domínios usando paginação recursiva
-      const fetchAllDomains = async () => {
-        let allDomains: Domain[] = [];
-        let from = 0;
-        const pageSize = 1000;
-        let hasMore = true;
-
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from("domains")
-            .select("*")
-            .range(from, from + pageSize - 1)
-            .order("created_at", { ascending: false });
-
-          if (error) throw error;
-
-          if (data && data.length > 0) {
-            allDomains = [...allDomains, ...data];
-            from += pageSize;
-
-            // Se retornou menos que o pageSize, chegamos ao fim
-            if (data.length < pageSize) {
-              hasMore = false;
-            }
-          } else {
-            hasMore = false;
-          }
-        }
-
-        return allDomains;
-      };
-
-      const data = await fetchAllDomains();
       setDomains(data || []);
-      applyFilters(data || []);
+      setFilteredDomains(data || []);
     } catch (error: any) {
+      console.error("Error fetching domains:", error);
       toast.error("Erro ao carregar domínios");
-      console.error("Error loading domains:", error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  const applyFilters = (domainsToFilter: Domain[] = domains) => {
-    let filtered = [...domainsToFilter];
+  useEffect(() => {
+    if (user) {
+      fetchDomains();
+    }
+  }, [user]);
 
-    // Apply search filter
+  // Filter and search logic
+  useEffect(() => {
+    let result = [...domains];
+
+    // Apply search
     if (searchQuery) {
-      filtered = filtered.filter((d) => d.domain_name.toLowerCase().includes(searchQuery.toLowerCase()));
+      result = result.filter((domain) => domain.domain_name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
+    // Apply filters
     if (filters.status) {
-      filtered = filtered.filter((d) => d.status === filters.status);
+      result = result.filter((domain) => domain.status === filters.status);
     }
-
     if (filters.platform) {
-      if (filters.platform === "empty") {
-        filtered = filtered.filter((d) => d.platform === null);
-      } else {
-        filtered = filtered.filter((d) => d.platform === filters.platform);
-      }
+      result = result.filter((domain) => domain.platform === filters.platform);
     }
-
     if (filters.traffic_source) {
-      if (filters.traffic_source === "empty") {
-        filtered = filtered.filter((d) => d.traffic_source === null);
-      } else {
-        filtered = filtered.filter((d) => d.traffic_source === filters.traffic_source);
-      }
+      result = result.filter((domain) => domain.traffic_source === filters.traffic_source);
     }
-
-    if (filters.purchase_date_start) {
-      filtered = filtered.filter(
-        (d) => d.purchase_date && new Date(d.purchase_date) >= new Date(filters.purchase_date_start),
-      );
-    }
-
-    if (filters.purchase_date_end) {
-      filtered = filtered.filter(
-        (d) => d.purchase_date && new Date(d.purchase_date) <= new Date(filters.purchase_date_end),
-      );
-    }
-
     if (filters.funnel_id) {
-      filtered = filtered.filter((d) => d.funnel_id === filters.funnel_id);
+      result = result.filter((domain) => domain.funnel_id === filters.funnel_id);
+    }
+    if (filters.purchase_date_start) {
+      result = result.filter((domain) => domain.purchase_date && domain.purchase_date >= filters.purchase_date_start);
+    }
+    if (filters.purchase_date_end) {
+      result = result.filter((domain) => domain.purchase_date && domain.purchase_date <= filters.purchase_date_end);
     }
 
     // Apply sorting
     if (sortConfig) {
-      filtered.sort((a, b) => {
-        let aValue: any = a[sortConfig.key as keyof Domain];
-        let bValue: any = b[sortConfig.key as keyof Domain];
+      result.sort((a, b) => {
+        const aValue = a[sortConfig.key as keyof Domain];
+        const bValue = b[sortConfig.key as keyof Domain];
 
-        // Handle null values
         if (aValue === null) return 1;
         if (bValue === null) return -1;
 
-        // Sort by date
-        if (sortConfig.key === "expiration_date") {
-          aValue = new Date(aValue).getTime();
-          bValue = new Date(bValue).getTime();
+        if (aValue < bValue) {
+          return sortConfig.direction === "asc" ? -1 : 1;
         }
-
-        // Sort alphabetically or numerically
-        if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
+        if (aValue > bValue) {
+          return sortConfig.direction === "asc" ? 1 : -1;
+        }
         return 0;
       });
     }
 
-    setFilteredDomains(filtered);
+    setFilteredDomains(result);
     setCurrentPage(1);
+  }, [domains, searchQuery, filters, sortConfig]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchDomains();
+    setRefreshing(false);
+    toast.success("Domínios atualizados!");
   };
 
   const handleSort = (key: string) => {
@@ -234,12 +158,7 @@ export default function DomainManagement() {
     setSortConfig({ key, direction });
   };
 
-  const handleFilterChange = (key: keyof Filters, value: string) => {
-    const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
-  };
-
-  const clearFilters = () => {
+  const resetFilters = () => {
     setFilters({
       status: "",
       platform: "",
@@ -248,410 +167,327 @@ export default function DomainManagement() {
       purchase_date_end: "",
       funnel_id: "",
     });
-    setFilteredDomains(domains);
-    setCurrentPage(1);
+    setSearchQuery("");
   };
 
-  useEffect(() => {
-    applyFilters();
-  }, [filters, domains, searchQuery, sortConfig]);
-
-  const totalPages = Math.ceil(filteredDomains.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
+  // Pagination
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredDomains.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
   const currentDomains = filteredDomains.slice(startIndex, endIndex);
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; className: string }> = {
-      active: { label: "Ativo", className: "bg-green-500 text-white hover:bg-green-600 transition-colors" },
-      expired: { label: "Expirado", className: "bg-red-500 text-white hover:bg-red-600 transition-colors" },
-      pending: { label: "Pendente", className: "bg-blue-500 text-white hover:bg-blue-600 transition-colors" },
-      suspended: { label: "Suspenso", className: "bg-orange-500 text-white hover:bg-orange-600 transition-colors" },
-      deactivated: { label: "Desativado", className: "bg-gray-400 text-white dark:bg-gray-600" },
-    };
-
-    const config = statusConfig[status.toLowerCase()] || statusConfig.active;
-    return <Badge className={config.className}>{config.label}</Badge>;
+  // Stats
+  const stats = {
+    total: domains.length,
+    active: domains.filter((d) => d.status === "active").length,
+    totalVisits: domains.reduce((acc, d) => acc + (d.monthly_visits || 0), 0),
   };
 
+  if (!user) {
+    return null;
+  }
+
   if (loading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Gerenciamento de Domínios</h1>
-            <p className="text-muted-foreground">Visualize e gerencie todos os seus domínios</p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setShowFilters(!showFilters)}>
-              <Filter className="h-4 w-4 mr-2" />
-              Filtros
-            </Button>
-          </div>
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <LayoutDashboard className="h-8 w-8" />
+            Gestão de Domínios
+          </h1>
+          <p className="text-muted-foreground mt-1">Gerencie e monitore todos os seus domínios</p>
         </div>
-
-        {/* Search Bar - Centralizada */}
-        <div className="flex justify-center">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Pesquisar domínio..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
+        <Button onClick={handleRefresh} disabled={refreshing} variant="outline">
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+          Atualizar
+        </Button>
       </div>
 
-      {showFilters && (
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader>
-            <CardTitle>Filtros</CardTitle>
-            <CardDescription>Filtre os domínios por critérios específicos</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Domínios</CardTitle>
+            <Globe className="h-4 w-4 text-muted-foreground dark:text-[#338BFF]" />
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="filter-status">Status</Label>
-                <Select
-                  value={filters.status || "all"}
-                  onValueChange={(value) => handleFilterChange("status", value === "all" ? "" : value)}
-                >
-                  <SelectTrigger id="filter-status">
-                    <SelectValue placeholder="Todos os status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="active">Ativo</SelectItem>
-                    <SelectItem value="expired">Expirado</SelectItem>
-                    <SelectItem value="suspended">Suspenso</SelectItem>
-                    <SelectItem value="deactivated">Desativado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="filter-platform">Plataforma</Label>
-                <Select
-                  value={filters.platform || "all"}
-                  onValueChange={(value) => handleFilterChange("platform", value === "all" ? "" : value)}
-                >
-                  <SelectTrigger id="filter-platform">
-                    <SelectValue placeholder="Todas as plataformas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="empty">Vazias</SelectItem>
-                    {platformOptions.map((platform) => (
-                      <SelectItem key={platform} value={platform}>
-                        {platform.charAt(0).toUpperCase() + platform.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="filter-traffic">Fonte de Tráfego</Label>
-                <Select
-                  value={filters.traffic_source || "all"}
-                  onValueChange={(value) => handleFilterChange("traffic_source", value === "all" ? "" : value)}
-                >
-                  <SelectTrigger id="filter-traffic">
-                    <SelectValue placeholder="Todas as fontes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="empty">Vazias</SelectItem>
-                    {trafficSourceOptions.map((source) => (
-                      <SelectItem key={source} value={source}>
-                        {source.charAt(0).toUpperCase() + source.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="filter-date-start">Data de Compra (Início)</Label>
-                <Input
-                  id="filter-date-start"
-                  type="date"
-                  value={filters.purchase_date_start}
-                  onChange={(e) => handleFilterChange("purchase_date_start", e.target.value)}
-                  className="dark:bg-background dark:text-foreground dark:[color-scheme:dark]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="filter-date-end">Data de Compra (Fim)</Label>
-                <Input
-                  id="filter-date-end"
-                  type="date"
-                  value={filters.purchase_date_end}
-                  onChange={(e) => handleFilterChange("purchase_date_end", e.target.value)}
-                  className="dark:bg-background dark:text-foreground dark:[color-scheme:dark]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="filter-funnel">ID Funil</Label>
-                <Input
-                  id="filter-funnel"
-                  type="text"
-                  placeholder="Digite o ID do funil"
-                  value={filters.funnel_id}
-                  onChange={(e) => handleFilterChange("funnel_id", e.target.value)}
-                />
-              </div>
-
-              <div className="flex items-end">
-                <Button variant="outline" onClick={clearFilters} className="w-full">
-                  Limpar Filtros
-                </Button>
-              </div>
-            </div>
+            <div className="text-2xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
-      )}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Domínios Ativos</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.active}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Visitas Mensais</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalVisits.toLocaleString()}</div>
+          </CardContent>
+        </Card>
+      </div>
 
+      {/* Search and Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            Seus Domínios
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Filtros</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
+              <Filter className="h-4 w-4 mr-2" />
+              {showFilters ? "Ocultar" : "Mostrar"} Filtros
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar domínios..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+
+            {/* Advanced Filters */}
+            {showFilters && (
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="active">Ativo</SelectItem>
+                      <SelectItem value="expired">Expirado</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="platform">Plataforma</Label>
+                  <Select
+                    value={filters.platform}
+                    onValueChange={(value) => setFilters({ ...filters, platform: value })}
+                  >
+                    <SelectTrigger id="platform">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas</SelectItem>
+                      <SelectItem value="namecheap">Namecheap</SelectItem>
+                      <SelectItem value="cloudflare">Cloudflare</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="traffic_source">Fonte de Tráfego</Label>
+                  <Select
+                    value={filters.traffic_source}
+                    onValueChange={(value) => setFilters({ ...filters, traffic_source: value })}
+                  >
+                    <SelectTrigger id="traffic_source">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas</SelectItem>
+                      <SelectItem value="organic">Orgânico</SelectItem>
+                      <SelectItem value="paid">Pago</SelectItem>
+                      <SelectItem value="social">Social</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="purchase_date_start">Data de Compra (Início)</Label>
+                  <Input
+                    id="purchase_date_start"
+                    type="date"
+                    value={filters.purchase_date_start}
+                    onChange={(e) => setFilters({ ...filters, purchase_date_start: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="purchase_date_end">Data de Compra (Fim)</Label>
+                  <Input
+                    id="purchase_date_end"
+                    type="date"
+                    value={filters.purchase_date_end}
+                    onChange={(e) => setFilters({ ...filters, purchase_date_end: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="funnel_id">ID do Funil</Label>
+                  <Input
+                    id="funnel_id"
+                    placeholder="ID do Funil"
+                    value={filters.funnel_id}
+                    onChange={(e) => setFilters({ ...filters, funnel_id: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Reset Filters */}
+            {(searchQuery || Object.values(filters).some((f) => f !== "")) && (
+              <Button variant="outline" size="sm" onClick={resetFilters}>
+                Limpar Filtros
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Domains Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Domínios ({filteredDomains.length})</CardTitle>
           <CardDescription>
-            {filteredDomains.length === domains.length
-              ? "Todos os domínios das suas integrações"
-              : `Mostrando ${filteredDomains.length} domínios filtrados`}
+            Mostrando {startIndex + 1}-{Math.min(endIndex, filteredDomains.length)} de {filteredDomains.length} domínios
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {filteredDomains.length === 0 ? (
-            <div className="text-center py-12">
-              <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">
-                {domains.length === 0 ? "Nenhum domínio encontrado" : "Nenhum domínio corresponde aos filtros"}
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {domains.length === 0
-                  ? "Sincronize suas integrações ou adicione novos domínios"
-                  : "Tente ajustar os filtros para ver mais resultados"}
-              </p>
-              {domains.length === 0 ? (
-                <Button>Adicionar Domínio</Button>
-              ) : (
-                <Button onClick={clearFilters}>Limpar Filtros</Button>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSort("domain_name")}
+                      className="flex items-center gap-1"
+                    >
+                      Domínio
+                      <ArrowUpDown className="h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Plataforma</TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSort("monthly_visits")}
+                      className="flex items-center gap-1"
+                    >
+                      Visitas/Mês
+                      <ArrowUpDown className="h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSort("expiration_date")}
+                      className="flex items-center gap-1"
+                    >
+                      Expiração
+                      <ArrowUpDown className="h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>Data de Compra</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentDomains.length === 0 ? (
                   <TableRow>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort("domain_name")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent hover:text-black dark:hover:text-white"
-                      >
-                        Domínio
-                        <ArrowUpDown className="h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-center">
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort("status")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-transparent hover:text-black dark:hover:text-white"
-                      >
-                        Status
-                        <ArrowUpDown className="h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-center">
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort("platform")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-transparent hover:text-black dark:hover:text-white"
-                      >
-                        Plataforma
-                        <ArrowUpDown className="h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-center">
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort("traffic_source")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-transparent hover:text-black dark:hover:text-white"
-                      >
-                        Fonte de Tráfego
-                        <ArrowUpDown className="h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-center">ID Funil</TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort("expiration_date")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent hover:text-black dark:hover:text-white"
-                      >
-                        Expiração
-                        <ArrowUpDown className="h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort("monthly_visits")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent hover:text-black dark:hover:text-white"
-                      >
-                        Visitas/Mês
-                        <ArrowUpDown className="h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-center">Ações</TableHead>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      Nenhum domínio encontrado
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {currentDomains.map((domain) => (
+                ) : (
+                  currentDomains.map((domain) => (
                     <TableRow key={domain.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Globe
-                            className={`h-4 w-4 ${
-                              ["deactivated", "suspended", "expired"].includes(domain.status?.toLowerCase())
-                                ? "text-muted-foreground"
-                                : ""
-                            }`}
-                            style={
-                              !["deactivated", "suspended", "expired"].includes(domain.status?.toLowerCase())
-                                ? { color: "rgb(8, 34, 255)" }
-                                : {}
-                            }
-                          />
-                          {domain.domain_name}
-                        </div>
+                      <TableCell className="font-medium">{domain.domain_name}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            domain.status === "active"
+                              ? "default"
+                              : domain.status === "expired"
+                                ? "destructive"
+                                : "secondary"
+                          }
+                        >
+                          {domain.status}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex justify-center">{getStatusBadge(domain.status)}</div>
+                        <Badge variant="outline">{domain.platform || "N/A"}</Badge>
                       </TableCell>
-                      <TableCell className="text-center">
-                        {domain.platform ? (
-                          <div className="flex items-center justify-center">
-                            {domain.platform.toLowerCase() === "wordpress" && (
-                              <img
-                                src="https://upload.wikimedia.org/wikipedia/commons/9/93/Wordpress_Blue_logo.png"
-                                alt="WordPress"
-                                className="h-6 w-6 rounded-full"
-                                title="WordPress"
-                              />
-                            )}
-                            {domain.platform.toLowerCase() === "atomicat" && (
-                              <img
-                                src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png"
-                                alt="AtomiCat"
-                                className="h-6 w-6 rounded"
-                                title="AtomiCat"
-                              />
-                            )}
-                            {domain.platform.toLowerCase() !== "wordpress" &&
-                              domain.platform.toLowerCase() !== "atomicat" && (
-                                <Badge variant="outline">{domain.platform}</Badge>
-                              )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {domain.traffic_source ? (
-                          <Badge variant="secondary">
-                            {domain.traffic_source.charAt(0).toUpperCase() + domain.traffic_source.slice(1)}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {domain.funnel_id ? (
-                          <Badge variant="outline">{domain.funnel_id}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                      <TableCell>{domain.monthly_visits?.toLocaleString() || "0"}</TableCell>
+                      <TableCell>
+                        {domain.expiration_date
+                          ? format(new Date(domain.expiration_date), "dd/MM/yyyy", {
+                              locale: ptBR,
+                            })
+                          : "N/A"}
                       </TableCell>
                       <TableCell>
-                        {domain.expiration_date ? (
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            {format(new Date(domain.expiration_date), "dd/MM/yyyy", { locale: ptBR })}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                          {domain.monthly_visits.toLocaleString()}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button variant="ghost" size="sm" onClick={() => navigate(`/domains/${domain.id}`)}>
-                          <LayoutDashboard className="h-4 w-4 mr-2" />
-                          Ver Detalhes
-                        </Button>
+                        {domain.purchase_date
+                          ? format(new Date(domain.purchase_date), "dd/MM/yyyy", {
+                              locale: ptBR,
+                            })
+                          : "N/A"}
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-          {filteredDomains.length > 0 && totalPages > 1 && (
+          {/* Pagination */}
+          {totalPages > 1 && (
             <div className="mt-4">
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
                     <PaginationPrevious
-                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                       className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                     />
                   </PaginationItem>
-
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                    if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
-                      return (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            onClick={() => setCurrentPage(page)}
-                            isActive={currentPage === page}
-                            className="cursor-pointer"
-                          >
-                            {page}
-                          </PaginationLink>
-                        </PaginationItem>
-                      );
-                    } else if (page === currentPage - 2 || page === currentPage + 2) {
-                      return (
-                        <PaginationItem key={page}>
-                          <span className="px-4">...</span>
-                        </PaginationItem>
-                      );
-                    }
-                    return null;
-                  })}
-
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
                   <PaginationItem>
                     <PaginationNext
-                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                       className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                     />
                   </PaginationItem>
@@ -659,8 +495,6 @@ export default function DomainManagement() {
               </Pagination>
             </div>
           )}
-
-          <div className="mt-4 text-xs text-muted-foreground">Total: {domains.length} domínios</div>
         </CardContent>
       </Card>
     </div>
