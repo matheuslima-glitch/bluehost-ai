@@ -202,22 +202,18 @@ export default function DomainManagement() {
     // Apply sorting
     if (sortConfig) {
       filtered.sort((a, b) => {
-        let aValue: any = a[sortConfig.key as keyof Domain];
-        let bValue: any = b[sortConfig.key as keyof Domain];
+        const aValue = a[sortConfig.key as keyof Domain];
+        const bValue = b[sortConfig.key as keyof Domain];
 
-        // Handle null values
-        if (aValue === null) return 1;
-        if (bValue === null) return -1;
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
 
-        // Sort by date
-        if (sortConfig.key === "expiration_date") {
-          aValue = new Date(aValue).getTime();
-          bValue = new Date(bValue).getTime();
+        if (aValue < bValue) {
+          return sortConfig.direction === "asc" ? -1 : 1;
         }
-
-        // Sort alphabetically or numerically
-        if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
+        if (aValue > bValue) {
+          return sortConfig.direction === "asc" ? 1 : -1;
+        }
         return 0;
       });
     }
@@ -226,17 +222,24 @@ export default function DomainManagement() {
     setCurrentPage(1);
   };
 
+  useEffect(() => {
+    applyFilters();
+  }, [searchQuery, filters, sortConfig]);
+
   const handleSort = (key: string) => {
-    let direction: "asc" | "desc" = "asc";
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc";
-    }
-    setSortConfig({ key, direction });
+    setSortConfig((current) => {
+      if (current?.key === key) {
+        return {
+          key,
+          direction: current.direction === "asc" ? "desc" : "asc",
+        };
+      }
+      return { key, direction: "asc" };
+    });
   };
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
-    const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
+    setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
   const clearFilters = () => {
@@ -248,210 +251,211 @@ export default function DomainManagement() {
       purchase_date_end: "",
       funnel_id: "",
     });
-    setFilteredDomains(domains);
-    setCurrentPage(1);
+    setSearchQuery("");
+    setSortConfig(null);
   };
 
-  useEffect(() => {
-    applyFilters();
-  }, [filters, domains, searchQuery, sortConfig]);
+  const getStatusBadge = (status: string) => {
+    const statusLower = status?.toLowerCase() || "";
+
+    if (["active", "ativo"].includes(statusLower)) {
+      return <Badge className="bg-green-500 hover:bg-green-600">Ativo</Badge>;
+    }
+    if (["inactive", "inativo"].includes(statusLower)) {
+      return <Badge className="bg-gray-500 hover:bg-gray-600">Inativo</Badge>;
+    }
+    if (["suspended", "suspenso"].includes(statusLower)) {
+      return <Badge className="bg-red-500 hover:bg-red-600">Suspenso</Badge>;
+    }
+    if (["expired", "expirado"].includes(statusLower)) {
+      return <Badge className="bg-orange-500 hover:bg-orange-600">Expirado</Badge>;
+    }
+    if (["deactivated", "desativado"].includes(statusLower)) {
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Desativado</Badge>;
+    }
+    return <Badge variant="outline">{status}</Badge>;
+  };
+
+  if (!user) {
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
   const totalPages = Math.ceil(filteredDomains.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentDomains = filteredDomains.slice(startIndex, endIndex);
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; className: string }> = {
-      active: { label: "Ativo", className: "bg-green-500 text-white hover:bg-green-600 transition-colors" },
-      expired: { label: "Expirado", className: "bg-red-500 text-white hover:bg-red-600 transition-colors" },
-      pending: { label: "Pendente", className: "bg-blue-500 text-white hover:bg-blue-600 transition-colors" },
-      suspended: { label: "Suspenso", className: "bg-orange-500 text-white hover:bg-orange-600 transition-colors" },
-      deactivated: { label: "Desativado", className: "bg-gray-400 text-white dark:bg-gray-600" },
-    };
-
-    const config = statusConfig[status.toLowerCase()] || statusConfig.active;
-    return <Badge className={config.className}>{config.label}</Badge>;
+  const stats = {
+    total: domains.length,
+    active: domains.filter((d) => ["active", "ativo"].includes(d.status?.toLowerCase())).length,
+    expiringSoon: domains.filter((d) => {
+      if (!d.expiration_date) return false;
+      const daysUntilExpiration = Math.floor(
+        (new Date(d.expiration_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24),
+      );
+      return daysUntilExpiration <= 30 && daysUntilExpiration > 0;
+    }).length,
+    totalVisits: domains.reduce((sum, d) => sum + (d.monthly_visits || 0), 0),
   };
 
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Gerenciamento de Domínios</h1>
-            <p className="text-muted-foreground">Visualize e gerencie todos os seus domínios</p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setShowFilters(!showFilters)}>
-              <Filter className="h-4 w-4 mr-2" />
-              Filtros
-            </Button>
-          </div>
-        </div>
-
-        {/* Search Bar - Centralizada */}
-        <div className="flex justify-center">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Pesquisar domínio..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-      </div>
-
-      {showFilters && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Filtros</CardTitle>
-            <CardDescription>Filtre os domínios por critérios específicos</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="filter-status">Status</Label>
-                <Select
-                  value={filters.status || "all"}
-                  onValueChange={(value) => handleFilterChange("status", value === "all" ? "" : value)}
-                >
-                  <SelectTrigger id="filter-status">
-                    <SelectValue placeholder="Todos os status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="active">Ativo</SelectItem>
-                    <SelectItem value="expired">Expirado</SelectItem>
-                    <SelectItem value="suspended">Suspenso</SelectItem>
-                    <SelectItem value="deactivated">Desativado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="filter-platform">Plataforma</Label>
-                <Select
-                  value={filters.platform || "all"}
-                  onValueChange={(value) => handleFilterChange("platform", value === "all" ? "" : value)}
-                >
-                  <SelectTrigger id="filter-platform">
-                    <SelectValue placeholder="Todas as plataformas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="empty">Vazias</SelectItem>
-                    {platformOptions.map((platform) => (
-                      <SelectItem key={platform} value={platform}>
-                        {platform.charAt(0).toUpperCase() + platform.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="filter-traffic">Fonte de Tráfego</Label>
-                <Select
-                  value={filters.traffic_source || "all"}
-                  onValueChange={(value) => handleFilterChange("traffic_source", value === "all" ? "" : value)}
-                >
-                  <SelectTrigger id="filter-traffic">
-                    <SelectValue placeholder="Todas as fontes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="empty">Vazias</SelectItem>
-                    {trafficSourceOptions.map((source) => (
-                      <SelectItem key={source} value={source}>
-                        {source.charAt(0).toUpperCase() + source.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="filter-date-start">Data de Compra (Início)</Label>
-                <Input
-                  id="filter-date-start"
-                  type="date"
-                  value={filters.purchase_date_start}
-                  onChange={(e) => handleFilterChange("purchase_date_start", e.target.value)}
-                  className="dark:bg-background dark:text-foreground dark:[color-scheme:dark]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="filter-date-end">Data de Compra (Fim)</Label>
-                <Input
-                  id="filter-date-end"
-                  type="date"
-                  value={filters.purchase_date_end}
-                  onChange={(e) => handleFilterChange("purchase_date_end", e.target.value)}
-                  className="dark:bg-background dark:text-foreground dark:[color-scheme:dark]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="filter-funnel">ID Funil</Label>
-                <Input
-                  id="filter-funnel"
-                  type="text"
-                  placeholder="Digite o ID do funil"
-                  value={filters.funnel_id}
-                  onChange={(e) => handleFilterChange("funnel_id", e.target.value)}
-                />
-              </div>
-
-              <div className="flex items-end">
-                <Button variant="outline" onClick={clearFilters} className="w-full">
-                  Limpar Filtros
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
+    <div className="container mx-auto py-8 px-4 max-w-[1800px]">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            Seus Domínios
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Globe className="h-5 w-5" />
+              <CardTitle>Gerenciamento de Domínios</CardTitle>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={loadDomains} disabled={refreshing}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+                Atualizar
+              </Button>
+            </div>
+          </div>
           <CardDescription>
-            {filteredDomains.length === domains.length
-              ? "Todos os domínios das suas integrações"
-              : `Mostrando ${filteredDomains.length} domínios filtrados`}
+            Gerencie seus {domains.length} domínios registrados. {stats.active} ativos, {stats.expiringSoon} expirando
+            em breve
           </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {filteredDomains.length === 0 ? (
+
+          {domains.length === 0 && !loading && (
             <div className="text-center py-12">
               <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">
-                {domains.length === 0 ? "Nenhum domínio encontrado" : "Nenhum domínio corresponde aos filtros"}
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {domains.length === 0
-                  ? "Sincronize suas integrações ou adicione novos domínios"
-                  : "Tente ajustar os filtros para ver mais resultados"}
-              </p>
-              {domains.length === 0 ? (
-                <Button>Adicionar Domínio</Button>
-              ) : (
-                <Button onClick={clearFilters}>Limpar Filtros</Button>
-              )}
+              <p className="text-muted-foreground">Nenhum domínio encontrado</p>
             </div>
-          ) : (
-            <div className="rounded-md border">
+          )}
+        </CardHeader>
+
+        <CardContent>
+          <div className="mb-6">
+            <div className="flex gap-4 mb-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar domínio..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+                <Filter className="h-4 w-4 mr-2" />
+                Filtros
+              </Button>
+            </div>
+
+            {showFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={filters.status} onValueChange={(value) => handleFilterChange("status", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="active">Ativo</SelectItem>
+                      <SelectItem value="inactive">Inativo</SelectItem>
+                      <SelectItem value="suspended">Suspenso</SelectItem>
+                      <SelectItem value="expired">Expirado</SelectItem>
+                      <SelectItem value="deactivated">Desativado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Plataforma</Label>
+                  <Select value={filters.platform} onValueChange={(value) => handleFilterChange("platform", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas</SelectItem>
+                      <SelectItem value="empty">Vazio</SelectItem>
+                      {platformOptions.map((platform) => (
+                        <SelectItem key={platform} value={platform}>
+                          {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Fonte de Tráfego</Label>
+                  <Select
+                    value={filters.traffic_source}
+                    onValueChange={(value) => handleFilterChange("traffic_source", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas</SelectItem>
+                      <SelectItem value="empty">Vazio</SelectItem>
+                      {trafficSourceOptions.map((source) => (
+                        <SelectItem key={source} value={source}>
+                          {source.charAt(0).toUpperCase() + source.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Data de Compra - Início</Label>
+                  <Input
+                    type="date"
+                    value={filters.purchase_date_start}
+                    onChange={(e) => handleFilterChange("purchase_date_start", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Data de Compra - Fim</Label>
+                  <Input
+                    type="date"
+                    value={filters.purchase_date_end}
+                    onChange={(e) => handleFilterChange("purchase_date_end", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>ID Funil</Label>
+                  <Input
+                    placeholder="ID do Funil"
+                    value={filters.funnel_id}
+                    onChange={(e) => handleFilterChange("funnel_id", e.target.value)}
+                  />
+                </div>
+
+                <div className="md:col-span-3 flex justify-end">
+                  <Button variant="outline" onClick={clearFilters}>
+                    Limpar Filtros
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {filteredDomains.length === 0 && !loading && (
+            <div className="text-center py-12">
+              <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Nenhum domínio encontrado com os filtros aplicados</p>
+            </div>
+          )}
+
+          {filteredDomains.length > 0 && (
+            <div className="border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -528,13 +532,8 @@ export default function DomainManagement() {
                             className={`h-4 w-4 ${
                               ["deactivated", "suspended", "expired"].includes(domain.status?.toLowerCase())
                                 ? "text-muted-foreground"
-                                : ""
+                                : "text-[rgb(8,34,255)] dark:text-[#338BFF]"
                             }`}
-                            style={
-                              !["deactivated", "suspended", "expired"].includes(domain.status?.toLowerCase())
-                                ? { color: "rgb(8, 34, 255)" }
-                                : {}
-                            }
                           />
                           {domain.domain_name}
                         </div>
