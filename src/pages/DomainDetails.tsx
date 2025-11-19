@@ -797,46 +797,32 @@ export default function DomainDetails() {
                             <ChevronDown className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuContent align="end" className="w-64">
                           <DropdownMenuItem
                             onClick={() => handleSetNamecheapDNS("BasicDNS")}
                             disabled={updateNameservers.isPending}
+                            className="cursor-pointer [&[data-highlighted]_.description]:text-accent-foreground"
                           >
-                            <Server className="h-4 w-4 mr-2" />
+                            <Server className="h-4 w-4 mr-2 flex-shrink-0" />
                             <div className="flex flex-col">
                               <span className="font-medium">Namecheap BasicDNS</span>
-                              <span className="text-xs text-muted-foreground">DNS padrão da Namecheap</span>
+                              <span className="description text-xs text-muted-foreground transition-colors">
+                                DNS padrão da Namecheap
+                              </span>
                             </div>
                           </DropdownMenuItem>
 
                           <DropdownMenuItem
                             onClick={() => handleSetNamecheapDNS("WebHostingDNS")}
                             disabled={updateNameservers.isPending}
+                            className="cursor-pointer [&[data-highlighted]_.description]:text-accent-foreground"
                           >
-                            <Server className="h-4 w-4 mr-2" />
+                            <Server className="h-4 w-4 mr-2 flex-shrink-0" />
                             <div className="flex flex-col">
-                              <span className="font-medium">Namecheap Web Hosting DNS</span>
-                              <span className="text-xs text-muted-foreground">DNS para hospedagem</span>
-                            </div>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuSeparator />
-
-                          <DropdownMenuItem
-                            onClick={() => {
-                              if (domain.registrar?.toLowerCase() !== "namecheap") {
-                                toast.error(
-                                  "Apenas domínios registrados na Namecheap podem ter nameservers editados aqui",
-                                );
-                                return;
-                              }
-                              setIsEditingNameservers(true);
-                            }}
-                          >
-                            <Edit2 className="h-4 w-4 mr-2" />
-                            <div className="flex flex-col">
-                              <span className="font-medium">Custom DNS</span>
-                              <span className="text-xs text-muted-foreground">Inserir nameservers manualmente</span>
+                              <span className="font-medium whitespace-nowrap">Namecheap Web Hosting DNS</span>
+                              <span className="description text-xs text-muted-foreground transition-colors">
+                                DNS para hospedagem
+                              </span>
                             </div>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
