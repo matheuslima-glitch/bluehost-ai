@@ -532,7 +532,7 @@ export default function DomainManagement() {
                             }`}
                             style={
                               !["deactivated", "suspended", "expired"].includes(domain.status?.toLowerCase())
-                                ? { color: "rgb(8, 34, 255)" }
+                                ? { color: "rgb(96, 165, 250)" }
                                 : {}
                             }
                           />
