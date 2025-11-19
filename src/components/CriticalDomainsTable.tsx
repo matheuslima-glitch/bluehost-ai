@@ -118,7 +118,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const criticalDomains = domains.filter((d) => {
     const statusLower = d.status?.toLowerCase() || "";
 
-    // Excluir domínios desativados (seja por status ou por flag)
+    // Excluir domínios desativados
     if (statusLower === "deactivated" || d.manually_deactivated === true) return false;
 
     // Incluir expirados e suspensos
@@ -173,38 +173,42 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
 
     // 0. DESATIVADO
     if (statusLower === "deactivated") {
-      return <Badge className="bg-gray-400 dark:bg-gray-600">Desativado</Badge>;
+      return <Badge className="bg-gray-400 text-white dark:bg-gray-600">Desativado</Badge>;
     }
 
     // 1. SUSPENSO - Prioridade máxima
     if (statusLower === "suspended" || statusLower === "suspend") {
-      return <Badge className="bg-orange-500">Suspenso</Badge>;
+      return <Badge className="bg-orange-500 text-white hover:bg-orange-600 transition-colors">Suspenso</Badge>;
     }
 
     // 2. ALERTA
     if (hasAlert) {
-      return <Badge className="bg-yellow-500">Alerta</Badge>;
+      return <Badge className="bg-yellow-500 text-white hover:bg-yellow-600 transition-colors">Alerta</Badge>;
     }
 
     // 3. EXPIRADO
     if (statusLower === "expired") {
-      return <Badge variant="destructive">Expirado</Badge>;
+      return <Badge className="bg-red-500 text-white hover:bg-red-600 transition-colors">Expirado</Badge>;
     }
 
     // 4. CRÍTICO (15 dias)
     if (domain.expiration_date) {
       const expDate = new Date(domain.expiration_date);
       if (expDate > now && expDate < fifteenDaysFromNow) {
-        return <Badge variant="destructive">Crítico (15 dias)</Badge>;
+        return <Badge className="bg-red-500 text-white hover:bg-red-600 transition-colors">Crítico (15 dias)</Badge>;
       }
 
       // 5. EXPIRANDO EM BREVE (30 dias)
       if (expDate > now && expDate < thirtyDaysFromNow) {
-        return <Badge className="bg-yellow-500">Expirando em breve (30 dias)</Badge>;
+        return (
+          <Badge className="bg-yellow-500 text-white hover:bg-yellow-600 transition-colors">
+            Expirando em breve (30 dias)
+          </Badge>
+        );
       }
     }
 
-    return <Badge>Ativo</Badge>;
+    return <Badge className="bg-green-500 text-white hover:bg-green-600 transition-colors">Ativo</Badge>;
   };
 
   const handleAlertClick = (domain: any) => {
@@ -245,7 +249,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
         .from("domains")
         .update({
           status: "deactivated",
-          manually_deactivated: true, // Flag de proteção contra o cron
+          manually_deactivated: true,
         })
         .eq("id", domainToDelete.id);
 
@@ -326,15 +330,14 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                               <AlertCircle className="h-4 w-4" />
                             </Button>
                           )}
-                          {/* Toggle On/Off visual - Azul mais forte */}
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleDeleteClick(domain)}
-                            className="relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 bg-blue-600 hover:bg-blue-700"
-                            title="Desativar domínio"
+                            className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
                           >
-                            <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white transition-transform shadow-md"></span>
-                            <span className="absolute left-2 text-[10px] font-bold text-white">ON</span>
-                          </button>
+                            <Power className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -375,7 +378,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <AlertTriangle className="h-5 w-5 text-destructive" />
               Mensagem de Alerta
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 text-base">
@@ -385,7 +388,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                 gerenciamento.
               </p>
               <p>
-                O domínio será marcado como desativado apenas no banco de dados interno mas continuará registrado
+                O domínio será marcado como desligado apenas no banco de dados interno mas continuará registrado
                 normalmente no provedor da Namecheap até que seja expirado ou renovado diretamente por lá.
               </p>
               <p className="font-semibold">Deseja prosseguir com a desativação?</p>
@@ -393,7 +396,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-500 text-white hover:bg-red-600">
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-blue-500 text-white hover:bg-blue-600">
               Desativar
             </AlertDialogAction>
           </AlertDialogFooter>

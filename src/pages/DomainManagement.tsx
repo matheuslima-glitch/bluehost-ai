@@ -262,22 +262,16 @@ export default function DomainManagement() {
   const currentDomains = filteredDomains.slice(startIndex, endIndex);
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { label: string; variant: "success" | "destructive" | "warning" | "secondary" }> = {
-      active: { label: "Ativo", variant: "success" },
-      expired: { label: "Expirado", variant: "destructive" },
-      pending: { label: "Pendente", variant: "secondary" },
-      suspended: { label: "Suspenso", variant: "warning" },
-      deactivated: { label: "Desativado", variant: "secondary" },
+    const statusConfig: Record<string, { label: string; className: string }> = {
+      active: { label: "Ativo", className: "bg-green-500 text-white hover:bg-green-600 transition-colors" },
+      expired: { label: "Expirado", className: "bg-red-500 text-white hover:bg-red-600 transition-colors" },
+      pending: { label: "Pendente", className: "bg-blue-500 text-white hover:bg-blue-600 transition-colors" },
+      suspended: { label: "Suspenso", className: "bg-orange-500 text-white hover:bg-orange-600 transition-colors" },
+      deactivated: { label: "Desativado", className: "bg-gray-400 text-white dark:bg-gray-600" },
     };
 
-    const config = variants[status.toLowerCase()] || variants.active;
-
-    // Se for desativado, usar classe customizada com cinza
-    if (status.toLowerCase() === "deactivated") {
-      return <Badge className="bg-gray-400 dark:bg-gray-600">Desativado</Badge>;
-    }
-
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    const config = statusConfig[status.toLowerCase()] || statusConfig.active;
+    return <Badge className={config.className}>{config.label}</Badge>;
   };
 
   if (loading) {
