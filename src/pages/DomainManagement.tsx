@@ -528,13 +528,8 @@ export default function DomainManagement() {
                             className={`h-4 w-4 ${
                               ["deactivated", "suspended", "expired"].includes(domain.status?.toLowerCase())
                                 ? "text-muted-foreground"
-                                : ""
+                                : "text-[rgb(8,34,255)] dark:text-blue-400"
                             }`}
-                            style={
-                              !["deactivated", "suspended", "expired"].includes(domain.status?.toLowerCase())
-                                ? { color: "rgb(96, 165, 250)" }
-                                : {}
-                            }
                           />
                           {domain.domain_name}
                         </div>
