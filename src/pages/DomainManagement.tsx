@@ -471,11 +471,11 @@ export default function DomainManagement() {
                         <ArrowUpDown className="h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead>
+                    <TableHead className="text-center">
                       <Button
                         variant="ghost"
                         onClick={() => handleSort("status")}
-                        className="flex items-center gap-1 p-0 h-auto font-semibold hover:bg-transparent hover:text-black dark:hover:text-white"
+                        className="flex items-center gap-1 p-0 h-auto font-semibold mx-auto hover:bg-transparent hover:text-black dark:hover:text-white"
                       >
                         Status
                         <ArrowUpDown className="h-4 w-4" />
