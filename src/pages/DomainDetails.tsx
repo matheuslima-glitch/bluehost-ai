@@ -16,6 +16,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -40,6 +47,7 @@ import {
   Info,
   AlertTriangle,
   Lock,
+  ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -404,55 +412,19 @@ export default function DomainDetails() {
       const oldNameservers = domain?.nameservers?.join(", ") || null;
       const newNameservers = nameservers.join(", ");
 
-      // ═══════════════════════════════════════════════════════════════
-      // ETAPA 1: Atualizar na Namecheap via Backend
-      // ═══════════════════════════════════════════════════════════════
-
-      console.log("📤 Atualizando nameservers na Namecheap...");
-
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://domainhub-backend.onrender.com";
-
-      const namecheapResponse = await fetch(`${backendUrl}/api/domains/nameservers/update`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          domainName: domain?.domain_name,
-          nameservers: nameservers,
-        }),
-      });
-
-      const namecheapData = await namecheapResponse.json();
-
-      if (!namecheapData.success) {
-        throw new Error(namecheapData.error || "Erro ao atualizar nameservers na Namecheap");
-      }
-
-      console.log("✅ Nameservers atualizados na Namecheap:", namecheapData.data);
-
-      // ═══════════════════════════════════════════════════════════════
-      // ETAPA 2: Atualizar no Supabase (banco de dados local)
-      // ═══════════════════════════════════════════════════════════════
-
-      console.log("💾 Salvando no banco de dados...");
-
       const { error } = await supabase.from("domains").update({ nameservers }).eq("id", id);
 
       if (error) throw error;
 
       // Log da atividade
       await logActivity("nameservers_updated", oldNameservers, newNameservers);
-
-      console.log("✅ Nameservers salvos no banco de dados");
     },
     onSuccess: () => {
       loadDomain();
-      toast.success("Nameservers atualizados com sucesso na Namecheap e no banco de dados!");
+      toast.success("Nameservers atualizados com sucesso!");
       setIsEditingNameservers(false);
     },
-    onError: (error: any) => {
-      console.error("❌ Erro ao atualizar nameservers:", error);
+    onError: (error) => {
       toast.error("Erro ao atualizar nameservers: " + error.message);
     },
   });
@@ -469,6 +441,52 @@ export default function DomainDetails() {
     }
 
     updateNameservers.mutate(nameservers);
+  };
+
+  /**
+   * Define DNS predefinido da Namecheap (BasicDNS ou WebHostingDNS)
+   */
+  const handleSetNamecheapDNS = async (dnsType: "BasicDNS" | "WebHostingDNS") => {
+    if (!domain) return;
+
+    const dnsTypeLabel = dnsType === "BasicDNS" ? "Namecheap BasicDNS" : "Namecheap Web Hosting DNS";
+
+    try {
+      console.log(`📤 Configurando ${dnsTypeLabel} para ${domain.domain_name}...`);
+
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://domainhub-backend.onrender.com";
+
+      const response = await fetch(`${backendUrl}/api/domains/nameservers/set-default`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          domainName: domain.domain_name,
+          dnsType: dnsType,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || `Erro ao configurar ${dnsTypeLabel}`);
+      }
+
+      console.log(`✅ ${dnsTypeLabel} configurado:`, data.data);
+
+      toast.success(`${dnsTypeLabel} configurado com sucesso!`);
+
+      // Registrar log de atividade
+      const oldNameservers = domain?.nameservers?.join(", ") || null;
+      await logActivity("nameservers_updated", oldNameservers, dnsTypeLabel);
+
+      // Recarregar domínio para atualizar nameservers
+      await loadDomain();
+    } catch (error: any) {
+      console.error(`❌ Erro ao configurar ${dnsTypeLabel}:`, error);
+      toast.error(`Erro ao configurar ${dnsTypeLabel}: ${error.message}`);
+    }
   };
 
   const handleDeactivateDomain = async () => {
@@ -762,25 +780,89 @@ export default function DomainDetails() {
                     <span className="text-sm font-medium">Nameservers:</span>
                   </div>
                   {!isEditingNameservers ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (domain.registrar?.toLowerCase() !== "namecheap") {
-                          toast.error("Apenas domínios registrados na Namecheap podem ter nameservers editados aqui");
-                          return;
+                    <div className="flex items-center gap-1">
+                      {/* Dropdown de Opções DNS */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={domain.registrar?.toLowerCase() !== "namecheap"}
+                            title={
+                              domain.registrar?.toLowerCase() !== "namecheap"
+                                ? "Apenas domínios Namecheap"
+                                : "Opções de DNS"
+                            }
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem
+                            onClick={() => handleSetNamecheapDNS("BasicDNS")}
+                            disabled={updateNameservers.isPending}
+                          >
+                            <Server className="h-4 w-4 mr-2" />
+                            <div className="flex flex-col">
+                              <span className="font-medium">Namecheap BasicDNS</span>
+                              <span className="text-xs text-muted-foreground">DNS padrão da Namecheap</span>
+                            </div>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem
+                            onClick={() => handleSetNamecheapDNS("WebHostingDNS")}
+                            disabled={updateNameservers.isPending}
+                          >
+                            <Server className="h-4 w-4 mr-2" />
+                            <div className="flex flex-col">
+                              <span className="font-medium">Namecheap Web Hosting DNS</span>
+                              <span className="text-xs text-muted-foreground">DNS para hospedagem</span>
+                            </div>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuSeparator />
+
+                          <DropdownMenuItem
+                            onClick={() => {
+                              if (domain.registrar?.toLowerCase() !== "namecheap") {
+                                toast.error(
+                                  "Apenas domínios registrados na Namecheap podem ter nameservers editados aqui",
+                                );
+                                return;
+                              }
+                              setIsEditingNameservers(true);
+                            }}
+                          >
+                            <Edit2 className="h-4 w-4 mr-2" />
+                            <div className="flex flex-col">
+                              <span className="font-medium">Custom DNS</span>
+                              <span className="text-xs text-muted-foreground">Inserir nameservers manualmente</span>
+                            </div>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {/* Botão de Editar (mantido para compatibilidade) */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (domain.registrar?.toLowerCase() !== "namecheap") {
+                            toast.error("Apenas domínios registrados na Namecheap podem ter nameservers editados aqui");
+                            return;
+                          }
+                          setIsEditingNameservers(true);
+                        }}
+                        disabled={domain.registrar?.toLowerCase() !== "namecheap"}
+                        title={
+                          domain.registrar?.toLowerCase() !== "namecheap"
+                            ? "Apenas domínios Namecheap"
+                            : "Editar nameservers"
                         }
-                        setIsEditingNameservers(true);
-                      }}
-                      disabled={domain.registrar?.toLowerCase() !== "namecheap"}
-                      title={
-                        domain.registrar?.toLowerCase() !== "namecheap"
-                          ? "Apenas domínios Namecheap"
-                          : "Editar nameservers"
-                      }
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   ) : (
                     <div className="flex gap-2">
                       <Button
