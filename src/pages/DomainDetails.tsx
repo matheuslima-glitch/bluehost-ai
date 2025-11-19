@@ -102,7 +102,7 @@ export default function DomainDetails() {
   const [loadingDns, setLoadingDns] = useState(false);
   const [newDnsRecord, setNewDnsRecord] = useState({ type: "A", name: "", content: "", ttl: 3600 });
   const [isEditingNameservers, setIsEditingNameservers] = useState(false);
-  const [nameserversInput, setNameserversInput] = useState("");
+  const [nameserversList, setNameserversList] = useState<string[]>(["", ""]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<any[]>([]);
@@ -396,8 +396,10 @@ export default function DomainDetails() {
       setDomain(data);
 
       // Inicializar nameservers input quando carregar o domínio
-      if (data?.nameservers) {
-        setNameserversInput(data.nameservers.join("\n"));
+      if (data?.nameservers && data.nameservers.length > 0) {
+        setNameserversList(data.nameservers);
+      } else {
+        setNameserversList(["", ""]);
       }
     } catch (error: any) {
       toast.error("Erro ao carregar domínio");
@@ -469,17 +471,42 @@ export default function DomainDetails() {
   });
 
   const handleSaveNameservers = () => {
-    const nameservers = nameserversInput
-      .split("\n")
-      .map((ns) => ns.trim())
-      .filter((ns) => ns.length > 0);
+    const nameservers = nameserversList.map((ns) => ns.trim()).filter((ns) => ns.length > 0);
 
-    if (nameservers.length === 0) {
-      toast.error("Adicione pelo menos um nameserver");
+    if (nameservers.length < 2) {
+      toast.error("Adicione pelo menos 2 nameservers");
+      return;
+    }
+
+    if (nameservers.length > 12) {
+      toast.error("Máximo de 12 nameservers permitidos");
       return;
     }
 
     updateNameservers.mutate(nameservers);
+  };
+
+  const handleAddNameserver = () => {
+    if (nameserversList.length < 12) {
+      setNameserversList([...nameserversList, ""]);
+    } else {
+      toast.warning("Máximo de 12 nameservers atingido");
+    }
+  };
+
+  const handleRemoveNameserver = (index: number) => {
+    if (nameserversList.length > 2) {
+      const newList = nameserversList.filter((_, i) => i !== index);
+      setNameserversList(newList);
+    } else {
+      toast.warning("Mínimo de 2 nameservers necessário");
+    }
+  };
+
+  const handleNameserverChange = (index: number, value: string) => {
+    const newList = [...nameserversList];
+    newList[index] = value;
+    setNameserversList(newList);
   };
 
   /**
@@ -884,7 +911,11 @@ export default function DomainDetails() {
                         size="sm"
                         onClick={() => {
                           setIsEditingNameservers(false);
-                          setNameserversInput(domain.nameservers?.join("\n") || "");
+                          if (domain.nameservers && domain.nameservers.length > 0) {
+                            setNameserversList(domain.nameservers);
+                          } else {
+                            setNameserversList(["", ""]);
+                          }
                         }}
                       >
                         Cancelar
@@ -912,12 +943,53 @@ export default function DomainDetails() {
                       <p className="text-sm text-muted-foreground">Não configurado</p>
                     )
                   ) : (
-                    <textarea
-                      value={nameserversInput}
-                      onChange={(e) => setNameserversInput(e.target.value)}
-                      placeholder="Digite um nameserver por linha&#10;Exemplo:&#10;ns1.example.com&#10;ns2.example.com"
-                      className="w-full min-h-[120px] p-2 text-sm border rounded-md bg-background"
-                    />
+                    <div className="space-y-3">
+                      {nameserversList.map((ns, index) => (
+                        <div key={index} className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <Label htmlFor={`ns-${index}`} className="text-xs text-muted-foreground">
+                                Nameserver {index + 1}
+                              </Label>
+                              <Input
+                                id={`ns-${index}`}
+                                value={ns}
+                                onChange={(e) => handleNameserverChange(index, e.target.value)}
+                                placeholder={`ns${index + 1}.example.com`}
+                                className="mt-1"
+                              />
+                            </div>
+                            {nameserversList.length > 2 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveNameserver(index)}
+                                className="mt-5"
+                                title="Remover nameserver"
+                              >
+                                <X className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                          {index === nameserversList.length - 1 && nameserversList.length < 12 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleAddNameserver}
+                              className="w-full"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Adicionar Nameserver
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      <p className="text-xs text-muted-foreground">
+                        {nameserversList.filter((ns) => ns.trim()).length} de 12 nameservers • Mínimo: 2 nameservers
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
