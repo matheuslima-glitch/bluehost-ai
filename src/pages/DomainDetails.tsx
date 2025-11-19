@@ -412,22 +412,58 @@ export default function DomainDetails() {
       const oldNameservers = domain?.nameservers?.join(", ") || null;
       const newNameservers = nameservers.join(", ");
 
+      // ═══════════════════════════════════════════════════════════════
+      // ETAPA 1: Atualizar na Namecheap via Backend
+      // ═══════════════════════════════════════════════════════════════
+
+      console.log("📤 Atualizando nameservers na Namecheap...");
+
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://domainhub-backend.onrender.com";
+
+      const namecheapResponse = await fetch(`${backendUrl}/api/domains/nameservers/update`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          domainName: domain?.domain_name,
+          nameservers: nameservers,
+        }),
+      });
+
+      const namecheapData = await namecheapResponse.json();
+
+      if (!namecheapData.success) {
+        throw new Error(namecheapData.error || "Erro ao atualizar nameservers na Namecheap");
+      }
+
+      console.log("✅ Nameservers atualizados na Namecheap:", namecheapData.data);
+
+      // ═══════════════════════════════════════════════════════════════
+      // ETAPA 2: Atualizar no Supabase (banco de dados local)
+      // ═══════════════════════════════════════════════════════════════
+
+      console.log("💾 Salvando no banco de dados...");
+
       const { error } = await supabase.from("domains").update({ nameservers }).eq("id", id);
 
       if (error) throw error;
 
       // Log da atividade
       await logActivity("nameservers_updated", oldNameservers, newNameservers);
+
+      console.log("✅ Nameservers salvos no banco de dados");
     },
     onSuccess: () => {
       loadDomain();
-      toast.success("Nameservers atualizados com sucesso!");
-      toast.info("A mudança de nameservers pode levar até 48 horas para propagar completamente.", {
+      toast.success("Nameservers atualizados com sucesso na Namecheap e no banco de dados!");
+      toast.info("⏰ A mudança de nameservers pode levar até 48 horas para propagar completamente.", {
         duration: 6000,
       });
       setIsEditingNameservers(false);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error("❌ Erro ao atualizar nameservers:", error);
       toast.error("Erro ao atualizar nameservers: " + error.message);
     },
   });
