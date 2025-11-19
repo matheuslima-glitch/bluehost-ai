@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Power, AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, Mail, Link as LinkIcon } from "lucide-react";
+import { AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, Mail, Link as LinkIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -195,7 +195,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     if (domain.expiration_date) {
       const expDate = new Date(domain.expiration_date);
       if (expDate > now && expDate < fifteenDaysFromNow) {
-        return <Badge className="bg-red-500 text-white hover:bg-red-600 transition-colors">Crítico (15 dias)</Badge>;
+        return <Badge className="bg-red-600 text-white hover:bg-red-700 transition-colors">Crítico (15 dias)</Badge>;
       }
 
       // 5. EXPIRANDO EM BREVE (30 dias)
@@ -303,7 +303,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                 <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow>
                     <TableHead>Domínio</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
                     <TableHead>Expiração</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -312,7 +312,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                   {paginatedDomains.map((domain) => (
                     <TableRow key={domain.id}>
                       <TableCell className="font-medium text-sm">{domain.domain_name}</TableCell>
-                      <TableCell>{getStatusBadge(domain)}</TableCell>
+                      <TableCell className="text-center">{getStatusBadge(domain)}</TableCell>
                       <TableCell className="text-sm">
                         {domain.expiration_date
                           ? format(new Date(domain.expiration_date), "dd/MM/yy", { locale: ptBR })
@@ -330,14 +330,13 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                               <AlertCircle className="h-4 w-4" />
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                          <button
                             onClick={() => handleDeleteClick(domain)}
-                            className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+                            className="relative inline-flex h-6 w-11 items-center rounded-full bg-blue-500 hover:bg-blue-600 transition-colors"
+                            title="Desativar domínio"
                           >
-                            <Power className="h-4 w-4" />
-                          </Button>
+                            <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-6" />
+                          </button>
                         </div>
                       </TableCell>
                     </TableRow>
