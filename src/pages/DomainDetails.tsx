@@ -404,19 +404,55 @@ export default function DomainDetails() {
       const oldNameservers = domain?.nameservers?.join(", ") || null;
       const newNameservers = nameservers.join(", ");
 
+      // ═══════════════════════════════════════════════════════════════
+      // ETAPA 1: Atualizar na Namecheap via Backend
+      // ═══════════════════════════════════════════════════════════════
+
+      console.log("📤 Atualizando nameservers na Namecheap...");
+
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://domainhub-backend.onrender.com";
+
+      const namecheapResponse = await fetch(`${backendUrl}/api/domains/nameservers/update`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          domainName: domain?.domain_name,
+          nameservers: nameservers,
+        }),
+      });
+
+      const namecheapData = await namecheapResponse.json();
+
+      if (!namecheapData.success) {
+        throw new Error(namecheapData.error || "Erro ao atualizar nameservers na Namecheap");
+      }
+
+      console.log("✅ Nameservers atualizados na Namecheap:", namecheapData.data);
+
+      // ═══════════════════════════════════════════════════════════════
+      // ETAPA 2: Atualizar no Supabase (banco de dados local)
+      // ═══════════════════════════════════════════════════════════════
+
+      console.log("💾 Salvando no banco de dados...");
+
       const { error } = await supabase.from("domains").update({ nameservers }).eq("id", id);
 
       if (error) throw error;
 
       // Log da atividade
       await logActivity("nameservers_updated", oldNameservers, newNameservers);
+
+      console.log("✅ Nameservers salvos no banco de dados");
     },
     onSuccess: () => {
       loadDomain();
-      toast.success("Nameservers atualizados com sucesso!");
+      toast.success("Nameservers atualizados com sucesso na Namecheap e no banco de dados!");
       setIsEditingNameservers(false);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error("❌ Erro ao atualizar nameservers:", error);
       toast.error("Erro ao atualizar nameservers: " + error.message);
     },
   });
@@ -726,7 +762,23 @@ export default function DomainDetails() {
                     <span className="text-sm font-medium">Nameservers:</span>
                   </div>
                   {!isEditingNameservers ? (
-                    <Button variant="ghost" size="sm" onClick={() => setIsEditingNameservers(true)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (domain.registrar?.toLowerCase() !== "namecheap") {
+                          toast.error("Apenas domínios registrados na Namecheap podem ter nameservers editados aqui");
+                          return;
+                        }
+                        setIsEditingNameservers(true);
+                      }}
+                      disabled={domain.registrar?.toLowerCase() !== "namecheap"}
+                      title={
+                        domain.registrar?.toLowerCase() !== "namecheap"
+                          ? "Apenas domínios Namecheap"
+                          : "Editar nameservers"
+                      }
+                    >
                       <Edit2 className="h-4 w-4" />
                     </Button>
                   ) : (
@@ -742,11 +794,16 @@ export default function DomainDetails() {
                         Cancelar
                       </Button>
                       <Button size="sm" onClick={handleSaveNameservers} disabled={updateNameservers.isPending}>
-                        Salvar
+                        {updateNameservers.isPending ? "Salvando..." : "Salvar"}
                       </Button>
                     </div>
                   )}
                 </div>
+                {domain.registrar?.toLowerCase() !== "namecheap" && (
+                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                    ⚠️ Edição de nameservers disponível apenas para domínios Namecheap
+                  </p>
+                )}
                 <div className="ml-6">
                   {!isEditingNameservers ? (
                     domain.nameservers && domain.nameservers.length > 0 ? (
