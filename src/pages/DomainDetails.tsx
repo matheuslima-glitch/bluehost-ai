@@ -26,7 +26,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Globe, Calendar, TrendingUp, Server, Wifi, X, Plus, Trash2, Edit2, Info, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft,
+  Globe,
+  Calendar,
+  TrendingUp,
+  Server,
+  Wifi,
+  X,
+  Plus,
+  Trash2,
+  Edit2,
+  Info,
+  AlertTriangle,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, subMonths } from "date-fns";
@@ -427,9 +440,9 @@ export default function DomainDetails() {
     try {
       const { error } = await supabase
         .from("domains")
-        .update({ 
+        .update({
           status: "deactivated",
-          manually_deactivated: true 
+          manually_deactivated: true,
         })
         .eq("id", domain.id);
 
@@ -438,7 +451,7 @@ export default function DomainDetails() {
       // Atualizar o estado local
       setDomain({ ...domain, status: "deactivated", manually_deactivated: true });
       setDeactivateDialogOpen(false);
-      
+
       toast.success("Domínio desativado com sucesso!");
     } catch (error: any) {
       toast.error("Erro ao desativar domínio: " + error.message);
@@ -549,9 +562,18 @@ export default function DomainDetails() {
       expired: { label: "Expirado", className: "bg-red-500 hover:bg-red-600 text-white" },
       pending: { label: "Pendente", className: "bg-blue-500 hover:bg-blue-600 text-white" },
       suspended: { label: "Suspenso", className: "bg-yellow-500 hover:bg-yellow-600 text-white" },
-      desligado: { label: "Desligado", className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700" },
-      disabled: { label: "Desligado", className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700" },
-      inactive: { label: "Desligado", className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700" },
+      desligado: {
+        label: "Desligado",
+        className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700",
+      },
+      disabled: {
+        label: "Desligado",
+        className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700",
+      },
+      inactive: {
+        label: "Desligado",
+        className: "bg-gray-400 hover:bg-gray-500 text-white dark:bg-gray-600 dark:hover:bg-gray-700",
+      },
     };
 
     const config = statusConfig[status.toLowerCase()] || statusConfig.active;
@@ -575,519 +597,530 @@ export default function DomainDetails() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => navigate("/domains")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Globe className="h-8 w-8" />
-              {domain.domain_name}
-            </h1>
-            <p className="text-muted-foreground">Detalhes do domínio</p>
-          </div>
-        </div>
-
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="icon" className="h-10 w-10" onClick={loadActivityLogs}>
-              <Info className="h-5 w-5 text-blue-500" />
+    <>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" onClick={() => navigate("/domains")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Logs de Atividade</DialogTitle>
-              <DialogDescription>Histórico de alterações realizadas neste domínio</DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="h-[500px] pr-4">
-              {loadingLogs ? (
-                <div className="flex justify-center py-8">
-                  <LoadingSpinner />
-                </div>
-              ) : activityLogs.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Nenhuma atividade registrada para este domínio
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {activityLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="border rounded-lg p-4 space-y-2 bg-card hover:bg-accent/5 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <p className="font-medium text-sm">{getActionLabel(log.action_type)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {log.profiles?.full_name || "Usuário desconhecido"}
-                        </Badge>
-                      </div>
-                      {(log.old_value || log.new_value) && (
-                        <div className="grid grid-cols-2 gap-4 pt-2 border-t text-xs">
-                          {log.old_value && (
-                            <div>
-                              <p className="text-muted-foreground mb-1">Valor anterior:</p>
-                              <p className="font-mono bg-muted p-2 rounded">{log.old_value}</p>
-                            </div>
-                          )}
-                          {log.new_value && (
-                            <div>
-                              <p className="text-muted-foreground mb-1">Novo valor:</p>
-                              <p className="font-mono bg-muted p-2 rounded">{log.new_value}</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Informações Básicas</CardTitle>
-            <CardDescription>Status e dados principais do domínio</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Status do Domínio</Label>
-              <div 
-                className={domain.manually_deactivated ? "" : "cursor-pointer hover:opacity-80 transition-opacity inline-block"}
-                onClick={() => {
-                  if (!domain.manually_deactivated) {
-                    setDeactivateDialogOpen(true);
-                  }
-                }}
-                title={domain.manually_deactivated ? "Status bloqueado - Domínio desativado permanentemente" : "Clique para desativar o domínio"}
-              >
-                {getStatusBadge(domain.status)}
-              </div>
-              {domain.manually_deactivated && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  🔒 Status bloqueado - Domínio desativado permanentemente
-                </p>
-              )}
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Globe className="h-8 w-8" />
+                {domain.domain_name}
+              </h1>
+              <p className="text-muted-foreground">Detalhes do domínio</p>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label>Registrador</Label>
-              <p className="text-sm">{domain.registrar || "Não informado"}</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Data de Expiração</Label>
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                {domain.expiration_date
-                  ? format(new Date(domain.expiration_date), "dd/MM/yyyy HH:mm", { locale: ptBR })
-                  : "Não informado"}
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-4 border-t">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Server className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Nameservers:</span>
-                </div>
-                {!isEditingNameservers ? (
-                  <Button variant="ghost" size="sm" onClick={() => setIsEditingNameservers(true)}>
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="icon" className="h-10 w-10" onClick={loadActivityLogs}>
+                <Info className="h-5 w-5 text-blue-500" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Logs de Atividade</DialogTitle>
+                <DialogDescription>Histórico de alterações realizadas neste domínio</DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="h-[500px] pr-4">
+                {loadingLogs ? (
+                  <div className="flex justify-center py-8">
+                    <LoadingSpinner />
+                  </div>
+                ) : activityLogs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhuma atividade registrada para este domínio
+                  </div>
                 ) : (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setIsEditingNameservers(false);
-                        setNameserversInput(domain.nameservers?.join("\n") || "");
-                      }}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button size="sm" onClick={handleSaveNameservers} disabled={updateNameservers.isPending}>
-                      Salvar
-                    </Button>
+                  <div className="space-y-4">
+                    {activityLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="border rounded-lg p-4 space-y-2 bg-card hover:bg-accent/5 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <p className="font-medium text-sm">{getActionLabel(log.action_type)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {log.profiles?.full_name || "Usuário desconhecido"}
+                          </Badge>
+                        </div>
+                        {(log.old_value || log.new_value) && (
+                          <div className="grid grid-cols-2 gap-4 pt-2 border-t text-xs">
+                            {log.old_value && (
+                              <div>
+                                <p className="text-muted-foreground mb-1">Valor anterior:</p>
+                                <p className="font-mono bg-muted p-2 rounded">{log.old_value}</p>
+                              </div>
+                            )}
+                            {log.new_value && (
+                              <div>
+                                <p className="text-muted-foreground mb-1">Novo valor:</p>
+                                <p className="font-mono bg-muted p-2 rounded">{log.new_value}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
-              </div>
-              <div className="ml-6">
-                {!isEditingNameservers ? (
-                  domain.nameservers && domain.nameservers.length > 0 ? (
-                    <ul className="list-disc list-inside text-sm text-muted-foreground">
-                      {domain.nameservers.map((ns, index) => (
-                        <li key={index}>{ns}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Não configurado</p>
-                  )
-                ) : (
-                  <textarea
-                    value={nameserversInput}
-                    onChange={(e) => setNameserversInput(e.target.value)}
-                    placeholder="Digite um nameserver por linha&#10;Exemplo:&#10;ns1.example.com&#10;ns2.example.com"
-                    className="w-full min-h-[120px] p-2 text-sm border rounded-md bg-background"
-                  />
-                )}
-              </div>
-            </div>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
+        </div>
 
-            <div className="space-y-2 pt-4 border-t">
-              <Label>Acesso Rápido</Label>
-              <div className="flex gap-3">
-                {domain.platform?.toLowerCase() === "wordpress" && (
-                  <Button
-                    onClick={() => {
-                      const wordpressUrl = `https://${domain.domain_name}/wordpanel124`;
-                      window.open(wordpressUrl, "_blank");
-                      toast.info("Abrindo painel WordPress. Faça login com as credenciais fornecidas.");
-                    }}
-                    className="flex items-center gap-2 bg-[#21759b] hover:bg-[#1e6a8d] text-white flex-1"
-                  >
-                    <img
-                      src="https://upload.wikimedia.org/wikipedia/commons/9/93/Wordpress_Blue_logo.png"
-                      alt="WordPress"
-                      className="h-5 w-5 object-contain"
-                    />
-                    <span className="text-sm">Login WordPress</span>
-                  </Button>
-                )}
-
-                {domain.platform?.toLowerCase() === "atomicat" && (
-                  <Button
-                    onClick={() => {
-                      const atomicatUrl = "https://app.atomicat.com.br/login";
-                      window.open(atomicatUrl, "_blank");
-                      toast.info("Abrindo painel Atomicat. Faça login com as credenciais fornecidas.");
-                    }}
-                    className="flex items-center gap-2 bg-gradient-to-r from-gray-900 to-gray-600 hover:from-gray-800 hover:to-gray-500 text-white flex-1"
-                  >
-                    <img
-                      src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png"
-                      alt="Atomicat"
-                      className="h-5 w-5 object-contain rounded"
-                    />
-                    <span className="text-sm">Login Atomicat</span>
-                  </Button>
-                )}
-
-                {!domain.platform && (
-                  <p className="text-sm text-muted-foreground">Selecione uma plataforma para ver as opções de login</p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Configurações</CardTitle>
-            <CardDescription>Configure plataforma e fonte de tráfego</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="platform">Plataforma</Label>
-              <Select
-                value={domain.platform || ""}
-                onValueChange={(value) => updateDomain("platform", value)}
-                disabled={saving}
-              >
-                <SelectTrigger id="platform">
-                  <Server className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Selecione uma plataforma" />
-                </SelectTrigger>
-                <SelectContent>
-                  {platformOptions.map((platform) => (
-                    <SelectItem key={platform} value={platform}>
-                      {platform.charAt(0).toUpperCase() + platform.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {domain.purchase_date ? "Informação preenchida automaticamente" : "Configure manualmente a plataforma"}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="traffic_source">Fonte de Tráfego</Label>
-              <Select
-                value={domain.traffic_source || ""}
-                onValueChange={(value) => updateDomain("traffic_source", value)}
-                disabled={saving}
-              >
-                <SelectTrigger id="traffic_source">
-                  <Wifi className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Selecione uma fonte" />
-                </SelectTrigger>
-                <SelectContent>
-                  {trafficSourceOptions.map((source) => (
-                    <SelectItem key={source} value={source}>
-                      {source.charAt(0).toUpperCase() + source.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="funnel_id">ID do Funil</Label>
-              <Input
-                id="funnel_id"
-                type="text"
-                placeholder="Digite o ID e pressione Enter"
-                value={funnelIdInput}
-                onChange={(e) => setFunnelIdInput(e.target.value)}
-                onKeyPress={handleFunnelIdKeyPress}
-                disabled={saving}
-              />
-              {funnelIdTags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {funnelIdTags.map((tag, index) => (
-                    <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                      {tag}
-                      <X className="h-3 w-3 cursor-pointer" onClick={() => removeFunnelIdTag(tag)} />
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Data e Hora da Compra</Label>
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                {domain.purchase_date
-                  ? format(new Date(domain.purchase_date), "dd/MM/yyyy HH:mm", { locale: ptBR })
-                  : "Domínio não foi comprado no sistema"}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Dashboard de Visitas Mensais</CardTitle>
-          <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loadingAnalytics ? (
-            <div className="flex justify-center items-center h-[300px]">
-              <LoadingSpinner />
-            </div>
-          ) : analyticsData.length === 0 ? (
-            <div className="flex justify-center items-center h-[300px] text-muted-foreground">
-              Nenhum dado de analytics encontrado para este domínio
-            </div>
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={analyticsData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
-                  <YAxis
-                    className="text-xs"
-                    tick={{ fill: "hsl(var(--foreground))" }}
-                    tickFormatter={(value) => value.toLocaleString()}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--background))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                    labelStyle={{ color: "hsl(var(--foreground))" }}
-                    formatter={(value: number) => [value.toLocaleString() + " visitas", "Visitas"]}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="visitas"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(var(--primary))" }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-
-              <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
-                <div className="text-center">
-                  <p className="text-3xl font-bold">
-                    {analyticsData.reduce((sum, item) => sum + item.visitas, 0).toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">Total Anual</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-3xl font-bold">
-                    {Math.round(
-                      analyticsData.reduce((sum, item) => sum + item.visitas, 0) / analyticsData.length,
-                    ).toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">Média Mensal</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-3xl font-bold">
-                    {Math.max(...analyticsData.map((item) => item.visitas)).toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">Pico Mensal</p>
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {domain.zone_id && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Zonas DNS</CardTitle>
-            <CardDescription>Gerencie os registros DNS do seu domínio</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Informações Básicas</CardTitle>
+              <CardDescription>Status e dados principais do domínio</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="dns-type">Tipo</Label>
-                <Select
-                  value={newDnsRecord.type}
-                  onValueChange={(value) => setNewDnsRecord({ ...newDnsRecord, type: value })}
+                <Label>Status do Domínio</Label>
+                <div
+                  className={
+                    domain.manually_deactivated ? "" : "cursor-pointer hover:opacity-80 transition-opacity inline-block"
+                  }
+                  onClick={() => {
+                    if (!domain.manually_deactivated) {
+                      setDeactivateDialogOpen(true);
+                    }
+                  }}
+                  title={
+                    domain.manually_deactivated
+                      ? "Status bloqueado - Domínio desativado permanentemente"
+                      : "Clique para desativar o domínio"
+                  }
                 >
-                  <SelectTrigger id="dns-type">
-                    <SelectValue />
+                  {getStatusBadge(domain.status)}
+                </div>
+                {domain.manually_deactivated && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    🔒 Status bloqueado - Domínio desativado permanentemente
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Registrador</Label>
+                <p className="text-sm">{domain.registrar || "Não informado"}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Data de Expiração</Label>
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  {domain.expiration_date
+                    ? format(new Date(domain.expiration_date), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                    : "Não informado"}
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Server className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Nameservers:</span>
+                  </div>
+                  {!isEditingNameservers ? (
+                    <Button variant="ghost" size="sm" onClick={() => setIsEditingNameservers(true)}>
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setIsEditingNameservers(false);
+                          setNameserversInput(domain.nameservers?.join("\n") || "");
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button size="sm" onClick={handleSaveNameservers} disabled={updateNameservers.isPending}>
+                        Salvar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className="ml-6">
+                  {!isEditingNameservers ? (
+                    domain.nameservers && domain.nameservers.length > 0 ? (
+                      <ul className="list-disc list-inside text-sm text-muted-foreground">
+                        {domain.nameservers.map((ns, index) => (
+                          <li key={index}>{ns}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Não configurado</p>
+                    )
+                  ) : (
+                    <textarea
+                      value={nameserversInput}
+                      onChange={(e) => setNameserversInput(e.target.value)}
+                      placeholder="Digite um nameserver por linha&#10;Exemplo:&#10;ns1.example.com&#10;ns2.example.com"
+                      className="w-full min-h-[120px] p-2 text-sm border rounded-md bg-background"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-4 border-t">
+                <Label>Acesso Rápido</Label>
+                <div className="flex gap-3">
+                  {domain.platform?.toLowerCase() === "wordpress" && (
+                    <Button
+                      onClick={() => {
+                        const wordpressUrl = `https://${domain.domain_name}/wordpanel124`;
+                        window.open(wordpressUrl, "_blank");
+                        toast.info("Abrindo painel WordPress. Faça login com as credenciais fornecidas.");
+                      }}
+                      className="flex items-center gap-2 bg-[#21759b] hover:bg-[#1e6a8d] text-white flex-1"
+                    >
+                      <img
+                        src="https://upload.wikimedia.org/wikipedia/commons/9/93/Wordpress_Blue_logo.png"
+                        alt="WordPress"
+                        className="h-5 w-5 object-contain"
+                      />
+                      <span className="text-sm">Login WordPress</span>
+                    </Button>
+                  )}
+
+                  {domain.platform?.toLowerCase() === "atomicat" && (
+                    <Button
+                      onClick={() => {
+                        const atomicatUrl = "https://app.atomicat.com.br/login";
+                        window.open(atomicatUrl, "_blank");
+                        toast.info("Abrindo painel Atomicat. Faça login com as credenciais fornecidas.");
+                      }}
+                      className="flex items-center gap-2 bg-gradient-to-r from-gray-900 to-gray-600 hover:from-gray-800 hover:to-gray-500 text-white flex-1"
+                    >
+                      <img
+                        src="https://hotmart.s3.amazonaws.com/product_pictures/27c9db33-412c-4683-b79f-562016a33220/imagemavatardegradedark.png"
+                        alt="Atomicat"
+                        className="h-5 w-5 object-contain rounded"
+                      />
+                      <span className="text-sm">Login Atomicat</span>
+                    </Button>
+                  )}
+
+                  {!domain.platform && (
+                    <p className="text-sm text-muted-foreground">
+                      Selecione uma plataforma para ver as opções de login
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurações</CardTitle>
+              <CardDescription>Configure plataforma e fonte de tráfego</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="platform">Plataforma</Label>
+                <Select
+                  value={domain.platform || ""}
+                  onValueChange={(value) => updateDomain("platform", value)}
+                  disabled={saving}
+                >
+                  <SelectTrigger id="platform">
+                    <Server className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Selecione uma plataforma" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="A">A</SelectItem>
-                    <SelectItem value="AAAA">AAAA</SelectItem>
-                    <SelectItem value="CNAME">CNAME</SelectItem>
-                    <SelectItem value="TXT">TXT</SelectItem>
-                    <SelectItem value="MX">MX</SelectItem>
+                    {platformOptions.map((platform) => (
+                      <SelectItem key={platform} value={platform}>
+                        {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {domain.purchase_date
+                    ? "Informação preenchida automaticamente"
+                    : "Configure manualmente a plataforma"}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="traffic_source">Fonte de Tráfego</Label>
+                <Select
+                  value={domain.traffic_source || ""}
+                  onValueChange={(value) => updateDomain("traffic_source", value)}
+                  disabled={saving}
+                >
+                  <SelectTrigger id="traffic_source">
+                    <Wifi className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Selecione uma fonte" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {trafficSourceOptions.map((source) => (
+                      <SelectItem key={source} value={source}>
+                        {source.charAt(0).toUpperCase() + source.slice(1)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="dns-name">Nome</Label>
-                <Input
-                  id="dns-name"
-                  placeholder="@, www, etc"
-                  value={newDnsRecord.name}
-                  onChange={(e) => setNewDnsRecord({ ...newDnsRecord, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dns-content">Conteúdo</Label>
-                <Input
-                  id="dns-content"
-                  placeholder="IP ou valor"
-                  value={newDnsRecord.content}
-                  onChange={(e) => setNewDnsRecord({ ...newDnsRecord, content: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dns-ttl">TTL</Label>
-                <Input
-                  id="dns-ttl"
-                  type="number"
-                  value={newDnsRecord.ttl}
-                  onChange={(e) => setNewDnsRecord({ ...newDnsRecord, ttl: parseInt(e.target.value) })}
-                />
-              </div>
-            </div>
-            <Button onClick={addDnsRecord} className="w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar Registro DNS
-            </Button>
 
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Conteúdo</TableHead>
-                    <TableHead>TTL</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loadingDns ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center">
-                        <LoadingSpinner />
-                      </TableCell>
-                    </TableRow>
-                  ) : dnsRecords.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">
-                        Nenhum registro DNS encontrado
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    dnsRecords.map((record: any) => (
-                      <TableRow key={record.id}>
-                        <TableCell>
-                          <Badge variant="outline">{record.type}</Badge>
-                        </TableCell>
-                        <TableCell className="font-mono">{record.name}</TableCell>
-                        <TableCell className="font-mono text-sm">{record.content}</TableCell>
-                        <TableCell>{record.ttl}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => deleteDnsRecord(record.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="funnel_id">ID do Funil</Label>
+                <Input
+                  id="funnel_id"
+                  type="text"
+                  placeholder="Digite o ID e pressione Enter"
+                  value={funnelIdInput}
+                  onChange={(e) => setFunnelIdInput(e.target.value)}
+                  onKeyPress={handleFunnelIdKeyPress}
+                  disabled={saving}
+                />
+                {funnelIdTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {funnelIdTags.map((tag, index) => (
+                      <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                        {tag}
+                        <X className="h-3 w-3 cursor-pointer" onClick={() => removeFunnelIdTag(tag)} />
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Data e Hora da Compra</Label>
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  {domain.purchase_date
+                    ? format(new Date(domain.purchase_date), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                    : "Domínio não foi comprado no sistema"}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Dashboard de Visitas Mensais</CardTitle>
+            <CardDescription>Histórico de visitas nos últimos 12 meses</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingAnalytics ? (
+              <div className="flex justify-center items-center h-[300px]">
+                <LoadingSpinner />
+              </div>
+            ) : analyticsData.length === 0 ? (
+              <div className="flex justify-center items-center h-[300px] text-muted-foreground">
+                Nenhum dado de analytics encontrado para este domínio
+              </div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={analyticsData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--foreground))" }} />
+                    <YAxis
+                      className="text-xs"
+                      tick={{ fill: "hsl(var(--foreground))" }}
+                      tickFormatter={(value) => value.toLocaleString()}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--background))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      labelStyle={{ color: "hsl(var(--foreground))" }}
+                      formatter={(value: number) => [value.toLocaleString() + " visitas", "Visitas"]}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="visitas"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--primary))" }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+
+                <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold">
+                      {analyticsData.reduce((sum, item) => sum + item.visitas, 0).toLocaleString()}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">Total Anual</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-3xl font-bold">
+                      {Math.round(
+                        analyticsData.reduce((sum, item) => sum + item.visitas, 0) / analyticsData.length,
+                      ).toLocaleString()}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">Média Mensal</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-3xl font-bold">
+                      {Math.max(...analyticsData.map((item) => item.visitas)).toLocaleString()}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">Pico Mensal</p>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
-      )}
-    </div>
 
-    {/* AlertDialog de Desativação */}
-    <AlertDialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-red-500" />
-            Atenção!
-          </AlertDialogTitle>
-          <AlertDialogDescription className="space-y-3 text-base">
-            <p className="font-semibold">Essa ação é irreversível.</p>
-            <p>
-              Alterar o status do domínio <strong>{domain?.domain_name}</strong> para <strong>DESATIVADO</strong> fará com que ele seja removido/desativado permanentemente.
-            </p>
-            <p>
-              O domínio será marcado como desativado apenas no banco de dados interno mas continuará registrado normalmente no provedor da Namecheap até que seja expirado ou renovado diretamente por lá.
-            </p>
-            <p className="font-semibold text-red-600">Tem certeza de que deseja continuar?</p>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleDeactivateDomain}
-            className="bg-red-500 text-white hover:bg-red-600"
-          >
-            Sim, Desativar
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        {domain.zone_id && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Zonas DNS</CardTitle>
+              <CardDescription>Gerencie os registros DNS do seu domínio</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="space-y-2">
+                  <Label htmlFor="dns-type">Tipo</Label>
+                  <Select
+                    value={newDnsRecord.type}
+                    onValueChange={(value) => setNewDnsRecord({ ...newDnsRecord, type: value })}
+                  >
+                    <SelectTrigger id="dns-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="A">A</SelectItem>
+                      <SelectItem value="AAAA">AAAA</SelectItem>
+                      <SelectItem value="CNAME">CNAME</SelectItem>
+                      <SelectItem value="TXT">TXT</SelectItem>
+                      <SelectItem value="MX">MX</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dns-name">Nome</Label>
+                  <Input
+                    id="dns-name"
+                    placeholder="@, www, etc"
+                    value={newDnsRecord.name}
+                    onChange={(e) => setNewDnsRecord({ ...newDnsRecord, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dns-content">Conteúdo</Label>
+                  <Input
+                    id="dns-content"
+                    placeholder="IP ou valor"
+                    value={newDnsRecord.content}
+                    onChange={(e) => setNewDnsRecord({ ...newDnsRecord, content: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dns-ttl">TTL</Label>
+                  <Input
+                    id="dns-ttl"
+                    type="number"
+                    value={newDnsRecord.ttl}
+                    onChange={(e) => setNewDnsRecord({ ...newDnsRecord, ttl: parseInt(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <Button onClick={addDnsRecord} className="w-full">
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Registro DNS
+              </Button>
+
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Conteúdo</TableHead>
+                      <TableHead>TTL</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loadingDns ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center">
+                          <LoadingSpinner />
+                        </TableCell>
+                      </TableRow>
+                    ) : dnsRecords.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          Nenhum registro DNS encontrado
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      dnsRecords.map((record: any) => (
+                        <TableRow key={record.id}>
+                          <TableCell>
+                            <Badge variant="outline">{record.type}</Badge>
+                          </TableCell>
+                          <TableCell className="font-mono">{record.name}</TableCell>
+                          <TableCell className="font-mono text-sm">{record.content}</TableCell>
+                          <TableCell>{record.ttl}</TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="sm" onClick={() => deleteDnsRecord(record.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* AlertDialog de Desativação */}
+      <AlertDialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Atenção!
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-base">
+              <p className="font-semibold">Essa ação é irreversível.</p>
+              <p>
+                Alterar o status do domínio <strong>{domain?.domain_name}</strong> para <strong>DESATIVADO</strong> fará
+                com que ele seja removido/desativado permanentemente.
+              </p>
+              <p>
+                O domínio será marcado como desativado apenas no banco de dados interno mas continuará registrado
+                normalmente no provedor da Namecheap até que seja expirado ou renovado diretamente por lá.
+              </p>
+              <p className="font-semibold text-red-600">Tem certeza de que deseja continuar?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeactivateDomain} className="bg-red-500 text-white hover:bg-red-600">
+              Sim, Desativar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
