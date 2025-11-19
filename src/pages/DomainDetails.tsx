@@ -422,6 +422,9 @@ export default function DomainDetails() {
     onSuccess: () => {
       loadDomain();
       toast.success("Nameservers atualizados com sucesso!");
+      toast.info("⏰ A mudança de nameservers pode levar até 48 horas para propagar completamente.", {
+        duration: 6000,
+      });
       setIsEditingNameservers(false);
     },
     onError: (error) => {
@@ -444,12 +447,12 @@ export default function DomainDetails() {
   };
 
   /**
-   * Define DNS predefinido da Namecheap (BasicDNS ou WebHostingDNS)
+   * Define DNS predefinido da Namecheap (BasicDNS)
    */
-  const handleSetNamecheapDNS = async (dnsType: "BasicDNS" | "WebHostingDNS") => {
+  const handleSetNamecheapDNS = async (dnsType: "BasicDNS") => {
     if (!domain) return;
 
-    const dnsTypeLabel = dnsType === "BasicDNS" ? "Namecheap BasicDNS" : "Namecheap Web Hosting DNS";
+    const dnsTypeLabel = "Namecheap BasicDNS";
 
     try {
       console.log(`📤 Configurando ${dnsTypeLabel} para ${domain.domain_name}...`);
@@ -476,6 +479,9 @@ export default function DomainDetails() {
       console.log(`✅ ${dnsTypeLabel} configurado:`, data.data);
 
       toast.success(`${dnsTypeLabel} configurado com sucesso!`);
+      toast.info("⏰ A mudança de nameservers pode levar até 48 horas para propagar completamente.", {
+        duration: 6000,
+      });
 
       // Registrar log de atividade
       const oldNameservers = domain?.nameservers?.join(", ") || null;
@@ -808,20 +814,6 @@ export default function DomainDetails() {
                               <span className="font-medium">Namecheap BasicDNS</span>
                               <span className="description text-xs text-muted-foreground transition-colors">
                                 DNS padrão da Namecheap
-                              </span>
-                            </div>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem
-                            onClick={() => handleSetNamecheapDNS("WebHostingDNS")}
-                            disabled={updateNameservers.isPending}
-                            className="cursor-pointer [&[data-highlighted]_.description]:text-accent-foreground"
-                          >
-                            <Server className="h-4 w-4 mr-2 flex-shrink-0" />
-                            <div className="flex flex-col">
-                              <span className="font-medium whitespace-nowrap">Namecheap Web Hosting DNS</span>
-                              <span className="description text-xs text-muted-foreground transition-colors">
-                                DNS para hospedagem
                               </span>
                             </div>
                           </DropdownMenuItem>
