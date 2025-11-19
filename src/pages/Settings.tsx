@@ -305,7 +305,6 @@ export default function Settings() {
               onChange={(e) => setWhatsappNumber(e.target.value)}
               placeholder="+55 11 99999-9999"
             />
-            <p className="text-sm text-muted-foreground">Formato: +55 11 99999-9999 (incluir código do país e DDD)</p>
           </div>
           <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
             {updateProfileMutation.isPending ? "Salvando..." : "Salvar Alterações"}
