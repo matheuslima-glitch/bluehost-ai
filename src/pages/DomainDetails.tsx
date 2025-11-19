@@ -558,10 +558,10 @@ export default function DomainDetails() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; className: string }> = {
-      active: { label: "Ativo", className: "bg-green-500 text-white" },
-      expired: { label: "Expirado", className: "bg-red-500 text-white" },
-      pending: { label: "Pendente", className: "bg-blue-500 text-white" },
-      suspended: { label: "Suspenso", className: "bg-yellow-500 text-white" },
+      active: { label: "Ativo", className: "bg-green-500 text-white hover:bg-green-600 transition-colors" },
+      expired: { label: "Expirado", className: "bg-red-500 text-white hover:bg-red-600 transition-colors" },
+      pending: { label: "Pendente", className: "bg-blue-500 text-white hover:bg-blue-600 transition-colors" },
+      suspended: { label: "Suspenso", className: "bg-orange-500 text-white hover:bg-orange-600 transition-colors" },
       deactivated: { label: "Desativado", className: "bg-gray-400 text-white dark:bg-gray-600" },
     };
 
@@ -676,7 +676,7 @@ export default function DomainDetails() {
               <div className="space-y-2">
                 <Label>Status do Domínio</Label>
                 <div
-                  className={domain.manually_deactivated ? "" : "cursor-pointer hover:opacity-80 transition-opacity"}
+                  className={domain.manually_deactivated ? "" : "cursor-pointer"}
                   onClick={() => {
                     if (!domain.manually_deactivated) {
                       setDeactivateDialogOpen(true);
@@ -1102,7 +1102,7 @@ export default function DomainDetails() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeactivateDomain} className="bg-red-500 text-white hover:bg-red-600">
+            <AlertDialogAction onClick={handleDeactivateDomain} className="bg-red-600 text-white hover:bg-red-700">
               Sim, Desativar
             </AlertDialogAction>
           </AlertDialogFooter>
