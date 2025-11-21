@@ -152,11 +152,10 @@ export default function Settings() {
 
     // Validar formato básico
     if (cleanNumber.length < 12) {
-      // +55 (2) + DDD (2) + número (8/9) = mínimo 12
       setWhatsappValidation({
         isValidating: false,
         isValid: false,
-        message: "Número incompleto",
+        message: "Número incompleto (mínimo 11 dígitos)",
       });
       return;
     }
@@ -180,9 +179,13 @@ export default function Settings() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          phoneNumber: cleanNumber, // Envia apenas números: 5519989320129
+          phoneNumber: cleanNumber,
         }),
       });
+
+      if (!response.ok) {
+        throw new Error(`Erro na validação: ${response.status}`);
+      }
 
       const data = await response.json();
 
@@ -203,7 +206,7 @@ export default function Settings() {
       setWhatsappValidation({
         isValidating: false,
         isValid: false,
-        message: "Erro ao validar número",
+        message: "Erro ao validar número. Verifique sua conexão.",
       });
     }
   };
@@ -511,10 +514,8 @@ export default function Settings() {
           <div className="space-y-2">
             <Label htmlFor="whatsapp">Número do WhatsApp</Label>
             <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-2xl pointer-events-none">🇧🇷</div>
               <Input
                 id="whatsapp"
-                className="pl-12"
                 placeholder="+55 19 98932-0129"
                 value={whatsappNumber}
                 onChange={handleWhatsappChange}
