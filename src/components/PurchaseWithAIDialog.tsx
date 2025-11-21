@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CheckCircle2, XCircle, Clock, Copy } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Clock, Copy, AlertCircle, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
@@ -12,7 +12,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface PurchaseProgress {
   step: string;
-  status: "in_progress" | "completed" | "error";
+  status: "in_progress" | "completed" | "error" | "canceled";
   message: string;
   error_details?: string;
   domain_name?: string;
@@ -32,6 +32,7 @@ const STEP_LABELS: { [key: string]: string } = {
   nameservers: "Alterando nameservers",
   cloudflare: "Configurando Cloudflare",
   completed: "Compra concluída",
+  canceled: "Compra cancelada !",
 };
 
 const WORDPRESS_STEPS = ["generating", "checking", "searching", "purchasing", "nameservers", "cloudflare", "completed"];
@@ -39,6 +40,7 @@ const ATOMICAT_STEPS = ["generating", "checking", "searching", "purchasing", "co
 
 const TIMEOUT_SECONDS = 90000;
 const MIN_DISPLAY_TIME = 800;
+const MAX_DOMAINS = 10; // LIMITE MÁXIMO
 
 export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: PurchaseWithAIDialogProps) {
   const [quantity, setQuantity] = useState<number>(1);
@@ -49,7 +51,9 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const [currentProgress, setCurrentProgress] = useState<PurchaseProgress | null>(null);
   const [showProgress, setShowProgress] = useState(false);
   const [progressPercentage, setProgressPercentage] = useState(0);
-  const [purchasedDomain, setPurchasedDomain] = useState<string | null>(null);
+
+  // MUDANÇA: Armazenar TODOS os domínios comprados
+  const [purchasedDomains, setPurchasedDomains] = useState<string[]>([]);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
@@ -64,7 +68,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       setCurrentProgress(null);
       setProgressPercentage(0);
       setShowProgress(false);
-      setPurchasedDomain(null);
+      setPurchasedDomains([]); // Limpar lista
       setShowSuccessDialog(false);
       updateQueueRef.current = [];
       processingRef.current = false;
@@ -103,43 +107,64 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     processingRef.current = true;
 
     while (updateQueueRef.current.length > 0) {
-      const now = Date.now();
-      const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
+      const update = updateQueueRef.current.shift();
 
-      if (timeSinceLastUpdate < MIN_DISPLAY_TIME) {
-        await new Promise((resolve) => setTimeout(resolve, MIN_DISPLAY_TIME - timeSinceLastUpdate));
-      }
+      if (update) {
+        const now = Date.now();
+        const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
 
-      const progress = updateQueueRef.current.shift()!;
+        if (timeSinceLastUpdate < MIN_DISPLAY_TIME) {
+          await new Promise((resolve) => setTimeout(resolve, MIN_DISPLAY_TIME - timeSinceLastUpdate));
+        }
 
-      setCurrentProgress(progress);
+        setCurrentProgress(update);
+        setProgressPercentage(calculateProgress(update.step));
+        lastUpdateTimeRef.current = Date.now();
 
-      if (progress.domain_name && progress.domain_name.trim() !== "") {
-        setPurchasedDomain(progress.domain_name);
-      }
+        // ADICIONAR DOMÍNIO À LISTA quando comprado
+        if (update.status === "completed" && update.domain_name) {
+          setPurchasedDomains((prev) => [...prev, update.domain_name!]);
+        }
 
-      const percentage = calculateProgress(progress.step);
-      setProgressPercentage(percentage);
+        if (update.status === "completed" && update.step === "completed") {
+          setTimeout(() => finishProcess(true), 1000);
+        }
 
-      lastUpdateTimeRef.current = Date.now();
+        if (update.status === "error") {
+          setTimeout(() => finishProcess(false, update.error_details || "Erro desconhecido"), 2000);
+        }
 
-      if (progress.step === "completed" && progress.status === "completed") {
-        setProgressPercentage(100);
-        updateQueueRef.current = [];
-        processingRef.current = false;
-        finishProcess(true, progress.message);
-        return;
-      }
-
-      if (progress.status === "error") {
-        updateQueueRef.current = [];
-        processingRef.current = false;
-        finishProcess(false, progress.message || "Erro no processo");
-        return;
+        if (update.status === "canceled") {
+          setTimeout(() => finishProcess(false, "Compra cancelada pelo usuário"), 1000);
+        }
       }
     }
 
     processingRef.current = false;
+  };
+
+  const finishProcess = (success: boolean, errorMessage?: string) => {
+    setLoading(false);
+
+    if (channelRef.current) {
+      channelRef.current.unsubscribe();
+      channelRef.current = null;
+    }
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    if (success && purchasedDomains.length > 0) {
+      setShowSuccessDialog(true);
+      setShowProgress(false);
+    } else {
+      if (errorMessage) {
+        toast.error(errorMessage, { duration: 5000 });
+      }
+      setShowProgress(false);
+    }
   };
 
   const resetTimeout = () => {
@@ -148,57 +173,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
 
     timeoutRef.current = setTimeout(() => {
-      finishProcess(false, "O processo não respondeu em 90 segundos. Verifique se há erros ou tente novamente.");
+      finishProcess(false, "Tempo esgotado. O processo pode ainda estar em andamento no servidor.");
     }, TIMEOUT_SECONDS);
-  };
-
-  const finishProcess = (success: boolean, message?: string) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-
-    if (channelRef.current) {
-      channelRef.current.unsubscribe();
-      channelRef.current = null;
-    }
-
-    setLoading(false);
-
-    if (success) {
-      const fetchAndShowSuccess = async () => {
-        try {
-          const { data, error } = await supabase
-            .from("domain_purchase_progress")
-            .select("domain_name, session_id, updated_at")
-            .not("domain_name", "is", null)
-            .order("updated_at", { ascending: false })
-            .limit(1)
-            .single();
-
-          if (data?.domain_name) {
-            setPurchasedDomain(data.domain_name);
-          } else {
-            // Silenciosamente falha, o 'purchasedDomain' do realtime deve bastar
-          }
-        } catch (err) {
-          console.error("Erro ao buscar último domínio:", err);
-        }
-
-        setShowProgress(false);
-        setShowSuccessDialog(true);
-      };
-
-      fetchAndShowSuccess();
-    } else {
-      toast.error(message || "Erro no processo", { duration: 5000 });
-      setTimeout(() => {
-        setShowProgress(false);
-        setCurrentProgress(null);
-        setProgressPercentage(0);
-        setPurchasedDomain(null);
-      }, 3000);
-    }
   };
 
   const handleGenerate = async () => {
@@ -221,7 +197,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setShowProgress(true);
     setCurrentProgress(null);
     setProgressPercentage(0);
-    setPurchasedDomain(null);
+    setPurchasedDomains([]); // Limpar lista ao iniciar
     updateQueueRef.current = [];
     processingRef.current = false;
     lastUpdateTimeRef.current = Date.now();
@@ -311,15 +287,51 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setCurrentProgress(null);
     setProgressPercentage(0);
     setShowProgress(false);
-    setPurchasedDomain(null);
+    setPurchasedDomains([]);
     setShowSuccessDialog(false);
     setCurrentSessionId(null);
   };
 
+  // FUNÇÃO DE CANCELAMENTO PODEROSA
+  const cancelPurchase = async () => {
+    if (!currentSessionId) return;
+
+    try {
+      // Chamar endpoint de cancelamento no backend
+      const response = await fetch("/api/domains/cancel", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId: currentSessionId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.warning("🛑 Compra cancelada! Domínios já comprados não serão revertidos.", {
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao cancelar:", error);
+    }
+  };
+
   const handleClose = () => {
     if (loading) {
-      const confirmCancel = confirm("O processo ainda está em andamento. Deseja realmente cancelar?");
+      const confirmCancel = confirm(
+        "⚠️ O processo ainda está em andamento.\n\n" +
+          "⚠️ IMPORTANTE: Domínios já comprados NÃO serão revertidos!\n\n" +
+          "Deseja realmente cancelar as compras pendentes?",
+      );
+
       if (!confirmCancel) return;
+
+      // Cancelar no backend
+      cancelPurchase();
 
       finishProcess(false, "Processo cancelado pelo usuário");
     }
@@ -344,11 +356,15 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     resetForm();
   };
 
-  const copyDomain = () => {
-    if (purchasedDomain) {
-      navigator.clipboard.writeText(purchasedDomain);
-      toast.success("Domínio copiado!");
-    }
+  const copyDomain = (domain: string) => {
+    navigator.clipboard.writeText(domain);
+    toast.success("Domínio copiado!");
+  };
+
+  const copyAllDomains = () => {
+    const allDomains = purchasedDomains.join("\n");
+    navigator.clipboard.writeText(allDomains);
+    toast.success(`${purchasedDomains.length} domínios copiados!`);
   };
 
   const getStatusIcon = (status: string) => {
@@ -357,11 +373,20 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         return <CheckCircle2 className="h-5 w-5 text-green-500" />;
       case "error":
         return <XCircle className="h-5 w-5 text-red-500" />;
+      case "canceled":
+        return <AlertCircle className="h-5 w-5 text-orange-500" />;
       case "in_progress":
         return <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />;
       default:
         return <Clock className="h-5 w-5 text-gray-400" />;
     }
+  };
+
+  // Validar input de quantidade
+  const handleQuantityChange = (value: string) => {
+    const num = parseInt(value) || 1;
+    const clamped = Math.max(1, Math.min(MAX_DOMAINS, num));
+    setQuantity(clamped);
   };
 
   return (
@@ -382,11 +407,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                   id="quantity"
                   type="number"
                   min={1}
-                  max={10}
+                  max={MAX_DOMAINS}
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+                  onChange={(e) => handleQuantityChange(e.target.value)}
                   disabled={loading}
                 />
+                <p className="text-xs text-muted-foreground">Máximo: {MAX_DOMAINS} domínios por compra</p>
               </div>
 
               <div className="space-y-2">
@@ -460,6 +486,25 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                 <Progress value={progressPercentage} className="h-3" />
               </div>
 
+              {/* MOSTRAR DOMÍNIOS JÁ COMPRADOS */}
+              {purchasedDomains.length > 0 && (
+                <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <span className="text-sm font-semibold text-green-700 dark:text-green-300">
+                      {purchasedDomains.length} de {quantity} domínio(s) comprado(s)
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {purchasedDomains.map((domain, index) => (
+                      <div key={index} className="text-xs text-green-600 dark:text-green-400 font-mono">
+                        ✓ {domain}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 {!currentProgress && (
                   <div className="text-center py-8 text-muted-foreground text-sm">
@@ -474,9 +519,10 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                       currentProgress.status === "completed"
                         ? "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800"
                         : currentProgress.status === "error"
-                          ? // CORREÇÃO ESTAVA AQUI
-                            "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800"
-                          : "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800"
+                          ? "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800"
+                          : currentProgress.status === "canceled"
+                            ? "bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800"
+                            : "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800"
                     }`}
                   >
                     <div className="mt-0.5">{getStatusIcon(currentProgress.status)}</div>
@@ -513,28 +559,80 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         </DialogContent>
       </Dialog>
 
-      {/* POPUP DE SUCESSO */}
+      {/* POPUP DE SUCESSO - REDESENHADO */}
       <Dialog open={showSuccessDialog} onOpenChange={handleSuccessClose}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl">Domínio Comprado!</DialogTitle>
-            <DialogDescription>Seu novo domínio está pronto para uso</DialogDescription>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <DialogTitle className="text-2xl">
+                  {purchasedDomains.length === 1
+                    ? "Domínio Comprado!"
+                    : `${purchasedDomains.length} Domínios Comprados!`}
+                </DialogTitle>
+                <DialogDescription>
+                  {purchasedDomains.length === 1
+                    ? "Seu novo domínio está pronto para uso"
+                    : "Seus novos domínios estão prontos para uso"}
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
 
-          <div className="py-6">
-            <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950 dark:to-blue-950 rounded-xl border-2 border-green-300 dark:border-green-700">
-              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400 flex-shrink-0" />
-              <code className="flex-1 text-xl font-bold font-mono text-foreground break-all">
-                {purchasedDomain || "carregando..."}
-              </code>
-              <Button
-                onClick={copyDomain}
-                size="icon"
-                variant="outline"
-                className="flex-shrink-0 h-10 w-10"
-                title="Copiar domínio"
-              >
-                <Copy className="h-4 w-4" />
+          <div className="space-y-4 py-4">
+            {/* LISTA DE DOMÍNIOS */}
+            <div className="max-h-[400px] overflow-y-auto space-y-2 pr-2">
+              {purchasedDomains.map((domain, index) => (
+                <div
+                  key={index}
+                  className="group flex items-center gap-3 p-3 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-all"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">#{index + 1}</span>
+                      <code className="text-base font-mono font-semibold text-foreground break-all">{domain}</code>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Button
+                      onClick={() => copyDomain(domain)}
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Copiar domínio"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+
+                    <Button
+                      onClick={() => window.open(`https://${domain}`, "_blank")}
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Abrir domínio"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* AÇÕES */}
+            <div className="flex gap-3 pt-2 border-t">
+              {purchasedDomains.length > 1 && (
+                <Button onClick={copyAllDomains} variant="outline" className="flex-1">
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copiar Todos
+                </Button>
+              )}
+
+              <Button onClick={handleSuccessClose} className="flex-1">
+                Fechar
               </Button>
             </div>
           </div>
