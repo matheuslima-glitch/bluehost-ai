@@ -157,8 +157,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
 
     if (success && purchasedDomains.length > 0) {
-      setShowSuccessDialog(true);
+      // CRÍTICO: Primeiro fechar o progresso, depois abrir o sucesso
       setShowProgress(false);
+      // Pequeno delay para garantir que o estado foi atualizado
+      setTimeout(() => {
+        setShowSuccessDialog(true);
+      }, 100);
     } else {
       if (errorMessage) {
         toast.error(errorMessage, { duration: 5000 });
@@ -299,7 +303,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setProgressPercentage(0);
     setShowProgress(false);
     setPurchasedDomains([]);
-    setShowSuccessDialog(false);
+    // NÃO resetar showSuccessDialog aqui - ele é controlado separadamente
+    // setShowSuccessDialog(false); // REMOVIDO
     setCurrentSessionId(null);
   };
 
@@ -356,19 +361,20 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       timeoutRef.current = null;
     }
 
+    // Garantir que o popup de sucesso também seja fechado
+    setShowSuccessDialog(false);
     onOpenChange(false);
     resetForm();
   };
 
   const handleSuccessClose = () => {
     setShowSuccessDialog(false);
-    // Não fechar o dialog principal automaticamente - apenas fechar o popup de sucesso
-    // onOpenChange(false); // REMOVIDO - causava o popup sumir rapidamente
     onSuccess();
-    resetForm();
-    // Fechar o dialog principal após um pequeno delay para garantir que o usuário viu os domínios
+
+    // Fechar o dialog principal e resetar o formulário após um delay
     setTimeout(() => {
       onOpenChange(false);
+      resetForm();
     }, 300);
   };
 
@@ -584,7 +590,16 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       </Dialog>
 
       {/* POPUP DE SUCESSO - REDESENHADO */}
-      <Dialog open={showSuccessDialog} onOpenChange={handleSuccessClose}>
+      <Dialog
+        open={showSuccessDialog}
+        onOpenChange={(isOpen) => {
+          // IMPORTANTE: Só permitir fechar se for explicitamente false
+          // Prevenir qualquer fechamento automático
+          if (!isOpen) {
+            handleSuccessClose();
+          }
+        }}
+      >
         <DialogContent
           className="max-w-2xl"
           onInteractOutside={(e) => {
