@@ -57,6 +57,7 @@ export default function Settings() {
 
   const [fullName, setFullName] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("+55 ");
+  const [hasUserModifiedNumber, setHasUserModifiedNumber] = useState(false);
   const [whatsappValidation, setWhatsappValidation] = useState<{
     isValidating: boolean;
     isValid: boolean | null;
@@ -193,13 +194,13 @@ export default function Settings() {
         setWhatsappValidation({
           isValidating: false,
           isValid: true,
-          message: "✓ Número verificado no WhatsApp",
+          message: "Número verificado no WhatsApp",
         });
       } else {
         setWhatsappValidation({
           isValidating: false,
           isValid: false,
-          message: "✗ Número não está cadastrado no WhatsApp",
+          message: "Número não está cadastrado no WhatsApp",
         });
       }
     } catch (error) {
@@ -213,17 +214,15 @@ export default function Settings() {
 
   // Efeito para validar número quando usuário para de digitar
   useEffect(() => {
-    if (whatsappNumber && whatsappNumber.length > 4) {
-      // +55 + pelo menos 1 dígito
+    // Só validar se o usuário tiver modificado o número
+    if (hasUserModifiedNumber && whatsappNumber && whatsappNumber.length > 4) {
       const timeoutId = setTimeout(() => {
         validateWhatsAppNumber(whatsappNumber);
       }, 1000);
 
       return () => clearTimeout(timeoutId);
-    } else {
-      setWhatsappValidation({ isValidating: false, isValid: null, message: "" });
     }
-  }, [whatsappNumber]);
+  }, [whatsappNumber, hasUserModifiedNumber]);
 
   // Função para formatar número enquanto digita
   const formatWhatsAppNumber = (value: string): string => {
@@ -274,6 +273,9 @@ export default function Settings() {
       setWhatsappNumber("+55 ");
       return;
     }
+
+    // Marcar que o usuário modificou o número
+    setHasUserModifiedNumber(true);
 
     // Formatar o número
     const formatted = formatWhatsAppNumber(value);
@@ -538,11 +540,16 @@ export default function Settings() {
               )}
             </div>
             {whatsappValidation.message && (
-              <p
-                className={`text-sm ${whatsappValidation.isValid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+              <div
+                className={`flex items-center gap-2 text-sm ${whatsappValidation.isValid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
               >
-                {whatsappValidation.message}
-              </p>
+                {whatsappValidation.isValid ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <AlertCircle className="h-4 w-4" />
+                )}
+                <span>{whatsappValidation.message}</span>
+              </div>
             )}
           </div>
           <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
