@@ -15,7 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect } from "react";
 import { ALERT_SOUNDS } from "@/components/CriticalDomainsAlert";
 import { Checkbox } from "@/components/ui/checkbox";
-import axios from "axios";
 
 // URL da API do backend
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -154,11 +153,19 @@ export default function Settings() {
     setWhatsappValidation({ isValidating: true, isValid: null, message: "Validando..." });
 
     try {
-      const response = await axios.post(`${API_URL}/api/whatsapp/check-number`, {
-        phoneNumber: cleanNumber,
+      const response = await fetch(`${API_URL}/api/whatsapp/check-number`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phoneNumber: cleanNumber,
+        }),
       });
 
-      if (response.data.exists) {
+      const data = await response.json();
+
+      if (data.exists) {
         setWhatsappValidation({
           isValidating: false,
           isValid: true,
