@@ -362,9 +362,14 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
   const handleSuccessClose = () => {
     setShowSuccessDialog(false);
-    onOpenChange(false);
+    // Não fechar o dialog principal automaticamente - apenas fechar o popup de sucesso
+    // onOpenChange(false); // REMOVIDO - causava o popup sumir rapidamente
     onSuccess();
     resetForm();
+    // Fechar o dialog principal após um pequeno delay para garantir que o usuário viu os domínios
+    setTimeout(() => {
+      onOpenChange(false);
+    }, 300);
   };
 
   const copyDomain = (domain: string) => {
@@ -580,7 +585,17 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
       {/* POPUP DE SUCESSO - REDESENHADO */}
       <Dialog open={showSuccessDialog} onOpenChange={handleSuccessClose}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent
+          className="max-w-2xl"
+          onInteractOutside={(e) => {
+            // Prevenir fechamento ao clicar fora - usuário deve clicar no botão Fechar
+            e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            // Prevenir fechamento com ESC - usuário deve clicar no botão Fechar
+            e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
