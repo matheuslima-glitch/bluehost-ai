@@ -27,7 +27,7 @@ export default function DomainSearch() {
   const loadBalance = async () => {
     try {
       const { data, error } = await supabase.functions.invoke("namecheap-domains", {
-        body: { action: "balance" }
+        body: { action: "balance" },
       });
 
       if (error) throw error;
@@ -47,21 +47,37 @@ export default function DomainSearch() {
     setSearchResult(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke("namecheap-domains", {
-        body: { action: "check", domain: searchQuery }
+      // Usar o endpoint do backend para verificar disponibilidade
+      const apiUrl = import.meta.env.VITE_API_URL || "https://domainhub-backend.onrender.com";
+      const response = await fetch(`${apiUrl}/api/purchase-domains/search`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ domain: searchQuery }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao verificar disponibilidade");
+      }
 
-      setSearchResult(data);
-      
-      if (data.available) {
-        toast.success(`Domínio disponível! Preço: $${data.price}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setSearchResult(data);
+
+        if (data.available) {
+          toast.success(`Domínio disponível! Preço: $${data.price}`);
+        } else {
+          toast.info("Domínio já está registrado");
+        }
       } else {
-        toast.info("Domínio já está registrado");
+        throw new Error(data.error || "Erro ao verificar disponibilidade");
       }
     } catch (error: any) {
-      toast.error("Erro ao verificar disponibilidade");
+      console.error("Erro ao verificar disponibilidade:", error);
+      toast.error(error.message || "Erro ao verificar disponibilidade");
     } finally {
       setSearching(false);
     }
@@ -73,22 +89,47 @@ export default function DomainSearch() {
     setPurchasing(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("namecheap-domains", {
-        body: {
-          action: "purchase",
+      // Obter o userId atual
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      // Usar o endpoint do backend para compra manual
+      const apiUrl = import.meta.env.VITE_API_URL || "https://domainhub-backend.onrender.com";
+      const response = await fetch(`${apiUrl}/api/purchase-domains/manual`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           domain: searchResult.domain,
-          structure: "wordpress"
-        }
+          userId: user.id,
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao comprar domínio");
+      }
 
-      toast.success("Domínio comprado com sucesso!");
-      setPurchasedDomains([data.domain]);
-      setClassificationDialogOpen(true);
-      setSearchResult(null);
-      setSearchQuery("");
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Compra iniciada! Session ID: ${data.sessionId}`);
+        toast.info("O processo de compra está sendo executado. Você será notificado quando finalizar.");
+        setPurchasedDomains([data.domain]);
+        setClassificationDialogOpen(true);
+        setSearchResult(null);
+        setSearchQuery("");
+      } else {
+        throw new Error(data.error || "Erro ao comprar domínio");
+      }
     } catch (error: any) {
+      console.error("Erro ao comprar domínio:", error);
       toast.error(error.message || "Erro ao comprar domínio");
     } finally {
       setPurchasing(false);
@@ -108,13 +149,13 @@ export default function DomainSearch() {
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 relative overflow-hidden">
         {/* Background gradient with floating glows */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#0EA5E9] via-[#3B82F6] to-[#1E40AF] opacity-[0.08]"></div>
-        
+
         {/* Floating blue glows */}
         <div className="absolute top-20 left-20 w-64 h-64 bg-[#0EA5E9] rounded-full blur-[100px] opacity-20 animate-float"></div>
         <div className="absolute bottom-40 right-32 w-80 h-80 bg-[#3B82F6] rounded-full blur-[120px] opacity-15 animate-float-slow"></div>
         <div className="absolute top-1/2 left-1/3 w-72 h-72 bg-[#22D3EE] rounded-full blur-[110px] opacity-10 animate-float-slower"></div>
         <div className="absolute bottom-20 left-1/4 w-56 h-56 bg-[#1E40AF] rounded-full blur-[90px] opacity-25 animate-float"></div>
-        
+
         {/* Centered content */}
         <div className="relative z-10 w-full max-w-2xl space-y-8 animate-fade-slide-up">
           {/* Header */}
@@ -144,17 +185,13 @@ export default function DomainSearch() {
                   onKeyPress={(e) => e.key === "Enter" && handleSearch()}
                   className="flex-1 h-12 text-base border-[hsl(var(--accent-cyan)_/_0.3)] focus-visible:border-[hsl(var(--accent-cyan))] transition-all duration-300"
                 />
-                <Button 
-                  onClick={handleSearch} 
+                <Button
+                  onClick={handleSearch}
                   disabled={searching}
                   size="lg"
                   className="px-6 transition-all duration-300 hover:scale-105"
                 >
-                  {searching ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Search className="h-5 w-5" />
-                  )}
+                  {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
                 </Button>
                 <Button
                   variant="secondary"
@@ -168,7 +205,9 @@ export default function DomainSearch() {
               </div>
 
               {searchResult && (
-                <Card className={`border-2 transition-all duration-300 animate-fade-slide-up ${searchResult.available ? "border-success bg-success/5" : "border-destructive bg-destructive/5"}`}>
+                <Card
+                  className={`border-2 transition-all duration-300 animate-fade-slide-up ${searchResult.available ? "border-success bg-success/5" : "border-destructive bg-destructive/5"}`}
+                >
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -179,9 +218,7 @@ export default function DomainSearch() {
                         )}
                         <div>
                           <p className="font-bold text-xl">{searchResult.domain}</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {searchResult.message}
-                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">{searchResult.message}</p>
                         </div>
                       </div>
                       {searchResult.available && (
@@ -190,8 +227,8 @@ export default function DomainSearch() {
                             <p className="text-2xl font-bold">${searchResult.price}</p>
                             <p className="text-xs text-muted-foreground">preço anual</p>
                           </div>
-                          <Button 
-                            onClick={handlePurchaseDomain} 
+                          <Button
+                            onClick={handlePurchaseDomain}
                             disabled={purchasing}
                             size="lg"
                             className="transition-all duration-300 hover:scale-105"
@@ -216,11 +253,7 @@ export default function DomainSearch() {
         </div>
       </div>
 
-      <PurchaseWithAIDialog
-        open={aiDialogOpen}
-        onOpenChange={setAiDialogOpen}
-        onSuccess={handleAISuccess}
-      />
+      <PurchaseWithAIDialog open={aiDialogOpen} onOpenChange={setAiDialogOpen} onSuccess={handleAISuccess} />
 
       <ClassificationDialog
         open={classificationDialogOpen}
