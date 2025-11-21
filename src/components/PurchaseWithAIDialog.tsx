@@ -157,12 +157,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
 
     if (success && purchasedDomains.length > 0) {
-      // CRÍTICO: Primeiro fechar o progresso, depois abrir o sucesso
+      setShowSuccessDialog(true);
       setShowProgress(false);
-      // Pequeno delay para garantir que o estado foi atualizado
-      setTimeout(() => {
-        setShowSuccessDialog(true);
-      }, 100);
     } else {
       if (errorMessage) {
         toast.error(errorMessage, { duration: 5000 });
@@ -303,8 +299,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setProgressPercentage(0);
     setShowProgress(false);
     setPurchasedDomains([]);
-    // NÃO resetar showSuccessDialog aqui - ele é controlado separadamente
-    // setShowSuccessDialog(false); // REMOVIDO
+    setShowSuccessDialog(false);
     setCurrentSessionId(null);
   };
 
@@ -361,21 +356,15 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       timeoutRef.current = null;
     }
 
-    // Garantir que o popup de sucesso também seja fechado
-    setShowSuccessDialog(false);
     onOpenChange(false);
     resetForm();
   };
 
   const handleSuccessClose = () => {
     setShowSuccessDialog(false);
+    onOpenChange(false);
     onSuccess();
-
-    // Fechar o dialog principal e resetar o formulário após um delay
-    setTimeout(() => {
-      onOpenChange(false);
-      resetForm();
-    }, 300);
+    resetForm();
   };
 
   const copyDomain = (domain: string) => {
@@ -590,24 +579,15 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       </Dialog>
 
       {/* POPUP DE SUCESSO - REDESENHADO */}
-      <Dialog
-        open={showSuccessDialog}
-        onOpenChange={(isOpen) => {
-          // IMPORTANTE: Só permitir fechar se for explicitamente false
-          // Prevenir qualquer fechamento automático
-          if (!isOpen) {
-            handleSuccessClose();
-          }
-        }}
-      >
+      <Dialog open={showSuccessDialog} onOpenChange={handleSuccessClose}>
         <DialogContent
           className="max-w-2xl"
           onInteractOutside={(e) => {
-            // Prevenir fechamento ao clicar fora - usuário deve clicar no botão Fechar
+            // Prevenir fechamento ao clicar fora
             e.preventDefault();
           }}
           onEscapeKeyDown={(e) => {
-            // Prevenir fechamento com ESC - usuário deve clicar no botão Fechar
+            // Prevenir fechamento com ESC
             e.preventDefault();
           }}
         >
