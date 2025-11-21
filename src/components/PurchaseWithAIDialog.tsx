@@ -32,7 +32,7 @@ const STEP_LABELS: { [key: string]: string } = {
   nameservers: "Alterando nameservers",
   cloudflare: "Configurando Cloudflare",
   completed: "Compra concluída",
-  canceled: "Compra cancelada !",
+  canceled: "Compra cancelada",
 };
 
 const WORDPRESS_STEPS = ["generating", "checking", "searching", "purchasing", "nameservers", "cloudflare", "completed"];
@@ -180,6 +180,17 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const handleGenerate = async () => {
     if (!niche.trim()) {
       toast.error("Por favor, insira o nicho");
+      return;
+    }
+
+    // Validar quantidade
+    if (quantity > MAX_DOMAINS) {
+      toast.error(`Máximo de ${MAX_DOMAINS} domínios por compra`);
+      return;
+    }
+
+    if (quantity < 1) {
+      toast.error("Quantidade mínima é 1 domínio");
       return;
     }
 
@@ -382,12 +393,16 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     }
   };
 
-  // Validar input de quantidade
+  // Validar input de quantidade - PERMITE digitar > 10 mas mostra erro
   const handleQuantityChange = (value: string) => {
     const num = parseInt(value) || 1;
-    const clamped = Math.max(1, Math.min(MAX_DOMAINS, num));
+    const clamped = Math.max(1, num); // Remove limite superior aqui
     setQuantity(clamped);
   };
+
+  // Verificar se quantidade é válida
+  const isQuantityValid = quantity >= 1 && quantity <= MAX_DOMAINS;
+  const quantityError = quantity > MAX_DOMAINS ? `Máximo de ${MAX_DOMAINS} domínios por compra` : "";
 
   return (
     <>
@@ -407,12 +422,16 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                   id="quantity"
                   type="number"
                   min={1}
-                  max={MAX_DOMAINS}
                   value={quantity}
                   onChange={(e) => handleQuantityChange(e.target.value)}
                   disabled={loading}
+                  className={quantity > MAX_DOMAINS ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
-                <p className="text-xs text-muted-foreground">Máximo: {MAX_DOMAINS} domínios por compra</p>
+                {quantityError ? (
+                  <p className="text-xs text-red-600 dark:text-red-400 font-medium">⚠️ {quantityError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Máximo: {MAX_DOMAINS} domínios por compra</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -464,7 +483,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                 <Button variant="outline" onClick={handleClose} disabled={loading} className="flex-1">
                   Cancelar
                 </Button>
-                <Button onClick={handleGenerate} disabled={loading} className="flex-1">
+                <Button onClick={handleGenerate} disabled={loading || !isQuantityValid} className="flex-1">
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
