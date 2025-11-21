@@ -214,36 +214,30 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     lastUpdateTimeRef.current = Date.now();
 
     try {
-      // ETAPA 1: VERIFICAR SALDO
-      const { error: balanceError } = await supabase.functions.invoke("check-balance");
+      // CHAMAR API REST DO BACKEND DIRETAMENTE
+      const apiUrl = import.meta.env.VITE_API_URL || "https://domainhub-backend.onrender.com";
 
-      if (balanceError) {
-        let errorMessage = "Erro ao verificar saldo.";
-        try {
-          const errorBody = JSON.parse(balanceError.message);
-          if (errorBody.error === "insufficient_balance") {
-            errorMessage = errorBody.message;
-          } else {
-            errorMessage = errorBody.error || errorBody.message;
-          }
-        } catch (e) {
-          errorMessage = balanceError.message;
-        }
+      console.log(`📡 Chamando API: ${apiUrl}/api/purchase-domains`);
 
-        toast.error(errorMessage, { duration: 6000 });
-        setLoading(false);
-        setShowProgress(false);
-        return;
-      }
-
-      // ETAPA 2: INICIAR A COMPRA
-      const { data: purchaseData, error: purchaseError } = await supabase.functions.invoke("purchase-domain-hub", {
-        body: { niche, quantity, language, platform },
+      const response = await fetch(`${apiUrl}/api/purchase-domains`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nicho: niche, // Mapeamento inglês → português
+          quantidade: quantity, // Mapeamento inglês → português
+          idioma: language, // Mapeamento inglês → português
+          plataforma: platform, // Mapeamento inglês → português
+        }),
       });
 
-      if (purchaseError) {
-        throw new Error(`Erro ao iniciar a compra: ${purchaseError.message}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao iniciar a compra");
       }
+
+      const purchaseData = await response.json();
 
       if (!purchaseData?.sessionId) {
         throw new Error("Resposta inválida do servidor ao iniciar a compra.");
@@ -583,11 +577,9 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         <DialogContent
           className="max-w-2xl"
           onInteractOutside={(e) => {
-            // Prevenir fechamento ao clicar fora
             e.preventDefault();
           }}
           onEscapeKeyDown={(e) => {
-            // Prevenir fechamento com ESC
             e.preventDefault();
           }}
         >
