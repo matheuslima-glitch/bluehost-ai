@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { User, Bell, Palette, Filter, X, Volume2, Check } from "lucide-react";
+import { User, Bell, Palette, Filter, X, Volume2, Check, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Switch } from "@/components/ui/switch";
@@ -14,6 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect } from "react";
 import { ALERT_SOUNDS } from "@/components/CriticalDomainsAlert";
+import { Checkbox } from "@/components/ui/checkbox";
+import axios from "axios";
+
+// URL da API do backend
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // Nomes dos sons de alerta (3 sons)
 const SOUND_NAMES: Record<string, string> = {
@@ -21,6 +26,29 @@ const SOUND_NAMES: Record<string, string> = {
   "alert-2": "Atenção Máxima - Alarme Duplo",
   "alert-4": "Alerta Suave - True Tone",
 };
+
+// Dias da semana
+const WEEK_DAYS = [
+  { value: "segunda", label: "Segunda" },
+  { value: "terca", label: "Terça" },
+  { value: "quarta", label: "Quarta" },
+  { value: "quinta", label: "Quinta" },
+  { value: "sexta", label: "Sexta" },
+];
+
+// Intervalos de horário
+const TIME_INTERVALS = [
+  { value: 1, label: "Cada 1 hora" },
+  { value: 3, label: "Cada 3 horas" },
+  { value: 6, label: "Cada 6 horas" },
+];
+
+// Frequência diária
+const DAILY_FREQUENCIES = [
+  { value: 1, label: "1x por dia" },
+  { value: 2, label: "2x por dia" },
+  { value: 3, label: "3x por dia" },
+];
 
 export default function Settings() {
   const { user } = useAuth();
@@ -30,10 +58,18 @@ export default function Settings() {
 
   const [fullName, setFullName] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [whatsappValidation, setWhatsappValidation] = useState<{
+    isValidating: boolean;
+    isValid: boolean | null;
+    message: string;
+  }>({ isValidating: false, isValid: null, message: "" });
   const [newPlatformFilter, setNewPlatformFilter] = useState("");
   const [newTrafficSourceFilter, setNewTrafficSourceFilter] = useState("");
   const [selectedSound, setSelectedSound] = useState("alert-4");
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [selectedInterval, setSelectedInterval] = useState<number>(6);
+  const [selectedFrequency, setSelectedFrequency] = useState<number>(1);
 
   // Fetch profile data
   const { data: profile } = useQuery({
@@ -67,6 +103,14 @@ export default function Settings() {
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") throw error;
+
+      // Carregar configurações de recorrência
+      if (data) {
+        setSelectedDays(data.notification_days || []);
+        setSelectedInterval(data.notification_interval_hours || 6);
+        setSelectedFrequency(data.notification_frequency || 1);
+      }
+
       return data;
     },
     enabled: !!user?.id,
@@ -87,6 +131,67 @@ export default function Settings() {
     },
     enabled: !!user?.id,
   });
+
+  // Separar filtros por tipo
+  const platformFilters = customFilters.filter((f) => f.filter_type === "platform");
+  const trafficSourceFilters = customFilters.filter((f) => f.filter_type === "traffic_source");
+
+  // Validar número de WhatsApp em tempo real
+  const validateWhatsAppNumber = async (number: string) => {
+    // Limpar número
+    const cleanNumber = number.replace(/\D/g, "");
+
+    // Validar formato básico
+    if (cleanNumber.length < 10) {
+      setWhatsappValidation({
+        isValidating: false,
+        isValid: false,
+        message: "Número muito curto",
+      });
+      return;
+    }
+
+    setWhatsappValidation({ isValidating: true, isValid: null, message: "Validando..." });
+
+    try {
+      const response = await axios.post(`${API_URL}/api/whatsapp/check-number`, {
+        phoneNumber: cleanNumber,
+      });
+
+      if (response.data.exists) {
+        setWhatsappValidation({
+          isValidating: false,
+          isValid: true,
+          message: "Número verificado no WhatsApp",
+        });
+      } else {
+        setWhatsappValidation({
+          isValidating: false,
+          isValid: false,
+          message: "Número não está cadastrado no WhatsApp",
+        });
+      }
+    } catch (error) {
+      setWhatsappValidation({
+        isValidating: false,
+        isValid: false,
+        message: "Erro ao validar número",
+      });
+    }
+  };
+
+  // Efeito para validar número quando usuário para de digitar
+  useEffect(() => {
+    if (whatsappNumber) {
+      const timeoutId = setTimeout(() => {
+        validateWhatsAppNumber(whatsappNumber);
+      }, 1000);
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      setWhatsappValidation({ isValidating: false, isValid: null, message: "" });
+    }
+  }, [whatsappNumber]);
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
@@ -123,6 +228,9 @@ export default function Settings() {
       alert_suspended: boolean;
       alert_expired: boolean;
       alert_expiring_soon: boolean;
+      notification_days?: string[];
+      notification_interval_hours?: number;
+      notification_frequency?: number;
     }) => {
       if (notificationSettings) {
         const { error } = await supabase.from("notification_settings").update(settings).eq("user_id", user?.id);
@@ -185,6 +293,16 @@ export default function Settings() {
   });
 
   const handleSaveProfile = () => {
+    // Validar se o número está no WhatsApp antes de salvar
+    if (whatsappNumber && whatsappValidation.isValid === false) {
+      toast({
+        title: "Atenção",
+        description: "O número informado não está cadastrado no WhatsApp",
+        variant: "destructive",
+      });
+      return;
+    }
+
     updateProfileMutation.mutate();
   };
 
@@ -222,24 +340,19 @@ export default function Settings() {
       audio.volume = 1.0;
       audio.play().catch((error) => {
         console.error("Erro ao reproduzir som:", error);
-        toast({
-          title: "Erro",
-          description: "Erro ao reproduzir som de preview",
-          variant: "destructive",
-        });
       });
+
       setCurrentAudio(audio);
     }
   };
 
-  const handleSoundChange = (value: string) => {
-    setSelectedSound(value);
-    previewSound(value); // Reproduz automaticamente ao selecionar
+  const handleSoundChange = (soundId: string) => {
+    setSelectedSound(soundId);
+    previewSound(soundId);
   };
 
   const saveSoundPreference = async () => {
     try {
-      console.log("Salvando preferência de som:", selectedSound);
       const { error } = await supabase
         .from("profiles")
         .update({ alert_sound_preference: selectedSound })
@@ -248,13 +361,12 @@ export default function Settings() {
       if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
-      console.log("Preferência de som salva com sucesso:", selectedSound);
+
       toast({
-        title: "Sucesso",
-        description: "Preferência de som de alerta salva com sucesso!",
+        title: "✅ Som salvo com sucesso!",
+        description: `Você escolheu: ${SOUND_NAMES[selectedSound]}`,
       });
     } catch (error) {
-      console.error("Erro ao salvar preferência de som:", error);
       toast({
         title: "Erro",
         description: "Erro ao salvar preferência de som",
@@ -263,21 +375,36 @@ export default function Settings() {
     }
   };
 
-  // Cleanup: parar áudio ao desmontar o componente
-  useEffect(() => {
-    return () => {
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-      }
-    };
-  }, [currentAudio]);
+  // Funções para gerenciar dias da semana
+  const toggleDay = (day: string) => {
+    const newDays = selectedDays.includes(day) ? selectedDays.filter((d) => d !== day) : [...selectedDays, day];
 
-  const platformFilters = customFilters.filter((f) => f.filter_type === "platform");
-  const trafficSourceFilters = customFilters.filter((f) => f.filter_type === "traffic_source");
+    setSelectedDays(newDays);
+  };
+
+  // Salvar configurações de recorrência
+  const handleSaveRecurrence = () => {
+    if (selectedDays.length === 0) {
+      toast({
+        title: "Atenção",
+        description: "Selecione pelo menos um dia da semana",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateNotificationMutation.mutate({
+      alert_suspended: notificationSettings?.alert_suspended || false,
+      alert_expired: notificationSettings?.alert_expired || false,
+      alert_expiring_soon: notificationSettings?.alert_expiring_soon || false,
+      notification_days: selectedDays,
+      notification_interval_hours: selectedInterval,
+      notification_frequency: selectedFrequency,
+    });
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="container max-w-3xl mx-auto py-10 space-y-6">
       {/* Profile Settings */}
       <Card>
         <CardHeader>
@@ -289,22 +416,44 @@ export default function Settings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="full-name">Nome Completo</Label>
+            <Label htmlFor="name">Nome Completo</Label>
             <Input
-              id="full-name"
+              id="name"
+              placeholder="Digite seu nome"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="Seu nome completo"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="whatsapp">Número do WhatsApp</Label>
-            <Input
-              id="whatsapp"
-              value={whatsappNumber}
-              onChange={(e) => setWhatsappNumber(e.target.value)}
-              placeholder="+55 11 99999-9999"
-            />
+            <div className="relative">
+              <Input
+                id="whatsapp"
+                placeholder="+55 11 99999-9999"
+                value={whatsappNumber}
+                onChange={(e) => setWhatsappNumber(e.target.value)}
+              />
+              {whatsappValidation.isValidating && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Clock className="h-4 w-4 text-muted-foreground animate-spin" />
+                </div>
+              )}
+              {!whatsappValidation.isValidating && whatsappValidation.isValid === true && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                </div>
+              )}
+              {!whatsappValidation.isValidating && whatsappValidation.isValid === false && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                </div>
+              )}
+            </div>
+            {whatsappValidation.message && (
+              <p className={`text-sm ${whatsappValidation.isValid ? "text-green-600" : "text-red-600"}`}>
+                {whatsappValidation.message}
+              </p>
+            )}
           </div>
           <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
             {updateProfileMutation.isPending ? "Salvando..." : "Salvar Alterações"}
@@ -391,6 +540,89 @@ export default function Settings() {
                 })
               }
             />
+          </div>
+
+          <Separator className="my-6" />
+
+          {/* Configurações de Recorrência */}
+          <div className="space-y-4 bg-muted/50 p-4 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <Clock className="h-4 w-4" />
+              <Label className="text-base font-semibold">Recorrência de Alertas</Label>
+            </div>
+
+            {/* Dias da Semana */}
+            <div className="space-y-2">
+              <Label className="text-sm">Dias da Semana</Label>
+              <div className="flex flex-wrap gap-2">
+                {WEEK_DAYS.map((day) => (
+                  <label
+                    key={day.value}
+                    className={`
+                      flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors
+                      ${
+                        selectedDays.includes(day.value)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background hover:bg-muted border-border"
+                      }
+                    `}
+                  >
+                    <Checkbox
+                      checked={selectedDays.includes(day.value)}
+                      onCheckedChange={() => toggleDay(day.value)}
+                      className="sr-only"
+                    />
+                    <span className="text-sm font-medium">{day.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Intervalo de Horário */}
+            <div className="space-y-2">
+              <Label htmlFor="interval" className="text-sm">
+                Intervalo de Horário
+              </Label>
+              <Select value={selectedInterval.toString()} onValueChange={(value) => setSelectedInterval(Number(value))}>
+                <SelectTrigger id="interval">
+                  <SelectValue placeholder="Selecione o intervalo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIME_INTERVALS.map((interval) => (
+                    <SelectItem key={interval.value} value={interval.value.toString()}>
+                      {interval.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Frequência Diária */}
+            <div className="space-y-2">
+              <Label htmlFor="frequency" className="text-sm">
+                Frequência Máxima Diária
+              </Label>
+              <Select
+                value={selectedFrequency.toString()}
+                onValueChange={(value) => setSelectedFrequency(Number(value))}
+              >
+                <SelectTrigger id="frequency">
+                  <SelectValue placeholder="Selecione a frequência" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAILY_FREQUENCIES.map((freq) => (
+                    <SelectItem key={freq.value} value={freq.value.toString()}>
+                      {freq.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button onClick={handleSaveRecurrence} className="w-full mt-4">
+              <Check className="h-4 w-4 mr-2" />
+              Salvar Configurações de Recorrência
+            </Button>
           </div>
         </CardContent>
       </Card>
