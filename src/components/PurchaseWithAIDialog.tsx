@@ -402,7 +402,6 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
   // Verificar se quantidade é válida
   const isQuantityValid = quantity >= 1 && quantity <= MAX_DOMAINS;
-  const quantityError = quantity > MAX_DOMAINS ? `Máximo de ${MAX_DOMAINS} domínios por compra` : "";
 
   return (
     <>
@@ -427,10 +426,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                   disabled={loading}
                   className={quantity > MAX_DOMAINS ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
-                {quantityError ? (
-                  <p className="text-xs text-red-600 dark:text-red-400 font-medium">⚠️ {quantityError}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Máximo: {MAX_DOMAINS} domínios por compra</p>
+                {quantity > MAX_DOMAINS && (
+                  <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    <p className="text-xs font-medium">Máximo de {MAX_DOMAINS} domínios por compra</p>
+                  </div>
                 )}
               </div>
 
