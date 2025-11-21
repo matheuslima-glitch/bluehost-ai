@@ -7,16 +7,14 @@ import { Search, ShoppingCart, CheckCircle2, XCircle, Loader2, DollarSign } from
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import PurchaseWithAIDialog from "@/components/PurchaseWithAIDialog";
-import ClassificationDialog from "@/components/ClassificationDialog";
+import ManualPurchaseDialog from "@/components/ManualPurchaseDialog";
 
 export default function DomainSearch() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
-  const [purchasing, setPurchasing] = useState(false);
   const [searchResult, setSearchResult] = useState<any>(null);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
-  const [classificationDialogOpen, setClassificationDialogOpen] = useState(false);
-  const [purchasedDomains, setPurchasedDomains] = useState<any[]>([]);
+  const [manualPurchaseDialogOpen, setManualPurchaseDialogOpen] = useState(false);
   const [balance, setBalance] = useState<{ usd: number; brl: number } | null>(null);
 
   // Load balance on mount
@@ -43,6 +41,13 @@ export default function DomainSearch() {
       return;
     }
 
+    // Validar formato do domínio (deve ter extensão como .com, .online, .org, etc)
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]\.[a-zA-Z]{2,}$/;
+    if (!domainRegex.test(searchQuery.trim())) {
+      toast.error("Digite um domínio válido (exemplo: meusite.online, exemplo.com)");
+      return;
+    }
+
     setSearching(true);
     setSearchResult(null);
 
@@ -54,7 +59,7 @@ export default function DomainSearch() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ domain: searchQuery }),
+        body: JSON.stringify({ domain: searchQuery.trim() }),
       });
 
       if (!response.ok) {
@@ -83,64 +88,22 @@ export default function DomainSearch() {
     }
   };
 
-  const handlePurchaseDomain = async () => {
+  const handlePurchaseDomain = () => {
     if (!searchResult?.available) return;
 
-    setPurchasing(true);
-
-    try {
-      // Obter o userId atual
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        throw new Error("Usuário não autenticado");
-      }
-
-      // Usar o endpoint do backend para compra manual
-      const apiUrl = import.meta.env.VITE_API_URL || "https://domainhub-backend.onrender.com";
-      const response = await fetch(`${apiUrl}/api/purchase-domains/manual`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          domain: searchResult.domain,
-          userId: user.id,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao comprar domínio");
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(`Compra iniciada! Session ID: ${data.sessionId}`);
-        toast.info("O processo de compra está sendo executado. Você será notificado quando finalizar.");
-        setPurchasedDomains([data.domain]);
-        setClassificationDialogOpen(true);
-        setSearchResult(null);
-        setSearchQuery("");
-      } else {
-        throw new Error(data.error || "Erro ao comprar domínio");
-      }
-    } catch (error: any) {
-      console.error("Erro ao comprar domínio:", error);
-      toast.error(error.message || "Erro ao comprar domínio");
-    } finally {
-      setPurchasing(false);
-    }
+    // Apenas abrir o dialog de compra manual
+    setManualPurchaseDialogOpen(true);
   };
 
   const handleAISuccess = () => {
     loadBalance();
   };
 
-  const handleClassificationSuccess = () => {
+  const handleManualPurchaseSuccess = () => {
+    // Limpar resultado da busca
+    setSearchResult(null);
+    setSearchQuery("");
+    // Recarregar saldo
     loadBalance();
   };
 
@@ -173,13 +136,13 @@ export default function DomainSearch() {
             <CardHeader className="text-center pb-4">
               <CardTitle className="text-2xl">Pesquisar Domínio</CardTitle>
               <CardDescription className="text-base">
-                Digite o nome do domínio que deseja verificar ou palavras-chave para sugestões
+                Digite o domínio completo com extensão (ex: meusite.online, exemplo.com)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex gap-3">
                 <Input
-                  placeholder="exemplo.com ou palavras-chave"
+                  placeholder="meusite.online, exemplo.com, dominio.org"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && handleSearch()}
@@ -229,18 +192,10 @@ export default function DomainSearch() {
                           </div>
                           <Button
                             onClick={handlePurchaseDomain}
-                            disabled={purchasing}
                             size="lg"
                             className="transition-all duration-300 hover:scale-105"
                           >
-                            {purchasing ? (
-                              <>
-                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                Comprando...
-                              </>
-                            ) : (
-                              "Comprar Domínio"
-                            )}
+                            Comprar Domínio
                           </Button>
                         </div>
                       )}
@@ -255,11 +210,12 @@ export default function DomainSearch() {
 
       <PurchaseWithAIDialog open={aiDialogOpen} onOpenChange={setAiDialogOpen} onSuccess={handleAISuccess} />
 
-      <ClassificationDialog
-        open={classificationDialogOpen}
-        onOpenChange={setClassificationDialogOpen}
-        domains={purchasedDomains}
-        onSuccess={handleClassificationSuccess}
+      <ManualPurchaseDialog
+        open={manualPurchaseDialogOpen}
+        onOpenChange={setManualPurchaseDialogOpen}
+        domain={searchResult?.domain || ""}
+        price={searchResult?.price || "0"}
+        onSuccess={handleManualPurchaseSuccess}
       />
     </>
   );
