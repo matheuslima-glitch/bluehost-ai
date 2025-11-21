@@ -56,7 +56,7 @@ export default function Settings() {
   const queryClient = useQueryClient();
 
   const [fullName, setFullName] = useState("");
-  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("+55 ");
   const [whatsappValidation, setWhatsappValidation] = useState<{
     isValidating: boolean;
     isValid: boolean | null;
@@ -83,7 +83,17 @@ export default function Settings() {
       if (error) throw error;
       if (data) {
         setFullName(data.full_name || "");
-        setWhatsappNumber(data.whatsapp_number || "");
+        // Garantir que sempre tenha +55
+        if (data.whatsapp_number) {
+          const cleanNumber = data.whatsapp_number.replace(/\D/g, "");
+          if (cleanNumber.startsWith("55")) {
+            setWhatsappNumber(`+${cleanNumber}`);
+          } else {
+            setWhatsappNumber(`+55${cleanNumber}`);
+          }
+        } else {
+          setWhatsappNumber("+55 ");
+        }
         setSelectedSound(data.alert_sound_preference || "alert-4");
       }
       return data;
@@ -137,15 +147,26 @@ export default function Settings() {
 
   // Validar número de WhatsApp em tempo real
   const validateWhatsAppNumber = async (number: string) => {
-    // Limpar número
+    // Limpar número - remover tudo exceto dígitos
     const cleanNumber = number.replace(/\D/g, "");
 
     // Validar formato básico
-    if (cleanNumber.length < 10) {
+    if (cleanNumber.length < 12) {
+      // +55 (2) + DDD (2) + número (8/9) = mínimo 12
       setWhatsappValidation({
         isValidating: false,
         isValid: false,
-        message: "Número muito curto",
+        message: "Número incompleto",
+      });
+      return;
+    }
+
+    // Validar se começa com 55
+    if (!cleanNumber.startsWith("55")) {
+      setWhatsappValidation({
+        isValidating: false,
+        isValid: false,
+        message: "Número deve começar com +55",
       });
       return;
     }
@@ -159,7 +180,7 @@ export default function Settings() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          phoneNumber: cleanNumber,
+          phoneNumber: cleanNumber, // Envia apenas números: 5519989320129
         }),
       });
 
@@ -169,13 +190,13 @@ export default function Settings() {
         setWhatsappValidation({
           isValidating: false,
           isValid: true,
-          message: "Número verificado no WhatsApp",
+          message: "✓ Número verificado no WhatsApp",
         });
       } else {
         setWhatsappValidation({
           isValidating: false,
           isValid: false,
-          message: "Número não está cadastrado no WhatsApp",
+          message: "✗ Número não está cadastrado no WhatsApp",
         });
       }
     } catch (error) {
@@ -189,7 +210,8 @@ export default function Settings() {
 
   // Efeito para validar número quando usuário para de digitar
   useEffect(() => {
-    if (whatsappNumber) {
+    if (whatsappNumber && whatsappNumber.length > 4) {
+      // +55 + pelo menos 1 dígito
       const timeoutId = setTimeout(() => {
         validateWhatsAppNumber(whatsappNumber);
       }, 1000);
@@ -199,6 +221,61 @@ export default function Settings() {
       setWhatsappValidation({ isValidating: false, isValid: null, message: "" });
     }
   }, [whatsappNumber]);
+
+  // Função para formatar número enquanto digita
+  const formatWhatsAppNumber = (value: string): string => {
+    // Manter apenas números
+    const numbers = value.replace(/\D/g, "");
+
+    // Garantir que sempre comece com 55
+    let formatted = "+55";
+
+    if (numbers.length > 2) {
+      const rest = numbers.substring(2);
+
+      // Adicionar espaço após +55
+      if (rest.length > 0) {
+        formatted += " ";
+
+        // Adicionar DDD (2 dígitos)
+        if (rest.length <= 2) {
+          formatted += rest;
+        } else {
+          formatted += rest.substring(0, 2);
+
+          // Adicionar número
+          const phoneNumber = rest.substring(2);
+          if (phoneNumber.length > 0) {
+            formatted += " ";
+
+            // Adicionar primeira parte (5 dígitos se celular, 4 se fixo)
+            if (phoneNumber.length <= 5) {
+              formatted += phoneNumber;
+            } else {
+              formatted += phoneNumber.substring(0, 5) + "-" + phoneNumber.substring(5, 9);
+            }
+          }
+        }
+      }
+    }
+
+    return formatted;
+  };
+
+  // Handler para mudanças no input de WhatsApp
+  const handleWhatsappChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+
+    // Impedir que o usuário apague o +55
+    if (value.length < 3) {
+      setWhatsappNumber("+55 ");
+      return;
+    }
+
+    // Formatar o número
+    const formatted = formatWhatsAppNumber(value);
+    setWhatsappNumber(formatted);
+  };
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
@@ -411,7 +488,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="container max-w-3xl mx-auto py-10 space-y-6">
+    <div className="container max-w-5xl mx-auto py-10 space-y-6">
       {/* Profile Settings */}
       <Card>
         <CardHeader>
@@ -434,11 +511,14 @@ export default function Settings() {
           <div className="space-y-2">
             <Label htmlFor="whatsapp">Número do WhatsApp</Label>
             <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-2xl pointer-events-none">🇧🇷</div>
               <Input
                 id="whatsapp"
-                placeholder="+55 11 99999-9999"
+                className="pl-12"
+                placeholder="+55 19 98932-0129"
                 value={whatsappNumber}
-                onChange={(e) => setWhatsappNumber(e.target.value)}
+                onChange={handleWhatsappChange}
+                maxLength={19}
               />
               {whatsappValidation.isValidating && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -457,7 +537,9 @@ export default function Settings() {
               )}
             </div>
             {whatsappValidation.message && (
-              <p className={`text-sm ${whatsappValidation.isValid ? "text-green-600" : "text-red-600"}`}>
+              <p
+                className={`text-sm ${whatsappValidation.isValid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+              >
                 {whatsappValidation.message}
               </p>
             )}
