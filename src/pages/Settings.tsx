@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { User, Bell, Palette, Filter, X, Volume2, Check, Clock } from "lucide-react"; // ADICIONADO Clock
+import { User, Bell, Palette, Filter, X, Volume2, Check, Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Switch } from "@/components/ui/switch";
@@ -64,6 +64,9 @@ export default function Settings() {
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [selectedInterval, setSelectedInterval] = useState<number>(6);
   const [selectedFrequency, setSelectedFrequency] = useState<number>(1);
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   // Fetch profile data
   const { data: profile } = useQuery({
@@ -71,7 +74,7 @@ export default function Settings() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("full_name, whatsapp_number, alert_sound_preference")
+        .select("full_name, whatsapp_number, alert_sound_preference, email")
         .eq("id", user?.id)
         .maybeSingle();
 
@@ -90,6 +93,7 @@ export default function Settings() {
           setWhatsappNumber("+55 ");
         }
         setSelectedSound(data.alert_sound_preference || "alert-4");
+        setNewEmail(data.email || user?.email || "");
       }
       return data;
     },
@@ -197,14 +201,13 @@ export default function Settings() {
     setWhatsappNumber(formatted);
   };
 
-  // Update profile mutation
+  // Update profile mutation (sem WhatsApp)
   const updateProfileMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
         .from("profiles")
         .update({
           full_name: fullName,
-          whatsapp_number: whatsappNumber,
         })
         .eq("id", user?.id);
 
@@ -221,6 +224,98 @@ export default function Settings() {
       toast({
         title: "Erro",
         description: "Erro ao atualizar perfil",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update WhatsApp number mutation
+  const updateWhatsAppMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          whatsapp_number: whatsappNumber,
+        })
+        .eq("id", user?.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      toast({
+        title: "Sucesso",
+        description: "Número do WhatsApp atualizado com sucesso!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar número do WhatsApp",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update email mutation
+  const updateEmailMutation = useMutation({
+    mutationFn: async () => {
+      const { error: authError } = await supabase.auth.updateUser({
+        email: newEmail,
+      });
+
+      if (authError) throw authError;
+
+      // Atualizar também na tabela profiles
+      const { error: profileError } = await supabase.from("profiles").update({ email: newEmail }).eq("id", user?.id);
+
+      if (profileError) throw profileError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      toast({
+        title: "Sucesso",
+        description: "E-mail atualizado com sucesso! Verifique seu novo e-mail para confirmar a alteração.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar e-mail",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update password mutation
+  const updatePasswordMutation = useMutation({
+    mutationFn: async () => {
+      if (newPassword !== confirmPassword) {
+        throw new Error("As senhas não coincidem");
+      }
+
+      if (newPassword.length < 6) {
+        throw new Error("A senha deve ter pelo menos 6 caracteres");
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setNewPassword("");
+      setConfirmPassword("");
+      toast({
+        title: "Sucesso",
+        description: "Senha alterada com sucesso!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao alterar senha",
         variant: "destructive",
       });
     },
@@ -297,55 +392,27 @@ export default function Settings() {
   });
 
   const handleSaveProfile = async () => {
-    try {
-      // Salvar perfil primeiro
-      await updateProfileMutation.mutateAsync();
+    await updateProfileMutation.mutateAsync();
+  };
 
-      // Se tem WhatsApp configurado, enviar mensagem de teste
-      if (whatsappNumber && whatsappNumber.length > 10) {
-        toast({
-          title: "Enviando notificação de teste...",
-          description: "Aguarde alguns instantes",
-        });
+  const handleSaveWhatsApp = async () => {
+    await updateWhatsAppMutation.mutateAsync();
+  };
 
-        try {
-          const response = await fetch(`${API_URL}/api/whatsapp/send-test-alert`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              userId: user?.id,
-            }),
-          });
-
-          const data = await response.json();
-
-          if (data.success) {
-            toast({
-              title: "✅ Notificação enviada!",
-              description: `Verifique seu WhatsApp! ${data.alertsSent || 0} alerta(s) enviado(s)`,
-            });
-          } else {
-            toast({
-              title: "Erro ao enviar notificação",
-              description: data.message || "Tente novamente mais tarde",
-              variant: "destructive",
-            });
-          }
-        } catch (error) {
-          console.error("Erro ao enviar notificação de teste:", error);
-          toast({
-            title: "Erro ao enviar notificação",
-            description: "Verifique se o número está correto e tente novamente",
-            variant: "destructive",
-          });
-        }
-      }
-    } catch (error) {
-      // Erro já tratado pelo mutation
-      console.error("Erro ao salvar perfil:", error);
+  const handleUpdateEmail = async () => {
+    if (!newEmail || newEmail === user?.email) {
+      toast({
+        title: "Atenção",
+        description: "Digite um novo e-mail diferente do atual",
+        variant: "destructive",
+      });
+      return;
     }
+    await updateEmailMutation.mutateAsync();
+  };
+
+  const handleUpdatePassword = async () => {
+    await updatePasswordMutation.mutateAsync();
   };
 
   const handleAddPlatformFilter = () => {
@@ -424,8 +491,8 @@ export default function Settings() {
     setSelectedDays(newDays);
   };
 
-  // Salvar configurações de recorrência
-  const handleSaveRecurrence = () => {
+  // Salvar configurações de recorrência COM envio de notificação de teste
+  const handleSaveRecurrence = async () => {
     if (selectedDays.length === 0) {
       toast({
         title: "Atenção",
@@ -435,6 +502,15 @@ export default function Settings() {
       return;
     }
 
+    // Salvar WhatsApp primeiro
+    try {
+      await updateWhatsAppMutation.mutateAsync();
+    } catch (error) {
+      console.error("Erro ao salvar WhatsApp:", error);
+      return;
+    }
+
+    // Salvar configurações de recorrência
     updateNotificationMutation.mutate({
       alert_suspended: notificationSettings?.alert_suspended || false,
       alert_expired: notificationSettings?.alert_expired || false,
@@ -443,6 +519,48 @@ export default function Settings() {
       notification_interval_hours: selectedInterval,
       notification_frequency: selectedFrequency,
     });
+
+    // Enviar notificação de teste se tem WhatsApp configurado
+    if (whatsappNumber && whatsappNumber.length > 10) {
+      toast({
+        title: "Enviando notificação de teste...",
+        description: "Aguarde alguns instantes",
+      });
+
+      try {
+        const response = await fetch(`${API_URL}/api/whatsapp/send-test-alert`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: user?.id,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          toast({
+            title: "✅ Notificação enviada!",
+            description: `Verifique seu WhatsApp! ${data.alertsSent || 0} alerta(s) enviado(s)`,
+          });
+        } else {
+          toast({
+            title: "Erro ao enviar notificação",
+            description: data.message || "Tente novamente mais tarde",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Erro ao enviar notificação de teste:", error);
+        toast({
+          title: "Erro ao enviar notificação",
+          description: "Verifique se o número está correto e tente novamente",
+          variant: "destructive",
+        });
+      }
+    }
   };
 
   return (
@@ -466,21 +584,50 @@ export default function Settings() {
               onChange={(e) => setFullName(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="whatsapp">Número do WhatsApp</Label>
-            <Input
-              id="whatsapp"
-              placeholder="+55 19 98932-0129"
-              value={whatsappNumber}
-              onChange={handleWhatsappChange}
-              maxLength={19}
-            />
-            <p className="text-sm text-muted-foreground">
-              💡 Ao salvar, você receberá uma mensagem de teste com os alertas dos seus domínios
-            </p>
-          </div>
           <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
-            {updateProfileMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+            {updateProfileMutation.isPending ? "Salvando..." : "Salvar Nome"}
+          </Button>
+
+          <Separator className="my-6" />
+
+          <div className="space-y-2">
+            <Label htmlFor="email">E-mail</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="Digite seu novo e-mail"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+            />
+          </div>
+          <Button onClick={handleUpdateEmail} disabled={updateEmailMutation.isPending}>
+            {updateEmailMutation.isPending ? "Atualizando..." : "Atualizar E-mail"}
+          </Button>
+
+          <Separator className="my-6" />
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Nova Senha</Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder="Digite sua nova senha"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              placeholder="Confirme sua nova senha"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </div>
+          <Button onClick={handleUpdatePassword} disabled={updatePasswordMutation.isPending}>
+            {updatePasswordMutation.isPending ? "Alterando..." : "Alterar Senha"}
           </Button>
         </CardContent>
       </Card>
@@ -515,6 +662,23 @@ export default function Settings() {
           <CardDescription>Receba alertas sobre seus domínios</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Campo de WhatsApp dentro do card de notificações */}
+          <div className="space-y-2 bg-muted/50 p-4 rounded-lg">
+            <Label htmlFor="whatsapp">Número do WhatsApp</Label>
+            <Input
+              id="whatsapp"
+              placeholder="+55 19 98932-0129"
+              value={whatsappNumber}
+              onChange={handleWhatsappChange}
+              maxLength={19}
+            />
+            <p className="text-sm text-muted-foreground">
+              💡 Ao salvar, você receberá uma mensagem de teste com os alertas dos seus domínios
+            </p>
+          </div>
+
+          <Separator />
+
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label>Domínios Suspensos</Label>
