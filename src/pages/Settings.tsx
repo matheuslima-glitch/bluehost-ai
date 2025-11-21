@@ -68,13 +68,119 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Verificar e processar confirmação de e-mail da URL
+  useEffect(() => {
+    const handleEmailConfirmation = async () => {
+      console.log("🔍 Verificando confirmação de e-mail...");
+      console.log("URL completa:", window.location.href);
+      console.log("Hash:", window.location.hash);
+
+      // Verificar se há parâmetros de confirmação na URL (com #)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const type = hashParams.get("type");
+      const accessToken = hashParams.get("access_token");
+
+      console.log("Type:", type);
+      console.log("Access Token presente:", !!accessToken);
+
+      // Também verificar query params (com ?)
+      const searchParams = new URLSearchParams(window.location.search);
+      const typeQuery = searchParams.get("type");
+      const accessTokenQuery = searchParams.get("access_token");
+
+      const finalType = type || typeQuery;
+      const finalToken = accessToken || accessTokenQuery;
+
+      console.log("Type final:", finalType);
+      console.log("Token final presente:", !!finalToken);
+
+      if (finalType === "email_change" && finalToken) {
+        console.log("✅ Confirmação de e-mail detectada!");
+
+        try {
+          // Aguardar um momento para o Supabase processar
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          // Pegar a sessão atualizada
+          const {
+            data: { session },
+            error: sessionError,
+          } = await supabase.auth.getSession();
+
+          console.log("Sessão atual:", session);
+          console.log("Erro de sessão:", sessionError);
+
+          if (sessionError) {
+            throw sessionError;
+          }
+
+          if (session && session.user) {
+            console.log("E-mail na sessão:", session.user.email);
+            console.log("User ID:", session.user.id);
+
+            // Atualizar o e-mail na tabela profiles
+            const { data: profileData, error: profileError } = await supabase
+              .from("profiles")
+              .update({ email: session.user.email })
+              .eq("id", session.user.id)
+              .select();
+
+            console.log("Profile atualizado:", profileData);
+            console.log("Erro ao atualizar profile:", profileError);
+
+            if (profileError) {
+              console.error("❌ Erro ao atualizar perfil:", profileError);
+              throw profileError;
+            }
+
+            // Invalidar queries para atualizar dados
+            await queryClient.invalidateQueries({ queryKey: ["profile", session.user.id] });
+
+            // Limpar a URL (remove os parâmetros)
+            window.history.replaceState({}, document.title, "/settings");
+
+            // Mostrar mensagem de sucesso
+            toast({
+              title: "✅ E-mail confirmado!",
+              description: `Seu e-mail foi alterado para ${session.user.email} com sucesso!`,
+            });
+
+            // Atualizar o campo de e-mail no formulário
+            setNewEmail(session.user.email || "");
+
+            console.log("✅ Processo de confirmação concluído!");
+          } else {
+            console.error("❌ Sessão não encontrada");
+            throw new Error("Sessão não encontrada após confirmação");
+          }
+        } catch (error: any) {
+          console.error("❌ Erro ao processar confirmação de e-mail:", error);
+          toast({
+            title: "Erro na confirmação",
+            description: error.message || "Erro ao processar confirmação de e-mail. Faça login novamente.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        console.log("ℹ️ Nenhuma confirmação de e-mail detectada");
+      }
+    };
+
+    // Executar com um pequeno delay para garantir que a página carregou
+    const timer = setTimeout(() => {
+      handleEmailConfirmation();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [queryClient, toast]);
+
   // Fetch profile data
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("full_name, whatsapp_number, alert_sound_preference, email")
+        .select("full_name, whatsapp_number, alert_sound_preference")
         .eq("id", user?.id)
         .maybeSingle();
 
@@ -93,7 +199,8 @@ export default function Settings() {
           setWhatsappNumber("+55 ");
         }
         setSelectedSound(data.alert_sound_preference || "alert-4");
-        setNewEmail(data.email || user?.email || "");
+        // Usar o e-mail do auth (sempre mais atualizado)
+        setNewEmail(user?.email || "");
       }
       return data;
     },
@@ -260,23 +367,29 @@ export default function Settings() {
   // Update email mutation
   const updateEmailMutation = useMutation({
     mutationFn: async () => {
-      const { error: authError } = await supabase.auth.updateUser({
-        email: newEmail,
-      });
+      // Obter a URL base da aplicação (produção ou desenvolvimento)
+      const siteUrl = window.location.origin;
+
+      const { data, error: authError } = await supabase.auth.updateUser(
+        {
+          email: newEmail,
+        },
+        {
+          emailRedirectTo: `${siteUrl}/settings`,
+        },
+      );
 
       if (authError) throw authError;
 
-      // Atualizar também na tabela profiles
-      const { error: profileError } = await supabase.from("profiles").update({ email: newEmail }).eq("id", user?.id);
-
-      if (profileError) throw profileError;
+      return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       toast({
-        title: "Sucesso",
-        description: "E-mail atualizado com sucesso! Verifique seu novo e-mail para confirmar a alteração.",
+        title: "Verificação enviada!",
+        description: "Verifique seu NOVO e-mail para confirmar a alteração. O link de confirmação expira em 24 horas.",
       });
+
+      // Não invalida as queries ainda, isso será feito após a confirmação
     },
     onError: (error: any) => {
       toast({
