@@ -9,13 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -59,18 +53,18 @@ export default function ManualPurchaseDialog({
 
     const pollProgress = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'https://domainhub-backend.onrender.com';
+        const apiUrl = import.meta.env.VITE_API_URL || "https://domainhub-backend.onrender.com";
         const response = await fetch(`${apiUrl}/api/purchase-domains/status/${sessionId}`);
-        
+
         if (response.ok) {
           const data = await response.json();
           setProgress(data.progress);
-          
+
           // Se completou ou deu erro, parar polling
-          if (data.progress?.status === 'completed' || data.progress?.status === 'error') {
+          if (data.progress?.status === "completed" || data.progress?.status === "error") {
             setPurchasing(false);
-            
-            if (data.progress?.status === 'completed') {
+
+            if (data.progress?.status === "completed") {
               toast.success("Domínio comprado com sucesso!");
               onOpenChange(false);
               if (onSuccess) onSuccess();
@@ -80,13 +74,13 @@ export default function ManualPurchaseDialog({
           }
         }
       } catch (error) {
-        console.error('Erro ao verificar progresso:', error);
+        console.error("Erro ao verificar progresso:", error);
       }
     };
 
     // Polling a cada 3 segundos
     const interval = setInterval(pollProgress, 3000);
-    
+
     // Primeira verificação imediata
     pollProgress();
 
@@ -103,30 +97,32 @@ export default function ManualPurchaseDialog({
 
     try {
       // Obter userId
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (!user) {
-        throw new Error('Usuário não autenticado');
+        throw new Error("Usuário não autenticado");
       }
 
       // Usar o endpoint do backend para compra manual
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://domainhub-backend.onrender.com';
+      const apiUrl = import.meta.env.VITE_API_URL || "https://domainhub-backend.onrender.com";
       const response = await fetch(`${apiUrl}/api/purchase-domains/manual`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           domain: domain,
           userId: user.id,
           platform: platform,
-          trafficSource: trafficSource.trim()
-        })
+          trafficSource: trafficSource.trim(),
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao comprar domínio');
+        throw new Error(errorData.error || "Erro ao comprar domínio");
       }
 
       const data = await response.json();
@@ -136,10 +132,10 @@ export default function ManualPurchaseDialog({
         toast.success("Compra iniciada! Acompanhando progresso...");
         // O polling vai cuidar do resto
       } else {
-        throw new Error(data.error || 'Erro ao comprar domínio');
+        throw new Error(data.error || "Erro ao comprar domínio");
       }
     } catch (error: any) {
-      console.error('Erro ao comprar domínio:', error);
+      console.error("Erro ao comprar domínio:", error);
       toast.error(error.message || "Erro ao comprar domínio");
       setPurchasing(false);
     }
@@ -177,9 +173,7 @@ export default function ManualPurchaseDialog({
                   <SelectItem value="atomicat">AtomiCat</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Estrutura do site que será criado após a compra
-              </p>
+              <p className="text-xs text-muted-foreground">Estrutura do site que será criado após a compra</p>
             </div>
 
             {/* Fonte de Tráfego */}
@@ -192,18 +186,23 @@ export default function ManualPurchaseDialog({
                 onChange={(e) => setTrafficSource(e.target.value)}
                 disabled={purchasing}
               />
-              <p className="text-xs text-muted-foreground">
-                Informe a origem do tráfego para este domínio
-              </p>
+              <p className="text-xs text-muted-foreground">Informe a origem do tráfego para este domínio</p>
             </div>
 
             {/* Resumo */}
             <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
               <h4 className="font-semibold text-sm">Resumo da Compra</h4>
               <div className="text-sm space-y-1">
-                <p><span className="text-muted-foreground">Domínio:</span> <strong>{domain}</strong></p>
-                <p><span className="text-muted-foreground">Preço:</span> <strong>${price}</strong></p>
-                <p><span className="text-muted-foreground">Plataforma:</span> <strong>{platform === 'wordpress' ? 'WordPress' : 'AtomiCat'}</strong></p>
+                <p>
+                  <span className="text-muted-foreground">Domínio:</span> <strong>{domain}</strong>
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Preço:</span> <strong>${price}</strong>
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Plataforma:</span>{" "}
+                  <strong>{platform === "wordpress" ? "WordPress" : "AtomiCat"}</strong>
+                </p>
               </div>
             </div>
           </div>
@@ -214,50 +213,41 @@ export default function ManualPurchaseDialog({
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
               <div className="text-center space-y-2">
                 <h3 className="font-semibold">Processando compra...</h3>
-                <p className="text-sm text-muted-foreground">
-                  {progress?.message || "Iniciando processo de compra"}
-                </p>
-                {progress?.step && (
-                  <p className="text-xs text-muted-foreground">
-                    Etapa: {progress.step}
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground">{progress?.message || "Iniciando processo de compra"}</p>
+                {progress?.step && <p className="text-xs text-muted-foreground">Etapa: {progress.step}</p>}
               </div>
             </div>
 
             {/* Barra de progresso visual */}
             <div className="space-y-2">
               <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-primary transition-all duration-500"
                   style={{
-                    width: progress?.step === 'checking' ? '25%' :
-                           progress?.step === 'purchasing' ? '50%' :
-                           progress?.step === 'creating_wordpress' ? '75%' :
-                           progress?.step === 'completed' ? '100%' : '10%'
+                    width:
+                      progress?.step === "checking"
+                        ? "25%"
+                        : progress?.step === "purchasing"
+                          ? "50%"
+                          : progress?.step === "creating_wordpress"
+                            ? "75%"
+                            : progress?.step === "completed"
+                              ? "100%"
+                              : "10%",
                   }}
                 />
               </div>
-              <p className="text-xs text-center text-muted-foreground">
-                Este processo pode levar de 2 a 5 minutos
-              </p>
+              <p className="text-xs text-center text-muted-foreground">Este processo pode levar de 2 a 5 minutos</p>
             </div>
           </div>
         )}
 
         {!purchasing && (
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={handleClose}
-              disabled={purchasing}
-            >
+            <Button variant="outline" onClick={handleClose} disabled={purchasing}>
               Cancelar
             </Button>
-            <Button 
-              onClick={handlePurchase}
-              disabled={purchasing || !trafficSource.trim()}
-            >
+            <Button onClick={handlePurchase} disabled={purchasing || !trafficSource.trim()}>
               Confirmar Compra
             </Button>
           </DialogFooter>
