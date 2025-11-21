@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { User, Bell, Palette, Filter, X, Volume2, Check, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import { User, Bell, Palette, Filter, X, Volume2, Check } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Switch } from "@/components/ui/switch";
@@ -16,7 +16,7 @@ import { useState, useEffect } from "react";
 import { ALERT_SOUNDS } from "@/components/CriticalDomainsAlert";
 import { Checkbox } from "@/components/ui/checkbox";
 
-// URL da API do backend
+// URL da API - usa variável de ambiente em produção, fallback para dev local
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // Nomes dos sons de alerta (3 sons)
@@ -57,12 +57,6 @@ export default function Settings() {
 
   const [fullName, setFullName] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("+55 ");
-  const [hasUserModifiedNumber, setHasUserModifiedNumber] = useState(false);
-  const [whatsappValidation, setWhatsappValidation] = useState<{
-    isValidating: boolean;
-    isValid: boolean | null;
-    message: string;
-  }>({ isValidating: false, isValid: null, message: "" });
   const [newPlatformFilter, setNewPlatformFilter] = useState("");
   const [newTrafficSourceFilter, setNewTrafficSourceFilter] = useState("");
   const [selectedSound, setSelectedSound] = useState("alert-4");
@@ -147,82 +141,6 @@ export default function Settings() {
   const trafficSourceFilters = customFilters.filter((f) => f.filter_type === "traffic_source");
 
   // Validar número de WhatsApp em tempo real
-  const validateWhatsAppNumber = async (number: string) => {
-    // Limpar número - remover tudo exceto dígitos
-    const cleanNumber = number.replace(/\D/g, "");
-
-    // Validar formato básico
-    if (cleanNumber.length < 12) {
-      setWhatsappValidation({
-        isValidating: false,
-        isValid: false,
-        message: "Número incompleto (mínimo 11 dígitos)",
-      });
-      return;
-    }
-
-    // Validar se começa com 55
-    if (!cleanNumber.startsWith("55")) {
-      setWhatsappValidation({
-        isValidating: false,
-        isValid: false,
-        message: "Número deve começar com +55",
-      });
-      return;
-    }
-
-    setWhatsappValidation({ isValidating: true, isValid: null, message: "Validando..." });
-
-    try {
-      const response = await fetch(`${API_URL}/api/whatsapp/check-number`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          phoneNumber: cleanNumber,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro na validação: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.exists) {
-        setWhatsappValidation({
-          isValidating: false,
-          isValid: true,
-          message: "Número verificado no WhatsApp",
-        });
-      } else {
-        setWhatsappValidation({
-          isValidating: false,
-          isValid: false,
-          message: "Número não está cadastrado no WhatsApp",
-        });
-      }
-    } catch (error) {
-      setWhatsappValidation({
-        isValidating: false,
-        isValid: false,
-        message: "Erro ao validar número. Verifique sua conexão.",
-      });
-    }
-  };
-
-  // Efeito para validar número quando usuário para de digitar
-  useEffect(() => {
-    // Só validar se o usuário tiver modificado o número
-    if (hasUserModifiedNumber && whatsappNumber && whatsappNumber.length > 4) {
-      const timeoutId = setTimeout(() => {
-        validateWhatsAppNumber(whatsappNumber);
-      }, 1000);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [whatsappNumber, hasUserModifiedNumber]);
 
   // Função para formatar número enquanto digita
   const formatWhatsAppNumber = (value: string): string => {
@@ -273,9 +191,6 @@ export default function Settings() {
       setWhatsappNumber("+55 ");
       return;
     }
-
-    // Marcar que o usuário modificou o número
-    setHasUserModifiedNumber(true);
 
     // Formatar o número
     const formatted = formatWhatsAppNumber(value);
@@ -381,18 +296,56 @@ export default function Settings() {
     },
   });
 
-  const handleSaveProfile = () => {
-    // Validar se o número está no WhatsApp antes de salvar
-    if (whatsappNumber && whatsappValidation.isValid === false) {
-      toast({
-        title: "Atenção",
-        description: "O número informado não está cadastrado no WhatsApp",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleSaveProfile = async () => {
+    try {
+      // Salvar perfil primeiro
+      await updateProfileMutation.mutateAsync();
 
-    updateProfileMutation.mutate();
+      // Se tem WhatsApp configurado, enviar mensagem de teste
+      if (whatsappNumber && whatsappNumber.length > 10) {
+        toast({
+          title: "Enviando notificação de teste...",
+          description: "Aguarde alguns instantes",
+        });
+
+        try {
+          const response = await fetch(`${API_URL}/api/whatsapp/send-test-alert`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userId: user?.id,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            toast({
+              title: "✅ Notificação enviada!",
+              description: `Verifique seu WhatsApp! ${data.alertsSent || 0} alerta(s) enviado(s)`,
+            });
+          } else {
+            toast({
+              title: "Erro ao enviar notificação",
+              description: data.message || "Tente novamente mais tarde",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          console.error("Erro ao enviar notificação de teste:", error);
+          toast({
+            title: "Erro ao enviar notificação",
+            description: "Verifique se o número está correto e tente novamente",
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      // Erro já tratado pelo mutation
+      console.error("Erro ao salvar perfil:", error);
+    }
   };
 
   const handleAddPlatformFilter = () => {
@@ -515,42 +468,16 @@ export default function Settings() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="whatsapp">Número do WhatsApp</Label>
-            <div className="relative">
-              <Input
-                id="whatsapp"
-                placeholder="+55 19 98932-0129"
-                value={whatsappNumber}
-                onChange={handleWhatsappChange}
-                maxLength={19}
-              />
-              {whatsappValidation.isValidating && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <Clock className="h-4 w-4 text-muted-foreground animate-spin" />
-                </div>
-              )}
-              {!whatsappValidation.isValidating && whatsappValidation.isValid === true && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                </div>
-              )}
-              {!whatsappValidation.isValidating && whatsappValidation.isValid === false && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <AlertCircle className="h-4 w-4 text-red-500" />
-                </div>
-              )}
-            </div>
-            {whatsappValidation.message && (
-              <div
-                className={`flex items-center gap-2 text-sm ${whatsappValidation.isValid ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-              >
-                {whatsappValidation.isValid ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <AlertCircle className="h-4 w-4" />
-                )}
-                <span>{whatsappValidation.message}</span>
-              </div>
-            )}
+            <Input
+              id="whatsapp"
+              placeholder="+55 19 98932-0129"
+              value={whatsappNumber}
+              onChange={handleWhatsappChange}
+              maxLength={19}
+            />
+            <p className="text-sm text-muted-foreground">
+              💡 Ao salvar, você receberá uma mensagem de teste com os alertas dos seus domínios
+            </p>
           </div>
           <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
             {updateProfileMutation.isPending ? "Salvando..." : "Salvar Alterações"}
