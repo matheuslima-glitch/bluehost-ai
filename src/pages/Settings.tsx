@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect } from "react";
 import { ALERT_SOUNDS } from "@/components/CriticalDomainsAlert";
 import { Checkbox } from "@/components/ui/checkbox";
+import { UserManagement } from "@/components/UserManagement";
 
 // URL da API - usa variável de ambiente em produção, fallback para dev local
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -1060,6 +1061,9 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Gerenciamento de Usuários */}
+      <UserManagement />
     </div>
   );
 }

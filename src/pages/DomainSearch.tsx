@@ -8,8 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import PurchaseWithAIDialog from "@/components/PurchaseWithAIDialog";
 import ManualPurchaseDialog from "@/components/ManualPurchaseDialog";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function DomainSearch() {
+  const { hasPermission } = usePermissions();
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<any>(null);
@@ -156,15 +158,17 @@ export default function DomainSearch() {
                 >
                   {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
                 </Button>
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  onClick={() => setAiDialogOpen(true)}
-                  className="px-6 bg-gradient-to-r from-[hsl(199,89%,48%)] to-[hsl(217,91%,60%)] text-white hover:opacity-90 animate-pulse-glow transition-all duration-300 hover:scale-105 border-none"
-                >
-                  <ShoppingCart className="h-5 w-5 mr-2 animate-pulse" />
-                  Compra com IA
-                </Button>
+                {hasPermission("can_ai_purchase") && (
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    onClick={() => setAiDialogOpen(true)}
+                    className="px-6 bg-gradient-to-r from-[hsl(199,89%,48%)] to-[hsl(217,91%,60%)] text-white hover:opacity-90 animate-pulse-glow transition-all duration-300 hover:scale-105 border-none"
+                  >
+                    <ShoppingCart className="h-5 w-5 mr-2 animate-pulse" />
+                    Compra com IA
+                  </Button>
+                )}
               </div>
 
               {searchResult && (
@@ -190,13 +194,15 @@ export default function DomainSearch() {
                             <p className="text-2xl font-bold">${searchResult.price}</p>
                             <p className="text-xs text-muted-foreground">preço anual</p>
                           </div>
-                          <Button
-                            onClick={handlePurchaseDomain}
-                            size="lg"
-                            className="transition-all duration-300 hover:scale-105"
-                          >
-                            Comprar Domínio
-                          </Button>
+                          {hasPermission("can_manual_purchase") && (
+                            <Button
+                              onClick={handlePurchaseDomain}
+                              size="lg"
+                              className="transition-all duration-300 hover:scale-105"
+                            >
+                              Comprar Domínio
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>

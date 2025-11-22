@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Domain {
   id: string;
@@ -51,6 +52,7 @@ interface Filters {
 export default function DomainManagement() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [filteredDomains, setFilteredDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
@@ -598,10 +600,12 @@ export default function DomainManagement() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Button variant="ghost" size="sm" onClick={() => navigate(`/domains/${domain.id}`)}>
-                          <LayoutDashboard className="h-4 w-4 mr-2" />
-                          Ver Detalhes
-                        </Button>
+                        {hasPermission("can_view_domain_details") && (
+                          <Button variant="ghost" size="sm" onClick={() => navigate(`/domains/${domain.id}`)}>
+                            <LayoutDashboard className="h-4 w-4 mr-2" />
+                            Ver Detalhes
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
