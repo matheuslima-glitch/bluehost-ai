@@ -3,13 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -32,36 +26,48 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, Settings as SettingsIcon, Mail, Check, X } from "lucide-react";
+import { Plus, Trash2, Settings as SettingsIcon, Mail, Check, X, Eye, Edit3, Ban } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
+// Tipos de permissão: none (sem acesso), read (leitura), write (escrita)
+type PermissionLevel = "none" | "read" | "write";
+
 interface UserPermission {
   id: string;
   user_id: string;
   permission_type: "total" | "personalizado";
-  can_access_dashboard: boolean;
-  can_access_domain_search: boolean;
-  can_access_management: boolean;
-  can_access_settings: boolean;
-  can_view_critical_domains: boolean;
-  can_view_integrations: boolean;
-  can_view_balance: boolean;
-  can_manual_purchase: boolean;
-  can_ai_purchase: boolean;
-  can_view_domain_details: boolean;
-  can_change_domain_status: boolean;
-  can_select_platform: boolean;
-  can_select_traffic_source: boolean;
-  can_insert_funnel_id: boolean;
-  can_view_logs: boolean;
-  can_change_nameservers: boolean;
-  can_create_filters: boolean;
-  can_manage_users: boolean;
+
+  // Acesso por Aba
+  can_access_dashboard: PermissionLevel;
+  can_access_domain_search: PermissionLevel;
+  can_access_management: PermissionLevel;
+  can_access_settings: PermissionLevel;
+
+  // Dashboard
+  can_view_critical_domains: PermissionLevel;
+  can_view_integrations: PermissionLevel;
+  can_view_balance: PermissionLevel;
+
+  // Compra de Domínios
+  can_manual_purchase: PermissionLevel;
+  can_ai_purchase: PermissionLevel;
+
+  // Gerenciamento
+  can_view_domain_details: PermissionLevel;
+  can_change_domain_status: PermissionLevel;
+  can_select_platform: PermissionLevel;
+  can_select_traffic_source: PermissionLevel;
+  can_insert_funnel_id: PermissionLevel;
+  can_view_logs: PermissionLevel;
+  can_change_nameservers: PermissionLevel;
+
+  // Configurações
+  can_create_filters: PermissionLevel;
+  can_manage_users: PermissionLevel;
 }
 
 interface TeamMember {
@@ -73,11 +79,53 @@ interface TeamMember {
   permissions: UserPermission | null;
 }
 
+// Helper para obter label do nível de permissão
+const getPermissionLabel = (level: PermissionLevel) => {
+  switch (level) {
+    case "none":
+      return "Sem acesso";
+    case "read":
+      return "Ler";
+    case "write":
+      return "Editar";
+    default:
+      return "Sem acesso";
+  }
+};
+
+// Helper para obter cor do badge
+const getPermissionColor = (level: PermissionLevel) => {
+  switch (level) {
+    case "none":
+      return "destructive";
+    case "read":
+      return "secondary";
+    case "write":
+      return "default";
+    default:
+      return "destructive";
+  }
+};
+
+// Helper para obter ícone do nível
+const getPermissionIcon = (level: PermissionLevel) => {
+  switch (level) {
+    case "none":
+      return <Ban className="h-3 w-3" />;
+    case "read":
+      return <Eye className="h-3 w-3" />;
+    case "write":
+      return <Edit3 className="h-3 w-3" />;
+    default:
+      return <Ban className="h-3 w-3" />;
+  }
+};
+
 export function UserManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
@@ -88,12 +136,8 @@ export function UserManagement() {
   const { data: currentUserProfile } = useQuery({
     queryKey: ["current-user-profile", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("is_admin")
-        .eq("id", user?.id)
-        .single();
-      
+      const { data, error } = await supabase.from("profiles").select("is_admin").eq("id", user?.id).single();
+
       if (error) throw error;
       return data;
     },
@@ -113,9 +157,7 @@ export function UserManagement() {
 
       if (profilesError) throw profilesError;
 
-      const { data: permissions, error: permissionsError } = await supabase
-        .from("user_permissions")
-        .select("*");
+      const { data: permissions, error: permissionsError } = await supabase.from("user_permissions").select("*");
 
       if (permissionsError) throw permissionsError;
 
@@ -130,10 +172,9 @@ export function UserManagement() {
   // Mutation para enviar convite
   const inviteMutation = useMutation({
     mutationFn: async (email: string) => {
-      // Gerar token único
       const token = crypto.randomUUID();
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // Expira em 7 dias
+      expiresAt.setDate(expiresAt.getDate() + 7);
 
       const { error } = await supabase.from("invitations").insert({
         invited_by: user?.id,
@@ -143,10 +184,6 @@ export function UserManagement() {
       });
 
       if (error) throw error;
-
-      // TODO: Enviar email de convite via API
-      // const inviteUrl = `${window.location.origin}/accept-invite/${token}`;
-      
       return { email, token };
     },
     onSuccess: () => {
@@ -169,42 +206,44 @@ export function UserManagement() {
 
   // Mutation para atualizar permissões
   const updatePermissionsMutation = useMutation({
-    mutationFn: async ({ userId, type, permissions }: { 
-      userId: string; 
+    mutationFn: async ({
+      userId,
+      type,
+      permissions,
+    }: {
+      userId: string;
       type: "total" | "personalizado";
       permissions?: Partial<UserPermission>;
     }) => {
       if (type === "total") {
-        // Acesso total - todas as permissões ativadas
         const { error } = await supabase
           .from("user_permissions")
           .upsert({
             user_id: userId,
             permission_type: "total",
-            can_access_dashboard: true,
-            can_access_domain_search: true,
-            can_access_management: true,
-            can_access_settings: true,
-            can_view_critical_domains: true,
-            can_view_integrations: true,
-            can_view_balance: true,
-            can_manual_purchase: true,
-            can_ai_purchase: true,
-            can_view_domain_details: true,
-            can_change_domain_status: true,
-            can_select_platform: true,
-            can_select_traffic_source: true,
-            can_insert_funnel_id: true,
-            can_view_logs: true,
-            can_change_nameservers: true,
-            can_create_filters: true,
-            can_manage_users: false, // Só admin pode gerenciar usuários
+            can_access_dashboard: "write",
+            can_access_domain_search: "write",
+            can_access_management: "write",
+            can_access_settings: "read",
+            can_view_critical_domains: "write",
+            can_view_integrations: "read",
+            can_view_balance: "read",
+            can_manual_purchase: "write",
+            can_ai_purchase: "write",
+            can_view_domain_details: "write",
+            can_change_domain_status: "write",
+            can_select_platform: "write",
+            can_select_traffic_source: "write",
+            can_insert_funnel_id: "write",
+            can_view_logs: "read",
+            can_change_nameservers: "write",
+            can_create_filters: "write",
+            can_manage_users: "none",
           })
           .eq("user_id", userId);
 
         if (error) throw error;
       } else {
-        // Acesso personalizado
         const { error } = await supabase
           .from("user_permissions")
           .upsert({
@@ -222,8 +261,8 @@ export function UserManagement() {
         title: "Permissões atualizadas!",
         description: "As permissões do usuário foram atualizadas com sucesso.",
       });
-      queryClient.invalidateQueries({ queryKey: ["team-members"] });
       setPermissionsDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["team-members"] });
     },
     onError: (error: any) => {
       toast({
@@ -234,21 +273,16 @@ export function UserManagement() {
     },
   });
 
-  // Mutation para excluir usuário
-  const deleteUserMutation = useMutation({
+  // Mutation para remover usuário
+  const removeUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // Deletar permissões
-      await supabase.from("user_permissions").delete().eq("user_id", userId);
-      
-      // Deletar perfil
-      const { error } = await supabase.from("profiles").delete().eq("id", userId);
-      if (error) throw error;
+      const { error } = await supabase.from("user_permissions").delete().eq("user_id", userId);
 
-      // TODO: Deletar do auth.users via admin API
+      if (error) throw error;
     },
     onSuccess: () => {
       toast({
-        title: "Usuário removido",
+        title: "Usuário removido!",
         description: "O usuário foi removido da equipe.",
       });
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
@@ -262,33 +296,58 @@ export function UserManagement() {
     },
   });
 
-  const handleSendInvite = () => {
-    if (!inviteEmail || !inviteEmail.includes("@")) {
+  const handleInviteUser = () => {
+    if (!inviteEmail.trim()) {
       toast({
         title: "Email inválido",
-        description: "Por favor, insira um email válido.",
+        description: "Digite um email válido para enviar o convite.",
         variant: "destructive",
       });
       return;
     }
+
     inviteMutation.mutate(inviteEmail);
   };
 
-  const handlePermissionTypeChange = (userId: string, type: "total" | "personalizado") => {
+  const handleChangePermissionType = (userId: string, type: "total" | "personalizado") => {
     if (type === "total") {
       updatePermissionsMutation.mutate({ userId, type });
     } else {
-      // Abrir modal de permissões personalizadas
-      setSelectedUserId(userId);
+      // Abrir dialog de permissões personalizadas
       const member = teamMembers.find((m) => m.id === userId);
-      setCustomPermissions(member?.permissions || {});
+      if (member?.permissions) {
+        setCustomPermissions(member.permissions);
+      } else {
+        // Inicializar com valores padrão
+        setCustomPermissions({
+          can_access_dashboard: "read",
+          can_access_domain_search: "none",
+          can_access_management: "read",
+          can_access_settings: "none",
+          can_view_critical_domains: "read",
+          can_view_integrations: "read",
+          can_view_balance: "read",
+          can_manual_purchase: "none",
+          can_ai_purchase: "none",
+          can_view_domain_details: "read",
+          can_change_domain_status: "none",
+          can_select_platform: "none",
+          can_select_traffic_source: "none",
+          can_insert_funnel_id: "none",
+          can_view_logs: "read",
+          can_change_nameservers: "none",
+          can_create_filters: "none",
+          can_manage_users: "none",
+        });
+      }
+      setSelectedUserId(userId);
       setPermissionsDialogOpen(true);
     }
   };
 
   const handleSaveCustomPermissions = () => {
     if (!selectedUserId) return;
-    
+
     updatePermissionsMutation.mutate({
       userId: selectedUserId,
       type: "personalizado",
@@ -296,21 +355,24 @@ export function UserManagement() {
     });
   };
 
-  const togglePermission = (key: keyof UserPermission) => {
+  const updatePermission = (key: keyof UserPermission, value: PermissionLevel) => {
     setCustomPermissions((prev) => ({
       ...prev,
-      [key]: !prev[key],
+      [key]: value,
     }));
   };
 
+  // Não mostrar para não-admins
   if (!isAdmin) {
+    return null;
+  }
+
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Acesso Restrito</CardTitle>
-          <CardDescription>
-            Apenas administradores podem gerenciar usuários.
-          </CardDescription>
+          <CardTitle>Contas e Permissões</CardTitle>
+          <CardDescription>Carregando...</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -326,50 +388,41 @@ export function UserManagement() {
                 <SettingsIcon className="h-5 w-5" />
                 Contas e Permissões
               </CardTitle>
-              <CardDescription>
-                Crie contas de equipe e gerencie o que os usuários podem ver ou fazer
-              </CardDescription>
+              <CardDescription>Crie contas de equipe e gerencie o que os usuários podem ver ou fazer</CardDescription>
             </div>
-            
             <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
                   Adicionar
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Convidar novo membro</DialogTitle>
+                  <DialogTitle>Convidar Novo Usuário</DialogTitle>
                   <DialogDescription>
-                    Envie um convite por email para adicionar um novo membro à equipe.
+                    Digite o email do usuário que você deseja convidar para a plataforma.
                   </DialogDescription>
                 </DialogHeader>
-                
+
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="invite-email">Email do convidado</Label>
+                    <Label htmlFor="email">Email</Label>
                     <Input
-                      id="invite-email"
+                      id="email"
                       type="email"
-                      placeholder="nome@exemplo.com"
+                      placeholder="usuario@exemplo.com"
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.target.value)}
                     />
                   </div>
                 </div>
-                
+
                 <DialogFooter>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setInviteDialogOpen(false)}
-                  >
+                  <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button 
-                    onClick={handleSendInvite}
-                    disabled={inviteMutation.isPending}
-                  >
+                  <Button onClick={handleInviteUser} disabled={inviteMutation.isPending}>
                     <Mail className="h-4 w-4 mr-2" />
                     Enviar Convite
                   </Button>
@@ -380,99 +433,79 @@ export function UserManagement() {
         </CardHeader>
 
         <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Carregando membros da equipe...
-            </div>
-          ) : teamMembers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Nenhum membro na equipe ainda. Clique em "Adicionar" para convidar.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {teamMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-primary">
-                        {member.full_name
-                          ? member.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-                          : member.email.slice(0, 2).toUpperCase()}
-                      </span>
-                    </div>
-                    
-                    <div className="flex-1">
-                      <p className="font-medium">
-                        {member.full_name || member.email}
-                        {member.is_admin && (
-                          <Badge variant="secondary" className="ml-2">
-                            Admin
-                          </Badge>
-                        )}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{member.email}</p>
-                    </div>
+          <div className="space-y-4">
+            {teamMembers.map((member) => (
+              <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
+                    <span className="text-sm font-semibold text-primary-foreground">
+                      {member.full_name
+                        ? member.full_name.substring(0, 2).toUpperCase()
+                        : member.email.substring(0, 2).toUpperCase()}
+                    </span>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    {!member.is_admin && (
-                      <>
-                        <Select
-                          value={member.permissions?.permission_type || "total"}
-                          onValueChange={(value) => 
-                            handlePermissionTypeChange(member.id, value as "total" | "personalizado")
-                          }
-                        >
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="total">Acesso Total</SelectItem>
-                            <SelectItem value="personalizado">Acesso Personalizado</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remover membro</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Tem certeza que deseja remover {member.full_name || member.email} da equipe?
-                                Esta ação não pode ser desfeita.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteUserMutation.mutate(member.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Remover
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </>
-                    )}
+                  <div>
+                    <p className="font-medium">{member.full_name || member.email}</p>
+                    <p className="text-sm text-muted-foreground">{member.email}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+
+                <div className="flex items-center gap-3">
+                  {member.is_admin ? (
+                    <Badge>Admin</Badge>
+                  ) : (
+                    <>
+                      <Select
+                        value={member.permissions?.permission_type || "total"}
+                        onValueChange={(value: "total" | "personalizado") =>
+                          handleChangePermissionType(member.id, value)
+                        }
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="total">Acesso Total</SelectItem>
+                          <SelectItem value="personalizado">Acesso Personalizado</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Remover Usuário</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja remover este usuário? Essa ação não pode ser desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => removeUserMutation.mutate(member.id)}
+                              className="bg-destructive"
+                            >
+                              Remover
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Modal de Permissões Personalizadas */}
+      {/* Dialog de Permissões Personalizadas */}
       <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh]">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Permissões Personalizadas</DialogTitle>
             <DialogDescription>
@@ -488,35 +521,130 @@ export function UserManagement() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="dashboard">Dashboard</Label>
-                    <Switch
-                      id="dashboard"
-                      checked={customPermissions.can_access_dashboard}
-                      onCheckedChange={() => togglePermission("can_access_dashboard")}
-                    />
+                    <Select
+                      value={customPermissions.can_access_dashboard || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_access_dashboard", value)}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("none")}
+                            Sem acesso
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="read">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("read")}
+                            Ler
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="write">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("write")}
+                            Editar
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Label htmlFor="domain-search">Compra de Domínios</Label>
-                    <Switch
-                      id="domain-search"
-                      checked={customPermissions.can_access_domain_search}
-                      onCheckedChange={() => togglePermission("can_access_domain_search")}
-                    />
+                    <Select
+                      value={customPermissions.can_access_domain_search || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_access_domain_search", value)}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("none")}
+                            Sem acesso
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="read">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("read")}
+                            Ler
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="write">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("write")}
+                            Editar
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Label htmlFor="management">Gerenciamento</Label>
-                    <Switch
-                      id="management"
-                      checked={customPermissions.can_access_management}
-                      onCheckedChange={() => togglePermission("can_access_management")}
-                    />
+                    <Select
+                      value={customPermissions.can_access_management || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_access_management", value)}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("none")}
+                            Sem acesso
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="read">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("read")}
+                            Ler
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="write">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("write")}
+                            Editar
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Label htmlFor="settings">Configurações</Label>
-                    <Switch
-                      id="settings"
-                      checked={customPermissions.can_access_settings}
-                      onCheckedChange={() => togglePermission("can_access_settings")}
-                    />
+                    <Select
+                      value={customPermissions.can_access_settings || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_access_settings", value)}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("none")}
+                            Sem acesso
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="read">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("read")}
+                            Ler
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="write">
+                          <div className="flex items-center gap-2">
+                            {getPermissionIcon("write")}
+                            Editar
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -529,27 +657,54 @@ export function UserManagement() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label>Gestão de domínios críticos</Label>
-                    <Switch
-                      checked={customPermissions.can_view_critical_domains}
-                      onCheckedChange={() => togglePermission("can_view_critical_domains")}
-                      disabled={!customPermissions.can_access_dashboard}
-                    />
+                    <Select
+                      value={customPermissions.can_view_critical_domains || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_view_critical_domains", value)}
+                      disabled={customPermissions.can_access_dashboard === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="read">Ler</SelectItem>
+                        <SelectItem value="write">Editar</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
-                    <Label>Acesso rápido as integrações</Label>
-                    <Switch
-                      checked={customPermissions.can_view_integrations}
-                      onCheckedChange={() => togglePermission("can_view_integrations")}
-                      disabled={!customPermissions.can_access_dashboard}
-                    />
+                    <Label>Acesso rápido às integrações</Label>
+                    <Select
+                      value={customPermissions.can_view_integrations || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_view_integrations", value)}
+                      disabled={customPermissions.can_access_dashboard === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="read">Ler</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Label>Saldo</Label>
-                    <Switch
-                      checked={customPermissions.can_view_balance}
-                      onCheckedChange={() => togglePermission("can_view_balance")}
-                      disabled={!customPermissions.can_access_dashboard}
-                    />
+                    <Select
+                      value={customPermissions.can_view_balance || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_view_balance", value)}
+                      disabled={customPermissions.can_access_dashboard === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="read">Ler</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -562,19 +717,36 @@ export function UserManagement() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label>Compra de domínios manual</Label>
-                    <Switch
-                      checked={customPermissions.can_manual_purchase}
-                      onCheckedChange={() => togglePermission("can_manual_purchase")}
-                      disabled={!customPermissions.can_access_domain_search}
-                    />
+                    <Select
+                      value={customPermissions.can_manual_purchase || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_manual_purchase", value)}
+                      disabled={customPermissions.can_access_domain_search === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="write">Editar</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Label>Compra de domínios com IA</Label>
-                    <Switch
-                      checked={customPermissions.can_ai_purchase}
-                      onCheckedChange={() => togglePermission("can_ai_purchase")}
-                      disabled={!customPermissions.can_access_domain_search}
-                    />
+                    <Select
+                      value={customPermissions.can_ai_purchase || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_ai_purchase", value)}
+                      disabled={customPermissions.can_access_domain_search === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="write">Editar</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -587,59 +759,122 @@ export function UserManagement() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label>Ver detalhes</Label>
-                    <Switch
-                      checked={customPermissions.can_view_domain_details}
-                      onCheckedChange={() => togglePermission("can_view_domain_details")}
-                      disabled={!customPermissions.can_access_management}
-                    />
+                    <Select
+                      value={customPermissions.can_view_domain_details || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_view_domain_details", value)}
+                      disabled={customPermissions.can_access_management === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="read">Ler</SelectItem>
+                        <SelectItem value="write">Editar</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Label>Mudar status de domínios</Label>
-                    <Switch
-                      checked={customPermissions.can_change_domain_status}
-                      onCheckedChange={() => togglePermission("can_change_domain_status")}
-                      disabled={!customPermissions.can_access_management}
-                    />
+                    <Select
+                      value={customPermissions.can_change_domain_status || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_change_domain_status", value)}
+                      disabled={customPermissions.can_access_management === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="write">Editar</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Label>Selecionar plataforma</Label>
-                    <Switch
-                      checked={customPermissions.can_select_platform}
-                      onCheckedChange={() => togglePermission("can_select_platform")}
-                      disabled={!customPermissions.can_access_management}
-                    />
+                    <Select
+                      value={customPermissions.can_select_platform || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_select_platform", value)}
+                      disabled={customPermissions.can_access_management === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="write">Editar</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Label>Selecionar fonte de tráfego</Label>
-                    <Switch
-                      checked={customPermissions.can_select_traffic_source}
-                      onCheckedChange={() => togglePermission("can_select_traffic_source")}
-                      disabled={!customPermissions.can_access_management}
-                    />
+                    <Select
+                      value={customPermissions.can_select_traffic_source || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_select_traffic_source", value)}
+                      disabled={customPermissions.can_access_management === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="write">Editar</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Label>Inserir ID</Label>
-                    <Switch
-                      checked={customPermissions.can_insert_funnel_id}
-                      onCheckedChange={() => togglePermission("can_insert_funnel_id")}
-                      disabled={!customPermissions.can_access_management}
-                    />
+                    <Select
+                      value={customPermissions.can_insert_funnel_id || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_insert_funnel_id", value)}
+                      disabled={customPermissions.can_access_management === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="write">Editar</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Label>Ver logs</Label>
-                    <Switch
-                      checked={customPermissions.can_view_logs}
-                      onCheckedChange={() => togglePermission("can_view_logs")}
-                      disabled={!customPermissions.can_access_management}
-                    />
+                    <Select
+                      value={customPermissions.can_view_logs || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_view_logs", value)}
+                      disabled={customPermissions.can_access_management === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="read">Ler</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Label>Alterar nameservers</Label>
-                    <Switch
-                      checked={customPermissions.can_change_nameservers}
-                      onCheckedChange={() => togglePermission("can_change_nameservers")}
-                      disabled={!customPermissions.can_access_management}
-                    />
+                    <Select
+                      value={customPermissions.can_change_nameservers || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_change_nameservers", value)}
+                      disabled={customPermissions.can_access_management === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="write">Editar</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -652,19 +887,36 @@ export function UserManagement() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label>Criação de filtros</Label>
-                    <Switch
-                      checked={customPermissions.can_create_filters}
-                      onCheckedChange={() => togglePermission("can_create_filters")}
-                      disabled={!customPermissions.can_access_settings}
-                    />
+                    <Select
+                      value={customPermissions.can_create_filters || "none"}
+                      onValueChange={(value: PermissionLevel) => updatePermission("can_create_filters", value)}
+                      disabled={customPermissions.can_access_settings === "none"}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                        <SelectItem value="write">Editar</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
                   <div className="flex items-center justify-between">
-                    <Label>Gerenciar usuários</Label>
-                    <Switch
-                      checked={false}
-                      disabled={true}
-                    />
-                    <span className="text-xs text-muted-foreground">(Apenas Admin)</span>
+                    <div className="flex items-center gap-2">
+                      <Label>Gerenciar usuários</Label>
+                      <Badge variant="secondary" className="text-xs">
+                        Apenas Admin
+                      </Badge>
+                    </div>
+                    <Select value="none" disabled>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem acesso</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
