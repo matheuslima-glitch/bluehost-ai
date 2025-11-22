@@ -31,14 +31,30 @@ const STEP_LABELS: { [key: string]: string } = {
   purchasing: "Comprando domínio(s)",
   nameservers: "Alterando nameservers",
   cloudflare: "Configurando Cloudflare",
+  cpanel: "Adicionando ao cPanel",
+  wordpress: "Instalando WordPress",
+  plugins: "Configurando plugins",
+  supabase: "Salvando no banco de dados",
   completed: "Compra concluída",
   canceled: "Compra cancelada",
 };
 
-const WORDPRESS_STEPS = ["generating", "checking", "searching", "purchasing", "nameservers", "cloudflare", "completed"];
+const WORDPRESS_STEPS = [
+  "generating",
+  "checking",
+  "searching",
+  "purchasing",
+  "nameservers",
+  "cloudflare",
+  "cpanel",
+  "wordpress",
+  "plugins",
+  "supabase",
+  "completed",
+];
 const ATOMICAT_STEPS = ["generating", "checking", "searching", "purchasing", "completed"];
 
-const TIMEOUT_SECONDS = 90000;
+const TIMEOUT_SECONDS = 180000;
 const MIN_DISPLAY_TIME = 800;
 const MAX_DOMAINS = 10; // LIMITE MÁXIMO
 
@@ -123,7 +139,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
         // ADICIONAR DOMÍNIO À LISTA quando comprado
         if (update.status === "completed" && update.domain_name) {
-          setPurchasedDomains((prev) => [...prev, update.domain_name!]);
+          setPurchasedDomains((prev) => {
+            if (!prev.includes(update.domain_name!)) {
+              return [...prev, update.domain_name!];
+            }
+            return prev;
+          });
         }
 
         if (update.status === "completed" && update.step === "completed") {
