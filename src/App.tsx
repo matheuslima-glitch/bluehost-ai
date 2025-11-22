@@ -15,6 +15,7 @@ import DomainDetails from "./pages/DomainDetails";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -34,6 +35,7 @@ const App = () => (
                 <Route path="domains" element={<DomainManagement />} />
                 <Route path="domains/:id" element={<DomainDetails />} />
                 <Route path="settings" element={<Settings />} />
+                <Route path="/accept-invite/:token" element={<AcceptInvite />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
