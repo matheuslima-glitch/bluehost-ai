@@ -17,13 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-
-const menuItems = [
-  { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "Compra de Domínios", url: "/search", icon: Search },
-  { title: "Gerenciamento", url: "/domains", icon: Globe },
-  { title: "Configurações", url: "/settings", icon: Settings },
-];
+import { usePermissions } from "@/hooks/usePermissions";
 
 // Função para extrair nome e sobrenome do email (fallback)
 const getNameFromEmail = (email: string | undefined) => {
@@ -57,6 +51,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const { canAccessPage } = usePermissions();
 
   // Buscar o full_name da tabela profiles
   const { data: profile } = useQuery({
@@ -76,6 +71,37 @@ export function AppSidebar() {
   // Usar full_name do profile, se não existir usa o email como fallback
   const userName = profile?.full_name || getNameFromEmail(user?.email);
   const userInitials = getInitials(userName);
+
+  // Definir itens do menu com suas respectivas permissões
+  const menuItems = [
+    {
+      title: "Dashboard",
+      url: "/dashboard",
+      icon: Home,
+      permission: "dashboard" as const,
+    },
+    {
+      title: "Compra de Domínios",
+      url: "/search",
+      icon: Search,
+      permission: "domain-search" as const,
+    },
+    {
+      title: "Gerenciamento",
+      url: "/domains",
+      icon: Globe,
+      permission: "management" as const,
+    },
+    {
+      title: "Configurações",
+      url: "/settings",
+      icon: Settings,
+      permission: "settings" as const,
+    },
+  ];
+
+  // Filtrar apenas os itens que o usuário pode acessar
+  const visibleMenuItems = menuItems.filter((item) => canAccessPage(item.permission));
 
   return (
     <Sidebar className="border-r-0" collapsible="icon">
@@ -98,7 +124,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
-              {menuItems.map((item) => {
+              {visibleMenuItems.map((item) => {
                 const isActive = location.pathname === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>

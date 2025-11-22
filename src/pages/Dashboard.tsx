@@ -24,9 +24,11 @@ import {
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { CriticalDomainsTable } from "@/components/CriticalDomainsTable";
 import { CriticalDomainsAlert } from "@/components/CriticalDomainsAlert";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
   const [firstName, setFirstName] = useState("");
   const [stats, setStats] = useState({
     total: 0,
@@ -458,146 +460,154 @@ export default function Dashboard() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* Integration Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Status das Integrações
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  {integrationStatus.namecheap ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-red-500" />
-                  )}
-                  <div>
-                    <p
-                      className="text-sm font-medium cursor-pointer"
-                      onClick={() => window.open("https://www.namecheap.com/myaccount/login/?ReturnUrl=%2f", "_blank")}
-                    >
-                      Namecheap
-                    </p>
+        {hasPermission("can_view_integrations") && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Status das Integrações
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    {integrationStatus.namecheap ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    )}
+                    <div>
+                      <p
+                        className="text-sm font-medium cursor-pointer"
+                        onClick={() =>
+                          window.open("https://www.namecheap.com/myaccount/login/?ReturnUrl=%2f", "_blank")
+                        }
+                      >
+                        Namecheap
+                      </p>
+                    </div>
                   </div>
+                  <Badge variant={integrationStatus.namecheap ? "default" : "destructive"}>
+                    {integrationStatus.namecheap ? "Ativa" : "Inativa"}
+                  </Badge>
                 </div>
-                <Badge variant={integrationStatus.namecheap ? "default" : "destructive"}>
-                  {integrationStatus.namecheap ? "Ativa" : "Inativa"}
-                </Badge>
-              </div>
 
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  {integrationStatus.cpanel ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-red-500" />
-                  )}
-                  <div>
-                    <p
-                      className="text-sm font-medium cursor-pointer"
-                      onClick={() => window.open("https://nexus.servidor.net.br:2083/", "_blank")}
-                    >
-                      cPanel
-                    </p>
-                    {/* LINHA REMOVIDA ABAIXO */}
-                    {/* <p className="text-xs text-muted-foreground">{integrations.cpanel} domínios</p> */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    {integrationStatus.cpanel ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    )}
+                    <div>
+                      <p
+                        className="text-sm font-medium cursor-pointer"
+                        onClick={() => window.open("https://nexus.servidor.net.br:2083/", "_blank")}
+                      >
+                        cPanel
+                      </p>
+                      {/* LINHA REMOVIDA ABAIXO */}
+                      {/* <p className="text-xs text-muted-foreground">{integrations.cpanel} domínios</p> */}
+                    </div>
                   </div>
+                  <Badge variant={integrationStatus.cpanel ? "default" : "destructive"}>
+                    {integrationStatus.cpanel ? "Ativa" : "Inativa"}
+                  </Badge>
                 </div>
-                <Badge variant={integrationStatus.cpanel ? "default" : "destructive"}>
-                  {integrationStatus.cpanel ? "Ativa" : "Inativa"}
-                </Badge>
-              </div>
 
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  {integrationStatus.cloudflare ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-red-500" />
-                  )}
-                  <div>
-                    <p
-                      className="text-sm font-medium cursor-pointer"
-                      onClick={() => window.open("https://dash.cloudflare.com/login", "_blank")}
-                    >
-                      Cloudflare
-                    </p>
-                    {/* LINHA REMOVIDA ABAIXO */}
-                    {/* <p className="text-xs text-muted-foreground">{integrations.cloudflare} zonas</p> */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    {integrationStatus.cloudflare ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    )}
+                    <div>
+                      <p
+                        className="text-sm font-medium cursor-pointer"
+                        onClick={() => window.open("https://dash.cloudflare.com/login", "_blank")}
+                      >
+                        Cloudflare
+                      </p>
+                      {/* LINHA REMOVIDA ABAIXO */}
+                      {/* <p className="text-xs text-muted-foreground">{integrations.cloudflare} zonas</p> */}
+                    </div>
                   </div>
+                  <Badge variant={integrationStatus.cloudflare ? "default" : "destructive"}>
+                    {integrationStatus.cloudflare ? "Ativa" : "Inativa"}
+                  </Badge>
                 </div>
-                <Badge variant={integrationStatus.cloudflare ? "default" : "destructive"}>
-                  {integrationStatus.cloudflare ? "Ativa" : "Inativa"}
-                </Badge>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Namecheap Balance */}
-        <Card className="shadow-md border-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Saldo Namecheap
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {balance ? (
-              <>
-                <div>
-                  {balance.usd === 0 && balance.brl === 0 ? (
-                    <>
-                      <div className="text-3xl font-bold text-muted-foreground">
-                        {balanceCurrency === "usd" ? "$0.00" : "R$ 0,00"}
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-2">Adicione créditos para começar</p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-4xl font-bold text-blue-500">
-                        {balanceCurrency === "usd" ? `$${balance.usd.toFixed(2)}` : `R$ ${balance.brl.toFixed(2)}`}
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-2">Saldo disponível para compras</p>
-                    </>
-                  )}
+        {hasPermission("can_view_balance") && (
+          <Card className="shadow-md border-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                Saldo Namecheap
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {balance ? (
+                <>
+                  <div>
+                    {balance.usd === 0 && balance.brl === 0 ? (
+                      <>
+                        <div className="text-3xl font-bold text-muted-foreground">
+                          {balanceCurrency === "usd" ? "$0.00" : "R$ 0,00"}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-2">Adicione créditos para começar</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-4xl font-bold text-blue-500">
+                          {balanceCurrency === "usd" ? `$${balance.usd.toFixed(2)}` : `R$ ${balance.brl.toFixed(2)}`}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-2">Saldo disponível para compras</p>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={balanceCurrency === "usd" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setBalanceCurrency("usd")}
+                      className={`${balanceCurrency === "usd" ? "bg-primary text-primary-foreground" : ""}`}
+                    >
+                      USD
+                    </Button>
+                    <Button
+                      variant={balanceCurrency === "brl" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setBalanceCurrency("brl")}
+                      className={`${balanceCurrency === "brl" ? "bg-primary text-primary-foreground" : ""}`}
+                    >
+                      BRL
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="py-4">
+                  <p className="text-lg font-semibold text-muted-foreground">Indisponível</p>
+                  <p className="text-sm text-muted-foreground mt-1">Verifique as credenciais</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant={balanceCurrency === "usd" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setBalanceCurrency("usd")}
-                    className={`${balanceCurrency === "usd" ? "bg-primary text-primary-foreground" : ""}`}
-                  >
-                    USD
-                  </Button>
-                  <Button
-                    variant={balanceCurrency === "brl" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setBalanceCurrency("brl")}
-                    className={`${balanceCurrency === "brl" ? "bg-primary text-primary-foreground" : ""}`}
-                  >
-                    BRL
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="py-4">
-                <p className="text-lg font-semibold text-muted-foreground">Indisponível</p>
-                <p className="text-sm text-muted-foreground mt-1">Verifique as credenciais</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Critical Domains Management Table */}
-      <div data-critical-domains-table className="critical-domains-table scroll-mt-4">
-        <CriticalDomainsTable domains={domains} onDomainsChange={loadDashboardData} />
-      </div>
+      {hasPermission("can_view_critical_domains") && (
+        <div data-critical-domains-table className="critical-domains-table scroll-mt-4">
+          <CriticalDomainsTable domains={domains} onDomainsChange={loadDashboardData} />
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
