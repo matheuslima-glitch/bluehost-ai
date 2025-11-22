@@ -15,6 +15,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
@@ -23,7 +25,7 @@ const menuItems = [
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
-// Função para extrair nome e sobrenome do email
+// Função para extrair nome e sobrenome do email (fallback)
 const getNameFromEmail = (email: string | undefined) => {
   if (!email) return "Usuário";
 
@@ -41,10 +43,12 @@ const getNameFromEmail = (email: string | undefined) => {
 
 // Função para obter iniciais do nome
 const getInitials = (name: string) => {
-  const parts = name.split(" ");
+  const parts = name.trim().split(" ");
   if (parts.length >= 2) {
+    // Pega primeira letra do primeiro nome e primeira letra do último nome
     return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
   }
+  // Se tiver apenas um nome, pega as 2 primeiras letras
   return name.substring(0, 2).toUpperCase();
 };
 
@@ -54,7 +58,23 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
 
-  const userName = getNameFromEmail(user?.email);
+  // Buscar o full_name da tabela profiles
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles").select("full_name").eq("id", user?.id).maybeSingle();
+
+      if (error) {
+        console.error("Erro ao buscar perfil:", error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Usar full_name do profile, se não existir usa o email como fallback
+  const userName = profile?.full_name || getNameFromEmail(user?.email);
   const userInitials = getInitials(userName);
 
   return (
