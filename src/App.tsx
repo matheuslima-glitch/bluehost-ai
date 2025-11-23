@@ -8,6 +8,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { usePermissions } from "@/hooks/usePermissions";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import Layout from "./pages/Layout";
 import Dashboard from "./pages/Dashboard";
 import DomainSearch from "./pages/DomainSearch";
@@ -36,6 +37,7 @@ function ProtectedRoutes() {
     <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/auth" element={<Auth />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/accept-invite/:token" element={<AcceptInvite />} />
       <Route path="/no-access" element={<NoAccess />} />
 
