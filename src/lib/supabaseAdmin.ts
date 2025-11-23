@@ -3,11 +3,17 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseServiceRoleKey) {
-  throw new Error("Missing Supabase environment variables");
+if (!supabaseUrl) {
+  throw new Error("Missing VITE_SUPABASE_URL in .env file");
 }
 
-// Cliente Admin - Use APENAS para operações administrativas
+if (!supabaseServiceRoleKey) {
+  throw new Error(
+    "Missing VITE_SUPABASE_SERVICE_ROLE_KEY in .env file - Get it from Supabase Dashboard > Settings > API > service_role key",
+  );
+}
+
+// Cliente Admin com Service Role Key
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
