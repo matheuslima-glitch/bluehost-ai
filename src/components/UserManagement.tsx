@@ -31,6 +31,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Trash2, Settings as SettingsIcon, Mail, Check, Shield } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -129,9 +130,8 @@ export function UserManagement() {
       permissions?: Partial<UserPermission>;
       isAdmin: boolean;
     }) => {
-      // Usar o método nativo do Supabase para enviar convite
-      // Isso vai acionar o template "Invite User" que você já configurou no Supabase
-      const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+      // Usar supabaseAdmin para ter permissões administrativas
+      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         data: {
           is_admin: isAdmin,
           permissions: permissions ? JSON.stringify(permissions) : null,
@@ -250,8 +250,8 @@ export function UserManagement() {
 
       if (permError) throw permError;
 
-      // Deletar o usuário do auth
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      // Deletar o usuário do auth usando supabaseAdmin
+      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
       if (authError) throw authError;
     },
     onSuccess: () => {
