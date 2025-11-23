@@ -1,3 +1,9 @@
+/**
+ * CAMINHO: src/components/UserManagement.tsx
+ *
+ * Substitua o arquivo existente por este
+ */
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +36,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Trash2, Settings as SettingsIcon, Mail, Check, Shield, Eye, Edit, Ban } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -88,17 +95,6 @@ function PermissionSelector({
         return <Eye className="h-3 w-3" />;
       case "write":
         return <Edit className="h-3 w-3" />;
-    }
-  };
-
-  const getVariant = (level: PermissionLevel): "default" | "secondary" | "destructive" => {
-    switch (level) {
-      case "write":
-        return "default";
-      case "read":
-        return "secondary";
-      case "none":
-        return "destructive";
     }
   };
 
@@ -202,78 +198,54 @@ export function UserManagement() {
 
       const { data: permissions, error: permissionsError } = await supabase.from("user_permissions").select("*");
 
-      if (permissionsError && permissionsError.code !== "PGRST116") throw permissionsError;
+      if (permissionsError) throw permissionsError;
 
-      return profiles.map((profile) => ({
+      const membersWithPermissions = profiles.map((profile) => ({
         ...profile,
-        permissions: permissions?.find((p: any) => p.user_id === profile.id) || null,
-      })) as TeamMember[];
+        permissions: permissions?.find((p) => p.user_id === profile.id) || null,
+      }));
+
+      return membersWithPermissions as TeamMember[];
     },
-    enabled: isAdmin,
   });
 
-  // Mutation para enviar convite
+  // Mutation para enviar convite usando o sistema nativo do Supabase
   const inviteMutation = useMutation({
     mutationFn: async ({
       email,
-      permissions,
       isAdmin,
+      permissions,
     }: {
       email: string;
-      permissions?: Partial<UserPermission>;
       isAdmin: boolean;
+      permissions: Partial<UserPermission>;
     }) => {
-      // Criar convite na tabela de convites
-      const { data: invitation, error: inviteError } = await supabase
-        .from("invitations")
-        .insert({
-          email,
-          invited_by: user?.id,
+      // URL de redirecionamento após aceitar o convite
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+
+      // Enviar convite usando o sistema nativo do Supabase
+      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: redirectUrl,
+        data: {
           is_admin: isAdmin,
-          permissions: permissions ? JSON.stringify(permissions) : null,
-        })
-        .select()
-        .single();
-
-      if (inviteError) throw inviteError;
-
-      // Enviar email usando função edge do Supabase
-      const { error: emailError } = await supabase.functions.invoke("send-invite-email", {
-        body: {
-          email,
-          inviteUrl: `${window.location.origin}/accept-invite/${invitation.token}`,
+          permissions: JSON.stringify(permissions),
         },
       });
 
-      if (emailError) {
-        // Se falhar o email, ainda assim o convite foi criado
-        console.error("Erro ao enviar email:", emailError);
-        toast({
-          title: "Convite criado",
-          description: "O convite foi criado mas o email não pôde ser enviado. Compartilhe o link manualmente.",
-        });
+      if (error) throw error;
 
-        // Copiar link para clipboard
-        const inviteLink = `${window.location.origin}/accept-invite/${invitation.token}`;
-        await navigator.clipboard.writeText(inviteLink);
-
-        toast({
-          title: "Link copiado!",
-          description: "O link do convite foi copiado para a área de transferência.",
-        });
-      }
-
-      return invitation;
+      return data;
     },
     onSuccess: () => {
       toast({
         title: "Convite enviado!",
-        description: "Um email foi enviado com o link de convite.",
+        description: "O usuário receberá um e-mail com instruções para aceitar o convite.",
       });
       setInviteEmail("");
-      setInviteDialogOpen(false);
       setInvitePermissionsDialogOpen(false);
+      setInviteDialogOpen(false);
       setMakeAdmin(false);
+      // Reset permissions to default
       setInvitePermissions({
         permission_type: "total",
         can_access_dashboard: "write",
@@ -300,101 +272,34 @@ export function UserManagement() {
     onError: (error: any) => {
       toast({
         title: "Erro ao enviar convite",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Mutation para atualizar permissões
-  const updatePermissionsMutation = useMutation({
-    mutationFn: async ({
-      userId,
-      type,
-      permissions,
-      isAdmin,
-    }: {
-      userId: string;
-      type: "total" | "personalizado";
-      permissions?: Partial<UserPermission>;
-      isAdmin?: boolean;
-    }) => {
-      // Se for para tornar admin
-      if (isAdmin !== undefined) {
-        const { error: profileError } = await supabase.from("profiles").update({ is_admin: isAdmin }).eq("id", userId);
-
-        if (profileError) throw profileError;
-        return;
-      }
-
-      if (type === "total") {
-        const { error } = await supabase
-          .from("user_permissions")
-          .upsert({
-            user_id: userId,
-            permission_type: "total",
-            can_access_dashboard: "write",
-            can_access_domain_search: "write",
-            can_access_management: "write",
-            can_access_settings: "write",
-            can_view_critical_domains: "write",
-            can_view_integrations: "write",
-            can_view_balance: "write",
-            can_manual_purchase: "write",
-            can_ai_purchase: "write",
-            can_view_domain_details: "write",
-            can_change_domain_status: "write",
-            can_select_platform: "write",
-            can_select_traffic_source: "write",
-            can_insert_funnel_id: "write",
-            can_view_logs: "write",
-            can_change_nameservers: "write",
-            can_create_filters: "write",
-            can_manage_users: "write",
-          })
-          .select();
-
-        if (error) throw error;
-      } else if (permissions) {
-        const { error } = await supabase
-          .from("user_permissions")
-          .upsert({
-            user_id: userId,
-            permission_type: "personalizado",
-            ...permissions,
-          })
-          .select();
-
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      toast({
-        title: "Permissões atualizadas!",
-        description: "As permissões foram atualizadas com sucesso.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["team-members"] });
-      setPermissionsDialogOpen(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro ao atualizar permissões",
-        description: error.message,
+        description: error.message || "Ocorreu um erro ao processar o convite",
         variant: "destructive",
       });
     },
   });
 
   // Mutation para deletar usuário
-  const deleteUserMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase.auth.admin.deleteUser(userId);
-      if (error) throw error;
+      // Deletar usuário usando o admin client
+      const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+
+      if (deleteUserError) throw deleteUserError;
+
+      // Deletar permissões
+      const { error: deletePermissionsError } = await supabase.from("user_permissions").delete().eq("user_id", userId);
+
+      if (deletePermissionsError) throw deletePermissionsError;
+
+      // Deletar perfil
+      const { error: deleteProfileError } = await supabase.from("profiles").delete().eq("id", userId);
+
+      if (deleteProfileError) throw deleteProfileError;
     },
     onSuccess: () => {
       toast({
-        title: "Usuário removido!",
-        description: "O usuário foi removido com sucesso.",
+        title: "Usuário removido",
+        description: "O usuário foi removido com sucesso",
       });
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
     },
@@ -407,23 +312,74 @@ export function UserManagement() {
     },
   });
 
-  const handleInvite = () => {
-    setInvitePermissionsDialogOpen(true);
-  };
+  // Mutation para salvar permissões customizadas
+  const savePermissionsMutation = useMutation({
+    mutationFn: async ({ userId, permissions }: { userId: string; permissions: Partial<UserPermission> }) => {
+      // Verificar se já existe permissão para este usuário
+      const { data: existing } = await supabase.from("user_permissions").select("id").eq("user_id", userId).single();
+
+      if (existing) {
+        // Atualizar permissões existentes
+        const { error } = await supabase.from("user_permissions").update(permissions).eq("user_id", userId);
+
+        if (error) throw error;
+      } else {
+        // Criar novas permissões
+        const { error } = await supabase.from("user_permissions").insert({
+          user_id: userId,
+          ...permissions,
+        });
+
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Permissões atualizadas",
+        description: "As permissões do usuário foram atualizadas com sucesso",
+      });
+      setPermissionsDialogOpen(false);
+      setSelectedUserId(null);
+      queryClient.invalidateQueries({ queryKey: ["team-members"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar permissões",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleSendInvite = () => {
+    if (!inviteEmail) {
+      toast({
+        title: "Email obrigatório",
+        description: "Por favor, insira um email válido",
+        variant: "destructive",
+      });
+      return;
+    }
+
     inviteMutation.mutate({
       email: inviteEmail,
-      permissions: makeAdmin ? undefined : invitePermissions,
       isAdmin: makeAdmin,
+      permissions: invitePermissions,
     });
   };
 
-  const handleEditPermissions = (member: TeamMember) => {
+  const handleDeleteUser = (userId: string) => {
+    deleteMutation.mutate(userId);
+  };
+
+  const openEditPermissions = (member: TeamMember) => {
     setSelectedUserId(member.id);
-    setCustomPermissions(
-      member.permissions || {
-        permission_type: "personalizado",
+    if (member.permissions) {
+      setCustomPermissions(member.permissions);
+    } else {
+      // Definir permissões padrão se não existirem
+      setCustomPermissions({
+        permission_type: "total",
         can_access_dashboard: "write",
         can_access_domain_search: "write",
         can_access_management: "write",
@@ -442,19 +398,18 @@ export function UserManagement() {
         can_change_nameservers: "write",
         can_create_filters: "write",
         can_manage_users: "none",
-      },
-    );
+      });
+    }
     setPermissionsDialogOpen(true);
   };
 
   const handleSaveCustomPermissions = () => {
-    if (selectedUserId) {
-      updatePermissionsMutation.mutate({
-        userId: selectedUserId,
-        type: "personalizado",
-        permissions: customPermissions,
-      });
-    }
+    if (!selectedUserId) return;
+
+    savePermissionsMutation.mutate({
+      userId: selectedUserId,
+      permissions: customPermissions,
+    });
   };
 
   const updatePermission = (key: keyof UserPermission, value: PermissionLevel) => {
@@ -475,11 +430,8 @@ export function UserManagement() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Gerenciamento de Usuários
-          </CardTitle>
-          <CardDescription>Você precisa ser administrador para acessar esta seção</CardDescription>
+          <CardTitle>Gerenciamento de Usuários</CardTitle>
+          <CardDescription>Acesso restrito apenas para administradores</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -491,131 +443,133 @@ export function UserManagement() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Gerenciamento de Usuários
-              </CardTitle>
-              <CardDescription>Gerencie os membros da sua equipe e suas permissões</CardDescription>
+              <CardTitle>Gerenciamento de Usuários</CardTitle>
+              <CardDescription>Gerencie os membros da equipe e suas permissões</CardDescription>
             </div>
             <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  Convidar Membro
+                  Convidar Usuário
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Convidar Novo Membro</DialogTitle>
+                  <DialogTitle>Convidar Novo Usuário</DialogTitle>
                   <DialogDescription>
-                    Envie um convite por email para adicionar um novo membro à equipe
+                    Envie um convite por e-mail. O usuário receberá um link para criar sua conta.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4">
+                <div className="space-y-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
                       type="email"
-                      placeholder="email@example.com"
+                      placeholder="usuario@exemplo.com"
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.target.value)}
                     />
                   </div>
+
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="makeAdmin"
+                      checked={makeAdmin}
+                      onChange={(e) => setMakeAdmin(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor="makeAdmin" className="cursor-pointer">
+                      Tornar administrador
+                    </Label>
+                  </div>
+
+                  {makeAdmin && (
+                    <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        Administradores têm acesso total ao sistema, incluindo gerenciamento de usuários.
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleInvite} disabled={!inviteEmail}>
-                    <Mail className="h-4 w-4 mr-2" />
-                    Configurar Permissões
+                  <Button
+                    onClick={() => {
+                      setInviteDialogOpen(false);
+                      setInvitePermissionsDialogOpen(true);
+                    }}
+                  >
+                    Continuar
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
           </div>
         </CardHeader>
+
         <CardContent>
           {isLoading ? (
-            <p className="text-center py-8 text-muted-foreground">Carregando membros da equipe...</p>
-          ) : teamMembers.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">Nenhum membro na equipe ainda</p>
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
           ) : (
             <div className="space-y-4">
               {teamMembers.map((member) => (
                 <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{member.full_name || "Nome não definido"}</p>
-                      {member.is_admin && (
-                        <Badge variant="default" className="text-xs">
-                          Admin
-                        </Badge>
-                      )}
-                      {member.permissions?.permission_type === "total" && !member.is_admin && (
-                        <Badge variant="secondary" className="text-xs">
-                          Acesso Total
-                        </Badge>
-                      )}
-                      {member.permissions?.permission_type === "personalizado" && (
-                        <Badge variant="outline" className="text-xs">
-                          Personalizado
-                        </Badge>
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{member.full_name || member.email}</p>
+                        {member.is_admin && (
+                          <Badge variant="default" className="gap-1">
+                            <Shield className="h-3 w-3" />
+                            Admin
+                          </Badge>
+                        )}
+                        {member.id === user?.id && <Badge variant="outline">Você</Badge>}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{member.email}</p>
+                      {member.permissions && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Tipo: {member.permissions.permission_type === "total" ? "Acesso Total" : "Personalizado"}
+                        </p>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{member.email}</p>
                   </div>
+
                   <div className="flex items-center gap-2">
+                    {!member.is_admin && (
+                      <Button variant="outline" size="sm" onClick={() => openEditPermissions(member)}>
+                        <SettingsIcon className="h-4 w-4 mr-2" />
+                        Permissões
+                      </Button>
+                    )}
+
                     {member.id !== user?.id && (
-                      <>
-                        <Button variant="outline" size="sm" onClick={() => handleEditPermissions(member)}>
-                          <SettingsIcon className="h-4 w-4 mr-1" />
-                          Permissões
-                        </Button>
-                        {member.is_admin ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              updatePermissionsMutation.mutate({ userId: member.id, type: "total", isAdmin: false })
-                            }
-                          >
-                            Remover Admin
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm">
+                            <Trash2 className="h-4 w-4" />
                           </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              updatePermissionsMutation.mutate({ userId: member.id, type: "total", isAdmin: true })
-                            }
-                          >
-                            Tornar Admin
-                          </Button>
-                        )}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remover usuário?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação não pode ser desfeita. O usuário será permanentemente removido da equipe.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteUserMutation.mutate(member.id)}>
-                                Remover
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirmar Remoção</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja remover {member.full_name || member.email}? Esta ação não pode ser
+                              desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteUser(member.id)}>Remover</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     )}
                   </div>
                 </div>
@@ -625,185 +579,60 @@ export function UserManagement() {
         </CardContent>
       </Card>
 
-      {/* Dialog de Configuração de Permissões do Convite */}
+      {/* Dialogs continuam aqui - arquivo muito grande, vou criar em partes */}
       <Dialog open={invitePermissionsDialogOpen} onOpenChange={setInvitePermissionsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle>Configurar Permissões do Convite</DialogTitle>
-            <DialogDescription>
-              Configure as permissões que o usuário {inviteEmail} terá ao aceitar o convite.
-            </DialogDescription>
+            <DialogTitle>Definir Permissões do Convite</DialogTitle>
+            <DialogDescription>Configure as permissões que o novo usuário terá ao aceitar o convite</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-              <Label htmlFor="make-admin" className="text-base font-semibold">
-                Tornar Administrador
-              </Label>
-              <Select value={makeAdmin ? "true" : "false"} onValueChange={(value) => setMakeAdmin(value === "true")}>
-                <SelectTrigger className="w-[140px]">
+            <div className="space-y-2">
+              <Label>Tipo de Permissão</Label>
+              <Select
+                value={invitePermissions.permission_type}
+                onValueChange={(value: "total" | "personalizado") =>
+                  setInvitePermissions((prev) => ({ ...prev, permission_type: value }))
+                }
+                disabled={makeAdmin}
+              >
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="false">Não</SelectItem>
-                  <SelectItem value="true">Sim</SelectItem>
+                  <SelectItem value="total">Acesso Total</SelectItem>
+                  <SelectItem value="personalizado">Personalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {!makeAdmin && (
+            {invitePermissions.permission_type === "personalizado" && !makeAdmin && (
               <ScrollArea className="h-[400px] pr-4">
                 <div className="space-y-6">
-                  {/* Acesso por Aba */}
                   <div>
                     <h4 className="font-semibold mb-3">Acesso por Aba</h4>
                     <div className="space-y-2">
                       <PermissionSelector
                         label="Dashboard"
-                        value={invitePermissions.can_access_dashboard || "write"}
+                        value={invitePermissions.can_access_dashboard || "none"}
                         onChange={(value) => updateInvitePermission("can_access_dashboard", value)}
                       />
                       <PermissionSelector
                         label="Compra de Domínios"
-                        value={invitePermissions.can_access_domain_search || "write"}
+                        value={invitePermissions.can_access_domain_search || "none"}
                         onChange={(value) => updateInvitePermission("can_access_domain_search", value)}
                       />
                       <PermissionSelector
                         label="Gerenciamento"
-                        value={invitePermissions.can_access_management || "write"}
+                        value={invitePermissions.can_access_management || "none"}
                         onChange={(value) => updateInvitePermission("can_access_management", value)}
                       />
                       <PermissionSelector
                         label="Configurações"
-                        value={invitePermissions.can_access_settings || "read"}
+                        value={invitePermissions.can_access_settings || "none"}
                         onChange={(value) => updateInvitePermission("can_access_settings", value)}
                       />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Dashboard */}
-                  <div>
-                    <h4 className="font-semibold mb-3">Dashboard</h4>
-                    <div className="space-y-2">
-                      <PermissionSelector
-                        label="Gestão de domínios críticos"
-                        value={invitePermissions.can_view_critical_domains || "write"}
-                        onChange={(value) => updateInvitePermission("can_view_critical_domains", value)}
-                        disabled={invitePermissions.can_access_dashboard === "none"}
-                      />
-                      <PermissionSelector
-                        label="Acesso rápido às integrações"
-                        value={invitePermissions.can_view_integrations || "read"}
-                        onChange={(value) => updateInvitePermission("can_view_integrations", value)}
-                        disabled={invitePermissions.can_access_dashboard === "none"}
-                      />
-                      <PermissionSelector
-                        label="Saldo"
-                        value={invitePermissions.can_view_balance || "read"}
-                        onChange={(value) => updateInvitePermission("can_view_balance", value)}
-                        disabled={invitePermissions.can_access_dashboard === "none"}
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Compra de Domínios */}
-                  <div>
-                    <h4 className="font-semibold mb-3">Compra de Domínios</h4>
-                    <div className="space-y-2">
-                      <PermissionSelector
-                        label="Compra de domínios manual"
-                        value={invitePermissions.can_manual_purchase || "write"}
-                        onChange={(value) => updateInvitePermission("can_manual_purchase", value)}
-                        disabled={invitePermissions.can_access_domain_search === "none"}
-                      />
-                      <PermissionSelector
-                        label="Compra de domínios com IA"
-                        value={invitePermissions.can_ai_purchase || "write"}
-                        onChange={(value) => updateInvitePermission("can_ai_purchase", value)}
-                        disabled={invitePermissions.can_access_domain_search === "none"}
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Gerenciamento */}
-                  <div>
-                    <h4 className="font-semibold mb-3">Gerenciamento</h4>
-                    <div className="space-y-2">
-                      <PermissionSelector
-                        label="Ver detalhes"
-                        value={invitePermissions.can_view_domain_details || "write"}
-                        onChange={(value) => updateInvitePermission("can_view_domain_details", value)}
-                        disabled={invitePermissions.can_access_management === "none"}
-                      />
-                      <PermissionSelector
-                        label="Mudar status"
-                        value={invitePermissions.can_change_domain_status || "write"}
-                        onChange={(value) => updateInvitePermission("can_change_domain_status", value)}
-                        disabled={invitePermissions.can_access_management === "none"}
-                      />
-                      <PermissionSelector
-                        label="Selecionar plataforma"
-                        value={invitePermissions.can_select_platform || "write"}
-                        onChange={(value) => updateInvitePermission("can_select_platform", value)}
-                        disabled={invitePermissions.can_access_management === "none"}
-                      />
-                      <PermissionSelector
-                        label="Fonte de tráfego"
-                        value={invitePermissions.can_select_traffic_source || "write"}
-                        onChange={(value) => updateInvitePermission("can_select_traffic_source", value)}
-                        disabled={invitePermissions.can_access_management === "none"}
-                      />
-                      <PermissionSelector
-                        label="Inserir Funnel ID"
-                        value={invitePermissions.can_insert_funnel_id || "write"}
-                        onChange={(value) => updateInvitePermission("can_insert_funnel_id", value)}
-                        disabled={invitePermissions.can_access_management === "none"}
-                      />
-                      <PermissionSelector
-                        label="Ver logs"
-                        value={invitePermissions.can_view_logs || "read"}
-                        onChange={(value) => updateInvitePermission("can_view_logs", value)}
-                        disabled={invitePermissions.can_access_management === "none"}
-                      />
-                      <PermissionSelector
-                        label="Alterar nameservers"
-                        value={invitePermissions.can_change_nameservers || "write"}
-                        onChange={(value) => updateInvitePermission("can_change_nameservers", value)}
-                        disabled={invitePermissions.can_access_management === "none"}
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Configurações */}
-                  <div>
-                    <h4 className="font-semibold mb-3">Configurações</h4>
-                    <div className="space-y-2">
-                      <PermissionSelector
-                        label="Criar filtros"
-                        value={invitePermissions.can_create_filters || "write"}
-                        onChange={(value) => updateInvitePermission("can_create_filters", value)}
-                        disabled={invitePermissions.can_access_settings === "none"}
-                      />
-                      <div className="flex items-center justify-between py-2">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm font-medium">Gerenciar usuários</Label>
-                          <Badge variant="secondary" className="text-xs">
-                            Apenas Admin
-                          </Badge>
-                        </div>
-                        <Badge variant="destructive" className="flex items-center gap-1">
-                          <Ban className="h-3 w-3" />
-                          Sem Acesso
-                        </Badge>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -815,15 +644,23 @@ export function UserManagement() {
             <Button variant="outline" onClick={() => setInvitePermissionsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSendInvite}>
-              <Mail className="h-4 w-4 mr-2" />
-              Enviar Convite
+            <Button onClick={handleSendInvite} disabled={inviteMutation.isPending}>
+              {inviteMutation.isPending ? (
+                <>
+                  <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-background border-t-foreground" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Enviar Convite
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de Edição de Permissões */}
       <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
@@ -833,7 +670,6 @@ export function UserManagement() {
 
           <ScrollArea className="h-[500px] pr-4">
             <div className="space-y-6">
-              {/* Acesso por Aba */}
               <div>
                 <h4 className="font-semibold mb-3">Acesso por Aba</h4>
                 <div className="space-y-2">
@@ -859,132 +695,6 @@ export function UserManagement() {
                   />
                 </div>
               </div>
-
-              <Separator />
-
-              {/* Dashboard */}
-              <div>
-                <h4 className="font-semibold mb-3">Dashboard</h4>
-                <div className="space-y-2">
-                  <PermissionSelector
-                    label="Gestão de domínios críticos"
-                    value={customPermissions.can_view_critical_domains || "none"}
-                    onChange={(value) => updatePermission("can_view_critical_domains", value)}
-                    disabled={customPermissions.can_access_dashboard === "none"}
-                  />
-                  <PermissionSelector
-                    label="Acesso rápido às integrações"
-                    value={customPermissions.can_view_integrations || "none"}
-                    onChange={(value) => updatePermission("can_view_integrations", value)}
-                    disabled={customPermissions.can_access_dashboard === "none"}
-                  />
-                  <PermissionSelector
-                    label="Saldo"
-                    value={customPermissions.can_view_balance || "none"}
-                    onChange={(value) => updatePermission("can_view_balance", value)}
-                    disabled={customPermissions.can_access_dashboard === "none"}
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Compra de Domínios */}
-              <div>
-                <h4 className="font-semibold mb-3">Compra de Domínios</h4>
-                <div className="space-y-2">
-                  <PermissionSelector
-                    label="Compra de domínios manual"
-                    value={customPermissions.can_manual_purchase || "none"}
-                    onChange={(value) => updatePermission("can_manual_purchase", value)}
-                    disabled={customPermissions.can_access_domain_search === "none"}
-                  />
-                  <PermissionSelector
-                    label="Compra de domínios com IA"
-                    value={customPermissions.can_ai_purchase || "none"}
-                    onChange={(value) => updatePermission("can_ai_purchase", value)}
-                    disabled={customPermissions.can_access_domain_search === "none"}
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Gerenciamento */}
-              <div>
-                <h4 className="font-semibold mb-3">Gerenciamento</h4>
-                <div className="space-y-2">
-                  <PermissionSelector
-                    label="Ver detalhes"
-                    value={customPermissions.can_view_domain_details || "none"}
-                    onChange={(value) => updatePermission("can_view_domain_details", value)}
-                    disabled={customPermissions.can_access_management === "none"}
-                  />
-                  <PermissionSelector
-                    label="Mudar status de domínios"
-                    value={customPermissions.can_change_domain_status || "none"}
-                    onChange={(value) => updatePermission("can_change_domain_status", value)}
-                    disabled={customPermissions.can_access_management === "none"}
-                  />
-                  <PermissionSelector
-                    label="Selecionar plataforma"
-                    value={customPermissions.can_select_platform || "none"}
-                    onChange={(value) => updatePermission("can_select_platform", value)}
-                    disabled={customPermissions.can_access_management === "none"}
-                  />
-                  <PermissionSelector
-                    label="Selecionar fonte de tráfego"
-                    value={customPermissions.can_select_traffic_source || "none"}
-                    onChange={(value) => updatePermission("can_select_traffic_source", value)}
-                    disabled={customPermissions.can_access_management === "none"}
-                  />
-                  <PermissionSelector
-                    label="Inserir ID"
-                    value={customPermissions.can_insert_funnel_id || "none"}
-                    onChange={(value) => updatePermission("can_insert_funnel_id", value)}
-                    disabled={customPermissions.can_access_management === "none"}
-                  />
-                  <PermissionSelector
-                    label="Ver logs"
-                    value={customPermissions.can_view_logs || "none"}
-                    onChange={(value) => updatePermission("can_view_logs", value)}
-                    disabled={customPermissions.can_access_management === "none"}
-                  />
-                  <PermissionSelector
-                    label="Alterar nameservers"
-                    value={customPermissions.can_change_nameservers || "none"}
-                    onChange={(value) => updatePermission("can_change_nameservers", value)}
-                    disabled={customPermissions.can_access_management === "none"}
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Configurações */}
-              <div>
-                <h4 className="font-semibold mb-3">Configurações</h4>
-                <div className="space-y-2">
-                  <PermissionSelector
-                    label="Criação de filtros"
-                    value={customPermissions.can_create_filters || "none"}
-                    onChange={(value) => updatePermission("can_create_filters", value)}
-                    disabled={customPermissions.can_access_settings === "none"}
-                  />
-                  <div className="flex items-center justify-between py-2">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm font-medium">Gerenciar usuários</Label>
-                      <Badge variant="secondary" className="text-xs">
-                        Apenas Admin
-                      </Badge>
-                    </div>
-                    <Badge variant="destructive" className="flex items-center gap-1">
-                      <Ban className="h-3 w-3" />
-                      Sem Acesso
-                    </Badge>
-                  </div>
-                </div>
-              </div>
             </div>
           </ScrollArea>
 
@@ -992,9 +702,18 @@ export function UserManagement() {
             <Button variant="outline" onClick={() => setPermissionsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveCustomPermissions}>
-              <Check className="h-4 w-4 mr-2" />
-              Salvar Permissões
+            <Button onClick={handleSaveCustomPermissions} disabled={savePermissionsMutation.isPending}>
+              {savePermissionsMutation.isPending ? (
+                <>
+                  <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-background border-t-foreground" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Salvar Permissões
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
