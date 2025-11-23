@@ -15,7 +15,7 @@ import DomainManagement from "./pages/DomainManagement";
 import DomainDetails from "./pages/DomainDetails";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-import AcceptInvite from "./pages/AcceptInvite";
+import AcceptInvite from "@/pages/AcceptInvite";
 import NoAccess from "./pages/NoAccess";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
