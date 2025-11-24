@@ -1,9 +1,3 @@
-/**
- * CAMINHO: src/components/UserManagement.tsx
- *
- * Substitua o arquivo existente por este
- */
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 
 type PermissionLevel = "none" | "read" | "write";
 
@@ -46,15 +41,19 @@ interface UserPermission {
   id: string;
   user_id: string;
   permission_type: "total" | "personalizado";
+  // Acesso por Aba
   can_access_dashboard: PermissionLevel;
   can_access_domain_search: PermissionLevel;
   can_access_management: PermissionLevel;
   can_access_settings: PermissionLevel;
+  // Dashboard
   can_view_critical_domains: PermissionLevel;
   can_view_integrations: PermissionLevel;
   can_view_balance: PermissionLevel;
+  // Compra de Domínios
   can_manual_purchase: PermissionLevel;
   can_ai_purchase: PermissionLevel;
+  // Gerenciamento
   can_view_domain_details: PermissionLevel;
   can_change_domain_status: PermissionLevel;
   can_select_platform: PermissionLevel;
@@ -62,8 +61,10 @@ interface UserPermission {
   can_insert_funnel_id: PermissionLevel;
   can_view_logs: PermissionLevel;
   can_change_nameservers: PermissionLevel;
+  // Configurações
   can_create_filters: PermissionLevel;
   can_manage_users: PermissionLevel;
+  can_send_invites: PermissionLevel;
 }
 
 interface TeamMember {
@@ -74,6 +75,30 @@ interface TeamMember {
   created_at: string;
   permissions: UserPermission | null;
 }
+
+// Permissões padrão
+const DEFAULT_PERMISSIONS: Partial<UserPermission> = {
+  permission_type: "personalizado",
+  can_access_dashboard: "write",
+  can_access_domain_search: "write",
+  can_access_management: "write",
+  can_access_settings: "read",
+  can_view_critical_domains: "write",
+  can_view_integrations: "read",
+  can_view_balance: "read",
+  can_manual_purchase: "write",
+  can_ai_purchase: "write",
+  can_view_domain_details: "write",
+  can_change_domain_status: "write",
+  can_select_platform: "write",
+  can_select_traffic_source: "write",
+  can_insert_funnel_id: "write",
+  can_view_logs: "read",
+  can_change_nameservers: "write",
+  can_create_filters: "write",
+  can_manage_users: "none",
+  can_send_invites: "none",
+};
 
 // Componente para renderizar o selector de permissão
 function PermissionSelector({
@@ -141,6 +166,7 @@ export function UserManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canEdit, isAdmin } = usePermissions();
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -148,27 +174,7 @@ export function UserManagement() {
   const [invitePermissionsDialogOpen, setInvitePermissionsDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [customPermissions, setCustomPermissions] = useState<Partial<UserPermission>>({});
-  const [invitePermissions, setInvitePermissions] = useState<Partial<UserPermission>>({
-    permission_type: "total",
-    can_access_dashboard: "write",
-    can_access_domain_search: "write",
-    can_access_management: "write",
-    can_access_settings: "read",
-    can_view_critical_domains: "write",
-    can_view_integrations: "read",
-    can_view_balance: "read",
-    can_manual_purchase: "write",
-    can_ai_purchase: "write",
-    can_view_domain_details: "write",
-    can_change_domain_status: "write",
-    can_select_platform: "write",
-    can_select_traffic_source: "write",
-    can_insert_funnel_id: "write",
-    can_view_logs: "read",
-    can_change_nameservers: "write",
-    can_create_filters: "write",
-    can_manage_users: "none",
-  });
+  const [invitePermissions, setInvitePermissions] = useState<Partial<UserPermission>>(DEFAULT_PERMISSIONS);
   const [makeAdmin, setMakeAdmin] = useState(false);
 
   // Verificar se o usuário atual é admin
@@ -183,7 +189,7 @@ export function UserManagement() {
     enabled: !!user?.id,
   });
 
-  const isAdmin = currentUserProfile?.is_admin || false;
+  const isCurrentUserAdmin = currentUserProfile?.is_admin || false;
 
   // Buscar todos os usuários da equipe
   const { data: teamMembers = [], isLoading } = useQuery({
@@ -209,7 +215,7 @@ export function UserManagement() {
     },
   });
 
-  // Mutation para enviar convite usando o sistema nativo do Supabase
+  // Mutation para enviar convite
   const inviteMutation = useMutation({
     mutationFn: async ({
       email,
@@ -220,10 +226,8 @@ export function UserManagement() {
       isAdmin: boolean;
       permissions: Partial<UserPermission>;
     }) => {
-      // URL de redirecionamento após aceitar o convite
       const redirectUrl = `${window.location.origin}/auth/callback`;
 
-      // Enviar convite usando o sistema nativo do Supabase
       const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         redirectTo: redirectUrl,
         data: {
@@ -245,28 +249,7 @@ export function UserManagement() {
       setInvitePermissionsDialogOpen(false);
       setInviteDialogOpen(false);
       setMakeAdmin(false);
-      // Reset permissions to default
-      setInvitePermissions({
-        permission_type: "total",
-        can_access_dashboard: "write",
-        can_access_domain_search: "write",
-        can_access_management: "write",
-        can_access_settings: "read",
-        can_view_critical_domains: "write",
-        can_view_integrations: "read",
-        can_view_balance: "read",
-        can_manual_purchase: "write",
-        can_ai_purchase: "write",
-        can_view_domain_details: "write",
-        can_change_domain_status: "write",
-        can_select_platform: "write",
-        can_select_traffic_source: "write",
-        can_insert_funnel_id: "write",
-        can_view_logs: "read",
-        can_change_nameservers: "write",
-        can_create_filters: "write",
-        can_manage_users: "none",
-      });
+      setInvitePermissions(DEFAULT_PERMISSIONS);
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
     },
     onError: (error: any) => {
@@ -281,19 +264,13 @@ export function UserManagement() {
   // Mutation para deletar usuário
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // Deletar usuário usando o admin client
       const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-
       if (deleteUserError) throw deleteUserError;
 
-      // Deletar permissões
       const { error: deletePermissionsError } = await supabase.from("user_permissions").delete().eq("user_id", userId);
-
       if (deletePermissionsError) throw deletePermissionsError;
 
-      // Deletar perfil
       const { error: deleteProfileError } = await supabase.from("profiles").delete().eq("id", userId);
-
       if (deleteProfileError) throw deleteProfileError;
     },
     onSuccess: () => {
@@ -312,24 +289,19 @@ export function UserManagement() {
     },
   });
 
-  // Mutation para salvar permissões customizadas
+  // Mutation para salvar permissões
   const savePermissionsMutation = useMutation({
     mutationFn: async ({ userId, permissions }: { userId: string; permissions: Partial<UserPermission> }) => {
-      // Verificar se já existe permissão para este usuário
       const { data: existing } = await supabase.from("user_permissions").select("id").eq("user_id", userId).single();
 
       if (existing) {
-        // Atualizar permissões existentes
         const { error } = await supabase.from("user_permissions").update(permissions).eq("user_id", userId);
-
         if (error) throw error;
       } else {
-        // Criar novas permissões
         const { error } = await supabase.from("user_permissions").insert({
           user_id: userId,
           ...permissions,
         });
-
         if (error) throw error;
       }
     },
@@ -377,28 +349,7 @@ export function UserManagement() {
     if (member.permissions) {
       setCustomPermissions(member.permissions);
     } else {
-      // Definir permissões padrão se não existirem
-      setCustomPermissions({
-        permission_type: "total",
-        can_access_dashboard: "write",
-        can_access_domain_search: "write",
-        can_access_management: "write",
-        can_access_settings: "read",
-        can_view_critical_domains: "write",
-        can_view_integrations: "read",
-        can_view_balance: "read",
-        can_manual_purchase: "write",
-        can_ai_purchase: "write",
-        can_view_domain_details: "write",
-        can_change_domain_status: "write",
-        can_select_platform: "write",
-        can_select_traffic_source: "write",
-        can_insert_funnel_id: "write",
-        can_view_logs: "read",
-        can_change_nameservers: "write",
-        can_create_filters: "write",
-        can_manage_users: "none",
-      });
+      setCustomPermissions(DEFAULT_PERMISSIONS);
     }
     setPermissionsDialogOpen(true);
   };
@@ -426,13 +377,213 @@ export function UserManagement() {
     }));
   };
 
-  if (!isAdmin) {
+  // Verificar se pode gerenciar usuários
+  const canManageUsers = isCurrentUserAdmin || canEdit("can_manage_users");
+  const canSendInvites = isCurrentUserAdmin || canEdit("can_send_invites");
+
+  // Renderizar seção de permissões detalhadas
+  const renderPermissionsSections = (
+    permissions: Partial<UserPermission>,
+    updateFn: (key: keyof UserPermission, value: PermissionLevel) => void,
+    disabled: boolean = false,
+  ) => (
+    <div className="space-y-6">
+      {/* Acesso por Aba */}
+      <div>
+        <h4 className="font-semibold mb-3 text-primary">Acesso por Aba</h4>
+        <div className="space-y-1 border rounded-lg p-3 bg-muted/30">
+          <PermissionSelector
+            label="Dashboard"
+            value={permissions.can_access_dashboard || "none"}
+            onChange={(value) => updateFn("can_access_dashboard", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Compra de Domínios"
+            value={permissions.can_access_domain_search || "none"}
+            onChange={(value) => updateFn("can_access_domain_search", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Gerenciamento"
+            value={permissions.can_access_management || "none"}
+            onChange={(value) => updateFn("can_access_management", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Configurações"
+            value={permissions.can_access_settings || "none"}
+            onChange={(value) => updateFn("can_access_settings", value)}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Dashboard */}
+      <div>
+        <h4 className="font-semibold mb-3 text-primary">Dashboard</h4>
+        <div className="space-y-1 border rounded-lg p-3 bg-muted/30">
+          <PermissionSelector
+            label="Ver Saldo"
+            value={permissions.can_view_balance || "none"}
+            onChange={(value) => updateFn("can_view_balance", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Acessar Integrações"
+            value={permissions.can_view_integrations || "none"}
+            onChange={(value) => updateFn("can_view_integrations", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Gestão de Domínios Críticos"
+            value={permissions.can_view_critical_domains || "none"}
+            onChange={(value) => updateFn("can_view_critical_domains", value)}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Compra de Domínios */}
+      <div>
+        <h4 className="font-semibold mb-3 text-primary">Compra de Domínios</h4>
+        <div className="space-y-1 border rounded-lg p-3 bg-muted/30">
+          <PermissionSelector
+            label="Compra Manual"
+            value={permissions.can_manual_purchase || "none"}
+            onChange={(value) => updateFn("can_manual_purchase", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Compra com IA"
+            value={permissions.can_ai_purchase || "none"}
+            onChange={(value) => updateFn("can_ai_purchase", value)}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Gerenciamento */}
+      <div>
+        <h4 className="font-semibold mb-3 text-primary">Gerenciamento</h4>
+        <div className="space-y-1 border rounded-lg p-3 bg-muted/30">
+          <PermissionSelector
+            label="Ver Detalhes"
+            value={permissions.can_view_domain_details || "none"}
+            onChange={(value) => updateFn("can_view_domain_details", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Alterar Nameservers"
+            value={permissions.can_change_nameservers || "none"}
+            onChange={(value) => updateFn("can_change_nameservers", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Alterar Status de Domínios"
+            value={permissions.can_change_domain_status || "none"}
+            onChange={(value) => updateFn("can_change_domain_status", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Alterar Plataformas"
+            value={permissions.can_select_platform || "none"}
+            onChange={(value) => updateFn("can_select_platform", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Alterar Fonte de Tráfego"
+            value={permissions.can_select_traffic_source || "none"}
+            onChange={(value) => updateFn("can_select_traffic_source", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Inserir ID do Funil"
+            value={permissions.can_insert_funnel_id || "none"}
+            onChange={(value) => updateFn("can_insert_funnel_id", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Ver Logs de Atividade"
+            value={permissions.can_view_logs || "none"}
+            onChange={(value) => updateFn("can_view_logs", value)}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Configurações */}
+      <div>
+        <h4 className="font-semibold mb-3 text-primary">Configurações</h4>
+        <div className="space-y-1 border rounded-lg p-3 bg-muted/30">
+          <PermissionSelector
+            label="Criar Filtros"
+            value={permissions.can_create_filters || "none"}
+            onChange={(value) => updateFn("can_create_filters", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Gerenciar Usuários"
+            value={permissions.can_manage_users || "none"}
+            onChange={(value) => updateFn("can_manage_users", value)}
+            disabled={disabled}
+          />
+          <PermissionSelector
+            label="Enviar Convites"
+            value={permissions.can_send_invites || "none"}
+            onChange={(value) => updateFn("can_send_invites", value)}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  // Se não pode gerenciar usuários, mostrar apenas visualização
+  if (!canManageUsers && !isCurrentUserAdmin) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Gerenciamento de Usuários</CardTitle>
-          <CardDescription>Acesso restrito apenas para administradores</CardDescription>
+          <CardDescription>Você pode visualizar os membros da equipe</CardDescription>
         </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {teamMembers.map((member) => (
+                <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{member.full_name || member.email}</p>
+                        {member.is_admin && (
+                          <Badge variant="default" className="gap-1">
+                            <Shield className="h-3 w-3" />
+                            Admin
+                          </Badge>
+                        )}
+                        {member.id === user?.id && <Badge variant="outline">Você</Badge>}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{member.email}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
       </Card>
     );
   }
@@ -446,68 +597,72 @@ export function UserManagement() {
               <CardTitle>Gerenciamento de Usuários</CardTitle>
               <CardDescription>Gerencie os membros da equipe e suas permissões</CardDescription>
             </div>
-            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Convidar Usuário
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Convidar Novo Usuário</DialogTitle>
-                  <DialogDescription>
-                    Envie um convite por e-mail. O usuário receberá um link para criar sua conta.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="usuario@exemplo.com"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="makeAdmin"
-                      checked={makeAdmin}
-                      onChange={(e) => setMakeAdmin(e.target.checked)}
-                      className="rounded border-gray-300"
-                    />
-                    <Label htmlFor="makeAdmin" className="cursor-pointer">
-                      Tornar administrador
-                    </Label>
-                  </div>
-
-                  {makeAdmin && (
-                    <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3">
-                      <p className="text-sm text-blue-800 dark:text-blue-200">
-                        Administradores têm acesso total ao sistema, incluindo gerenciamento de usuários.
-                      </p>
+            {canSendInvites && (
+              <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Convidar Usuário
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Convidar Novo Usuário</DialogTitle>
+                    <DialogDescription>
+                      Envie um convite por e-mail. O usuário receberá um link para criar sua conta.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="usuario@exemplo.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                      />
                     </div>
-                  )}
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setInviteDialogOpen(false);
-                      setInvitePermissionsDialogOpen(true);
-                    }}
-                  >
-                    Continuar
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+
+                    {isCurrentUserAdmin && (
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="makeAdmin"
+                          checked={makeAdmin}
+                          onChange={(e) => setMakeAdmin(e.target.checked)}
+                          className="rounded border-gray-300"
+                        />
+                        <Label htmlFor="makeAdmin" className="cursor-pointer">
+                          Tornar administrador
+                        </Label>
+                      </div>
+                    )}
+
+                    {makeAdmin && (
+                      <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3">
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                          Administradores têm acesso total ao sistema, incluindo gerenciamento de usuários.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setInviteDialogOpen(false);
+                        setInvitePermissionsDialogOpen(true);
+                      }}
+                    >
+                      Continuar
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </CardHeader>
 
@@ -549,7 +704,7 @@ export function UserManagement() {
                       </Button>
                     )}
 
-                    {member.id !== user?.id && (
+                    {member.id !== user?.id && isCurrentUserAdmin && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="sm">
@@ -579,7 +734,7 @@ export function UserManagement() {
         </CardContent>
       </Card>
 
-      {/* Dialogs continuam aqui - arquivo muito grande, vou criar em partes */}
+      {/* Dialog de Permissões do Convite */}
       <Dialog open={invitePermissionsDialogOpen} onOpenChange={setInvitePermissionsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
@@ -608,34 +763,8 @@ export function UserManagement() {
             </div>
 
             {invitePermissions.permission_type === "personalizado" && !makeAdmin && (
-              <ScrollArea className="h-[400px] pr-4">
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="font-semibold mb-3">Acesso por Aba</h4>
-                    <div className="space-y-2">
-                      <PermissionSelector
-                        label="Dashboard"
-                        value={invitePermissions.can_access_dashboard || "none"}
-                        onChange={(value) => updateInvitePermission("can_access_dashboard", value)}
-                      />
-                      <PermissionSelector
-                        label="Compra de Domínios"
-                        value={invitePermissions.can_access_domain_search || "none"}
-                        onChange={(value) => updateInvitePermission("can_access_domain_search", value)}
-                      />
-                      <PermissionSelector
-                        label="Gerenciamento"
-                        value={invitePermissions.can_access_management || "none"}
-                        onChange={(value) => updateInvitePermission("can_access_management", value)}
-                      />
-                      <PermissionSelector
-                        label="Configurações"
-                        value={invitePermissions.can_access_settings || "none"}
-                        onChange={(value) => updateInvitePermission("can_access_settings", value)}
-                      />
-                    </div>
-                  </div>
-                </div>
+              <ScrollArea className="h-[500px] pr-4">
+                {renderPermissionsSections(invitePermissions, updateInvitePermission)}
               </ScrollArea>
             )}
           </div>
@@ -661,6 +790,7 @@ export function UserManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog de Edição de Permissões */}
       <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
@@ -669,33 +799,7 @@ export function UserManagement() {
           </DialogHeader>
 
           <ScrollArea className="h-[500px] pr-4">
-            <div className="space-y-6">
-              <div>
-                <h4 className="font-semibold mb-3">Acesso por Aba</h4>
-                <div className="space-y-2">
-                  <PermissionSelector
-                    label="Dashboard"
-                    value={customPermissions.can_access_dashboard || "none"}
-                    onChange={(value) => updatePermission("can_access_dashboard", value)}
-                  />
-                  <PermissionSelector
-                    label="Compra de Domínios"
-                    value={customPermissions.can_access_domain_search || "none"}
-                    onChange={(value) => updatePermission("can_access_domain_search", value)}
-                  />
-                  <PermissionSelector
-                    label="Gerenciamento"
-                    value={customPermissions.can_access_management || "none"}
-                    onChange={(value) => updatePermission("can_access_management", value)}
-                  />
-                  <PermissionSelector
-                    label="Configurações"
-                    value={customPermissions.can_access_settings || "none"}
-                    onChange={(value) => updatePermission("can_access_settings", value)}
-                  />
-                </div>
-              </div>
-            </div>
+            {renderPermissionsSections(customPermissions, updatePermission)}
           </ScrollArea>
 
           <DialogFooter>

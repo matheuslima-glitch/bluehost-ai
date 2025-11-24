@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { usePermissions } from "@/hooks/usePermissions";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import Layout from "./pages/Layout";
@@ -18,67 +17,15 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import AcceptInvite from "@/pages/AcceptInvite";
 import NoAccess from "./pages/NoAccess";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
-const queryClient = new QueryClient();
-
-function ProtectedRoutes() {
-  const { canAccessPage, isLoading } = usePermissions();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/auth" element={<Auth />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/accept-invite/:token" element={<AcceptInvite />} />
-      <Route path="/no-access" element={<NoAccess />} />
-
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
-        <Route
-          path="dashboard"
-          element={canAccessPage("dashboard") ? <Dashboard /> : <Navigate to="/no-access" replace />}
-        />
-
-        <Route
-          path="search"
-          element={canAccessPage("domain-search") ? <DomainSearch /> : <Navigate to="/no-access" replace />}
-        />
-
-        <Route
-          path="domains"
-          element={canAccessPage("management") ? <DomainManagement /> : <Navigate to="/no-access" replace />}
-        />
-
-        <Route
-          path="domains/:id"
-          element={canAccessPage("management") ? <DomainDetails /> : <Navigate to="/no-access" replace />}
-        />
-
-        <Route
-          path="settings"
-          element={canAccessPage("settings") ? <Settings /> : <Navigate to="/no-access" replace />}
-        />
-      </Route>
-
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-}
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutos
+      retry: 2,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -88,7 +35,73 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
-            <ProtectedRoutes />
+            <Routes>
+              {/* Rotas públicas */}
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/accept-invite" element={<AcceptInvite />} />
+              <Route path="/no-access" element={<NoAccess />} />
+
+              {/* Rota raiz redireciona para dashboard */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+              {/* Rotas protegidas dentro do Layout */}
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute page="dashboard">
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/search"
+                  element={
+                    <ProtectedRoute page="domain-search">
+                      <DomainSearch />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/domains"
+                  element={
+                    <ProtectedRoute page="management">
+                      <DomainManagement />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/domains/:id"
+                  element={
+                    <ProtectedRoute page="management">
+                      <DomainDetails />
+                    </ProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/settings"
+                  element={
+                    <ProtectedRoute page="settings">
+                      <Settings />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
+
+              {/* Rota 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </TooltipProvider>
         </ThemeProvider>
       </AuthProvider>

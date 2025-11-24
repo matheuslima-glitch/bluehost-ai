@@ -53,11 +53,57 @@ export default function AcceptInvite() {
   const processInvite = async () => {
     try {
       // Obter os parâmetros da URL do convite do Supabase
-      // O Supabase envia: ?token_hash=xxx&type=invite
       const tokenHash = searchParams.get("token_hash");
       const type = searchParams.get("type");
 
+      console.log("AcceptInvite - Processando convite:", { tokenHash: !!tokenHash, type });
+
       if (!tokenHash || type !== "invite") {
+        // Verificar se já existe uma sessão (usuário pode ter clicado no link depois de já estar logado)
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session) {
+          // Verificar se o usuário precisa completar o setup
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("id, full_name")
+            .eq("id", session.user.id)
+            .single();
+
+          if (profile && !profile.full_name) {
+            // Usuário existe mas não completou o setup
+            const userMetadata = session.user.user_metadata || {};
+            setInviteData({
+              user: session.user,
+              email: session.user.email,
+              is_admin: userMetadata.is_admin || false,
+            });
+
+            // Parse das permissões
+            if (userMetadata.permissions) {
+              try {
+                const parsedPermissions =
+                  typeof userMetadata.permissions === "string"
+                    ? JSON.parse(userMetadata.permissions)
+                    : userMetadata.permissions;
+                setPermissions(parsedPermissions);
+              } catch (e) {
+                console.error("Erro ao parsear permissões:", e);
+              }
+            }
+
+            setStep("setup");
+            setLoading(false);
+            return;
+          }
+
+          // Usuário já tem setup completo, ir para dashboard
+          navigate("/dashboard");
+          return;
+        }
+
         toast.error("Link de convite inválido");
         navigate("/auth");
         return;
