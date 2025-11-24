@@ -1,3 +1,9 @@
+/**
+ * CAMINHO: src/components/UserManagement.tsx
+ *
+ * CORREÇÃO: Popup de permissões com todas as funcionalidades granulares
+ */
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -388,39 +394,6 @@ export function UserManagement() {
     disabled: boolean = false,
   ) => (
     <div className="space-y-6">
-      {/* Acesso por Aba */}
-      <div>
-        <h4 className="font-semibold mb-3 text-primary">Acesso por Aba</h4>
-        <div className="space-y-1 border rounded-lg p-3 bg-muted/30">
-          <PermissionSelector
-            label="Dashboard"
-            value={permissions.can_access_dashboard || "none"}
-            onChange={(value) => updateFn("can_access_dashboard", value)}
-            disabled={disabled}
-          />
-          <PermissionSelector
-            label="Compra de Domínios"
-            value={permissions.can_access_domain_search || "none"}
-            onChange={(value) => updateFn("can_access_domain_search", value)}
-            disabled={disabled}
-          />
-          <PermissionSelector
-            label="Gerenciamento"
-            value={permissions.can_access_management || "none"}
-            onChange={(value) => updateFn("can_access_management", value)}
-            disabled={disabled}
-          />
-          <PermissionSelector
-            label="Configurações"
-            value={permissions.can_access_settings || "none"}
-            onChange={(value) => updateFn("can_access_settings", value)}
-            disabled={disabled}
-          />
-        </div>
-      </div>
-
-      <Separator />
-
       {/* Dashboard */}
       <div>
         <h4 className="font-semibold mb-3 text-primary">Dashboard</h4>
@@ -569,7 +542,7 @@ export function UserManagement() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{member.full_name || member.email}</p>
                         {member.is_admin && (
-                          <Badge variant="default" className="gap-1">
+                          <Badge className="gap-1 bg-blue-600 hover:bg-blue-700 text-white">
                             <Shield className="h-3 w-3" />
                             Admin
                           </Badge>
@@ -680,7 +653,7 @@ export function UserManagement() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{member.full_name || member.email}</p>
                         {member.is_admin && (
-                          <Badge variant="default" className="gap-1">
+                          <Badge className="gap-1 bg-blue-600 hover:bg-blue-700 text-white">
                             <Shield className="h-3 w-3" />
                             Admin
                           </Badge>
