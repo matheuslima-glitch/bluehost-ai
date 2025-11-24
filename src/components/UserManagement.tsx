@@ -547,8 +547,8 @@ export function UserManagement() {
     </div>
   );
 
-  // Se não pode gerenciar usuários, mostrar apenas visualização
-  if (!canManageUsers && !isCurrentUserAdmin) {
+  // Se não pode gerenciar usuários E não pode enviar convites, mostrar apenas visualização básica
+  if (!canManageUsers && !canSendInvites && !isCurrentUserAdmin) {
     return (
       <Card>
         <CardHeader>
@@ -697,7 +697,7 @@ export function UserManagement() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {!member.is_admin && (
+                    {!member.is_admin && canManageUsers && (
                       <Button variant="outline" size="sm" onClick={() => openEditPermissions(member)}>
                         <SettingsIcon className="h-4 w-4 mr-2" />
                         Permissões
