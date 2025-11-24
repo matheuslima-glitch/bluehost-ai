@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -19,37 +19,72 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const initialized = useRef(false);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // Evitar inicialização dupla
+    if (initialized.current) return;
+    initialized.current = true;
+
+    console.log("AuthContext: Iniciando verificação de sessão...");
+
+    // PRIMEIRO: Verificar sessão existente de forma síncrona
+    const initializeAuth = async () => {
+      try {
+        const {
+          data: { session: currentSession },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error("AuthContext: Erro ao buscar sessão:", error);
+        } else {
+          console.log("AuthContext: Sessão inicial:", currentSession?.user?.email || "Nenhuma");
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+        }
+      } catch (err) {
+        console.error("AuthContext: Erro na inicialização:", err);
+      } finally {
+        console.log("AuthContext: Carregamento inicial completo");
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    // DEPOIS: Configurar listener para mudanças futuras
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth state changed:", event, session?.user?.email);
-      setSession(session);
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
+      console.log("AuthContext: Estado de auth mudou:", event, newSession?.user?.email || "Nenhum");
+
+      // Atualizar estado
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+
+      // Se o loading ainda estiver true, setar para false
       setLoading(false);
     });
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("Initial session check:", session?.user?.email);
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log("AuthContext: Limpando subscription");
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    console.log("AuthContext: Tentando login para:", email);
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (!error) {
+      console.log("AuthContext: Login bem-sucedido, redirecionando...");
       navigate("/dashboard");
+    } else {
+      console.error("AuthContext: Erro no login:", error);
     }
 
     return { error };
@@ -77,9 +112,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    console.log("AuthContext: Fazendo logout...");
     await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
     navigate("/auth");
   };
+
+  // Log do estado atual para debug
+  console.log("AuthContext render - loading:", loading, "user:", user?.email || "null");
 
   return (
     <AuthContext.Provider value={{ user, session, signIn, signUp, signOut, loading }}>{children}</AuthContext.Provider>

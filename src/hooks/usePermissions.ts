@@ -90,18 +90,21 @@ const DEFAULT_USER_PERMISSIONS: UserPermissions = {
 };
 
 export function usePermissions() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const {
     data: permissions,
-    isLoading,
+    isLoading: queryLoading,
     error,
+    isFetching,
   } = useQuery({
     queryKey: ["user-permissions", user?.id],
     queryFn: async (): Promise<UserPermissions> => {
       if (!user?.id) {
         throw new Error("Usuário não autenticado");
       }
+
+      console.log("usePermissions: Buscando permissões para user:", user.id);
 
       // Buscar se é admin
       const { data: profile, error: profileError } = await supabase
@@ -111,13 +114,16 @@ export function usePermissions() {
         .single();
 
       if (profileError) {
-        console.error("Erro ao buscar perfil:", profileError);
+        console.error("usePermissions: Erro ao buscar perfil:", profileError);
         // Se não encontrar perfil, retornar permissões padrão
         return DEFAULT_USER_PERMISSIONS;
       }
 
+      console.log("usePermissions: Profile encontrado, is_admin:", profile?.is_admin);
+
       // Se é admin, tem todas as permissões em nível "write"
       if (profile?.is_admin) {
+        console.log("usePermissions: Usuário é ADMIN, retornando permissões totais");
         return ADMIN_PERMISSIONS;
       }
 
@@ -129,10 +135,12 @@ export function usePermissions() {
         .single();
 
       if (permissionsError) {
-        console.log("Usuário sem permissões específicas, usando padrão");
+        console.log("usePermissions: Usuário sem permissões específicas, usando padrão");
         // Se não tem permissões, retornar permissões padrão
         return DEFAULT_USER_PERMISSIONS;
       }
+
+      console.log("usePermissions: Permissões encontradas:", userPermissions);
 
       // Retornar permissões do banco com valores padrão para campos faltantes
       return {
@@ -159,14 +167,18 @@ export function usePermissions() {
         is_admin: false,
       };
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !authLoading,
     staleTime: 5 * 60 * 1000, // Cache por 5 minutos
     retry: 2,
   });
 
+  // CORREÇÃO: isLoading considera TODOS os estados de carregamento
+  const isLoading = authLoading || queryLoading || (!permissions && !!user?.id && !error);
+
   // Verificar se tem permissão (read ou write)
   const hasPermission = (permission: keyof UserPermissions): boolean => {
-    if (isLoading) return false;
+    // Durante carregamento, retornar true para evitar flash
+    if (isLoading) return true;
     if (!permissions) return false;
     if (permissions.is_admin) return true;
 
@@ -189,23 +201,50 @@ export function usePermissions() {
 
   // Verificar acesso a páginas
   const canAccessPage = (page: "dashboard" | "domain-search" | "management" | "settings"): boolean => {
-    // Durante carregamento, permitir acesso para evitar flash de tela de erro
-    if (isLoading) return true;
-    if (!permissions) return false;
-    if (permissions.is_admin) return true;
+    // CRÍTICO: Durante QUALQUER carregamento, permitir acesso para evitar flash
+    if (authLoading || queryLoading || isFetching) {
+      console.log("canAccessPage: Ainda carregando, permitindo acesso temporário");
+      return true;
+    }
 
+    // Se não tem permissões carregadas ainda mas tem usuário, permitir acesso
+    if (!permissions && user?.id) {
+      console.log("canAccessPage: Permissões não carregadas ainda, permitindo acesso temporário");
+      return true;
+    }
+
+    // Se não tem permissões e não tem usuário, negar
+    if (!permissions) {
+      console.log("canAccessPage: Sem permissões e sem usuário, negando acesso");
+      return false;
+    }
+
+    // Admin SEMPRE tem acesso
+    if (permissions.is_admin) {
+      console.log("canAccessPage: Usuário é ADMIN, permitindo acesso");
+      return true;
+    }
+
+    let hasAccess = false;
     switch (page) {
       case "dashboard":
-        return permissions.can_access_dashboard !== "none";
+        hasAccess = permissions.can_access_dashboard !== "none";
+        break;
       case "domain-search":
-        return permissions.can_access_domain_search !== "none";
+        hasAccess = permissions.can_access_domain_search !== "none";
+        break;
       case "management":
-        return permissions.can_access_management !== "none";
+        hasAccess = permissions.can_access_management !== "none";
+        break;
       case "settings":
-        return permissions.can_access_settings !== "none";
+        hasAccess = permissions.can_access_settings !== "none";
+        break;
       default:
-        return false;
+        hasAccess = false;
     }
+
+    console.log(`canAccessPage: ${page} = ${hasAccess}`);
+    return hasAccess;
   };
 
   // Verificar se pode editar em uma página específica
