@@ -1,9 +1,3 @@
-/**
- * CAMINHO: src/components/UserManagement.tsx
- *
- * CORREÇÃO: Popup de permissões com todas as funcionalidades granulares
- */
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
