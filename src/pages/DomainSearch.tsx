@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, ShoppingCart, CheckCircle2, XCircle, Loader2, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -11,7 +12,10 @@ import ManualPurchaseDialog from "@/components/ManualPurchaseDialog";
 import { usePermissions } from "@/hooks/usePermissions";
 
 export default function DomainSearch() {
-  const { hasPermission } = usePermissions();
+  const { hasPermission, canEdit } = usePermissions();
+  const canManualPurchase = canEdit("can_manual_purchase");
+  const canAIPurchase = canEdit("can_ai_purchase");
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<any>(null);
@@ -142,34 +146,68 @@ export default function DomainSearch() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex gap-3">
-                <Input
-                  placeholder="meusite.online, exemplo.com, dominio.org"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                  className="flex-1 h-12 text-base border-[hsl(var(--accent-cyan)_/_0.3)] focus-visible:border-[hsl(var(--accent-cyan))] transition-all duration-300"
-                />
-                <Button
-                  onClick={handleSearch}
-                  disabled={searching}
-                  size="lg"
-                  className="px-6 transition-all duration-300 hover:scale-105"
-                >
-                  {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
-                </Button>
-                {hasPermission("can_ai_purchase") && (
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    onClick={() => setAiDialogOpen(true)}
-                    className="px-6 bg-gradient-to-r from-[hsl(199,89%,48%)] to-[hsl(217,91%,60%)] text-white hover:opacity-90 animate-pulse-glow transition-all duration-300 hover:scale-105 border-none"
-                  >
-                    <ShoppingCart className="h-5 w-5 mr-2 animate-pulse" />
-                    Compra com IA
-                  </Button>
-                )}
-              </div>
+              {hasPermission("can_manual_purchase") && (
+                <div className="flex gap-3">
+                  <Input
+                    placeholder="meusite.online, exemplo.com, dominio.org"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && canManualPurchase && handleSearch()}
+                    className="flex-1 h-12 text-base border-[hsl(var(--accent-cyan)_/_0.3)] focus-visible:border-[hsl(var(--accent-cyan))] transition-all duration-300"
+                    disabled={!canManualPurchase}
+                  />
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            onClick={() => canManualPurchase && handleSearch()}
+                            disabled={searching || !canManualPurchase}
+                            size="lg"
+                            className={`px-6 transition-all duration-300 hover:scale-105 ${!canManualPurchase && "cursor-not-allowed opacity-50"}`}
+                          >
+                            {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!canManualPurchase && (
+                        <TooltipContent>
+                          <p>Você não tem permissão para pesquisar domínios</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                  {hasPermission("can_ai_purchase") && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              variant="secondary"
+                              size="lg"
+                              onClick={() => canAIPurchase && setAiDialogOpen(true)}
+                              disabled={!canAIPurchase}
+                              className={`px-6 transition-all duration-300 hover:scale-105 border-none ${
+                                canAIPurchase
+                                  ? "bg-gradient-to-r from-[hsl(199,89%,48%)] to-[hsl(217,91%,60%)] text-white hover:opacity-90 animate-pulse-glow"
+                                  : "cursor-not-allowed opacity-50 bg-gray-300"
+                              }`}
+                            >
+                              <ShoppingCart className="h-5 w-5 mr-2" />
+                              Compra com IA
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!canAIPurchase && (
+                          <TooltipContent>
+                            <p>Você não tem permissão para comprar com IA</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
+              )}
 
               {searchResult && (
                 <Card
@@ -195,13 +233,29 @@ export default function DomainSearch() {
                             <p className="text-xs text-muted-foreground">preço anual</p>
                           </div>
                           {hasPermission("can_manual_purchase") && (
-                            <Button
-                              onClick={handlePurchaseDomain}
-                              size="lg"
-                              className="transition-all duration-300 hover:scale-105"
-                            >
-                              Comprar Domínio
-                            </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Button
+                                      onClick={() => canManualPurchase && handlePurchaseDomain()}
+                                      disabled={!canManualPurchase}
+                                      size="lg"
+                                      className={`transition-all duration-300 hover:scale-105 ${
+                                        !canManualPurchase && "opacity-50 cursor-not-allowed"
+                                      }`}
+                                    >
+                                      Comprar Domínio
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                {!canManualPurchase && (
+                                  <TooltipContent>
+                                    <p>Você não tem permissão para comprar manualmente</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
                           )}
                         </div>
                       )}

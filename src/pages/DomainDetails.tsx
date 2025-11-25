@@ -93,7 +93,14 @@ export default function DomainDetails() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, canEdit } = usePermissions();
+  const canChangeNameservers = canEdit("can_change_nameservers");
+  const canChangeStatus = canEdit("can_change_domain_status");
+  const canChangePlatform = canEdit("can_select_platform");
+  const canChangeTraffic = canEdit("can_select_traffic_source");
+  const canChangeFunnelId = canEdit("can_insert_funnel_id");
+  const canViewLogs = hasPermission("can_view_logs");
+  const canEditLogs = canEdit("can_view_logs");
   const [domain, setDomain] = useState<Domain | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

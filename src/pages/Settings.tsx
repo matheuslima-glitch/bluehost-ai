@@ -9,6 +9,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePermissions } from "@/hooks/usePermissions";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -60,6 +62,8 @@ export default function Settings() {
   const [whatsappNumber, setWhatsappNumber] = useState("+55 ");
   const [newPlatformFilter, setNewPlatformFilter] = useState("");
   const [newTrafficSourceFilter, setNewTrafficSourceFilter] = useState("");
+  const { hasPermission, canEdit } = usePermissions();
+  const canCreateFilters = canEdit("can_create_filters");
   const [selectedSound, setSelectedSound] = useState("alert-4");
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
@@ -996,69 +1000,103 @@ export default function Settings() {
           <CardDescription>Crie filtros customizados para plataforma e fonte de tráfego</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Platform Filters */}
-          <div className="space-y-3">
-            <Label>Plataformas</Label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Nova plataforma"
-                value={newPlatformFilter}
-                onChange={(e) => setNewPlatformFilter(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    handleAddPlatformFilter();
-                  }
-                }}
-              />
-              <Button
-                onClick={handleAddPlatformFilter}
-                disabled={addFilterMutation.isPending || !newPlatformFilter.trim()}
-              >
-                Adicionar
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {platformFilters.map((filter) => (
-                <Badge key={filter.id} variant="secondary" className="gap-1">
-                  {filter.filter_value}
-                  <X className="h-3 w-3 cursor-pointer" onClick={() => deleteFilterMutation.mutate(filter.id)} />
-                </Badge>
-              ))}
-            </div>
-          </div>
+          {hasPermission("can_create_filters") && (
+            <>
+              {/* Platform Filters */}
+              <div className="space-y-3">
+                <Label>Plataformas</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Nova plataforma"
+                    value={newPlatformFilter}
+                    onChange={(e) => setNewPlatformFilter(e.target.value)}
+                    disabled={!canCreateFilters}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter") {
+                        canCreateFilters && handleAddPlatformFilter();
+                      }
+                    }}
+                  />
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            onClick={() => canCreateFilters && handleAddPlatformFilter()}
+                            disabled={addFilterMutation.isPending || !newPlatformFilter.trim() || !canCreateFilters}
+                          >
+                            Adicionar
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!canCreateFilters && (
+                        <TooltipContent>
+                          <p>Você não tem permissão para criar filtros</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {platformFilters.map((filter) => (
+                    <Badge key={filter.id} variant="secondary" className="gap-1">
+                      {filter.filter_value}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => deleteFilterMutation.mutate(filter.id)} />
+                    </Badge>
+                  ))}
+                </div>
+              </div>
 
-          <Separator />
+              <Separator />
 
-          {/* Traffic Source Filters */}
-          <div className="space-y-3">
-            <Label>Fontes de Tráfego</Label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Nova fonte de tráfego"
-                value={newTrafficSourceFilter}
-                onChange={(e) => setNewTrafficSourceFilter(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    handleAddTrafficSourceFilter();
-                  }
-                }}
-              />
-              <Button
-                onClick={handleAddTrafficSourceFilter}
-                disabled={addFilterMutation.isPending || !newTrafficSourceFilter.trim()}
-              >
-                Adicionar
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {trafficSourceFilters.map((filter) => (
-                <Badge key={filter.id} variant="secondary" className="gap-1">
-                  {filter.filter_value}
-                  <X className="h-3 w-3 cursor-pointer" onClick={() => deleteFilterMutation.mutate(filter.id)} />
-                </Badge>
-              ))}
-            </div>
-          </div>
+              {/* Traffic Source Filters */}
+              <div className="space-y-3">
+                <Label>Fontes de Tráfego</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Nova fonte de tráfego"
+                    value={newTrafficSourceFilter}
+                    onChange={(e) => setNewTrafficSourceFilter(e.target.value)}
+                    disabled={!canCreateFilters}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter") {
+                        canCreateFilters && handleAddTrafficSourceFilter();
+                      }
+                    }}
+                  />
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            onClick={() => canCreateFilters && handleAddTrafficSourceFilter()}
+                            disabled={
+                              addFilterMutation.isPending || !newTrafficSourceFilter.trim() || !canCreateFilters
+                            }
+                          >
+                            Adicionar
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!canCreateFilters && (
+                        <TooltipContent>
+                          <p>Você não tem permissão para criar filtros</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {trafficSourceFilters.map((filter) => (
+                    <Badge key={filter.id} variant="secondary" className="gap-1">
+                      {filter.filter_value}
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => deleteFilterMutation.mutate(filter.id)} />
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
