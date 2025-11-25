@@ -22,7 +22,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -95,13 +94,6 @@ export default function DomainDetails() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { hasPermission, canEdit } = usePermissions();
-  const canChangeNameservers = canEdit("can_change_nameservers");
-  const canChangeStatus = canEdit("can_change_domain_status");
-  const canChangePlatform = canEdit("can_select_platform");
-  const canChangeTraffic = canEdit("can_select_traffic_source");
-  const canChangeFunnelId = canEdit("can_insert_funnel_id");
-  const canViewLogs = hasPermission("can_view_logs");
-  const canEditLogs = canEdit("can_view_logs");
   const [domain, setDomain] = useState<Domain | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -481,6 +473,12 @@ export default function DomainDetails() {
   });
 
   const handleSaveNameservers = () => {
+    // Verificar permissão antes de salvar
+    if (!canEdit("can_change_nameservers")) {
+      toast.error("Você não tem permissão para alterar nameservers");
+      return;
+    }
+
     const nameservers = nameserversList.map((ns) => ns.trim()).filter((ns) => ns.length > 0);
 
     if (nameservers.length < 2) {
@@ -524,6 +522,12 @@ export default function DomainDetails() {
    */
   const handleSetNamecheapDNS = async (dnsType: "BasicDNS") => {
     if (!domain) return;
+
+    // Verificar permissão antes de executar
+    if (!canEdit("can_change_nameservers")) {
+      toast.error("Você não tem permissão para alterar nameservers");
+      return;
+    }
 
     const dnsTypeLabel = "Namecheap BasicDNS";
 
@@ -570,6 +574,12 @@ export default function DomainDetails() {
 
   const handleDeactivateDomain = async () => {
     if (!domain) return;
+
+    // Verificar permissão antes de desativar
+    if (!canEdit("can_change_domain_status")) {
+      toast.error("Você não tem permissão para alterar o status do domínio");
+      return;
+    }
 
     try {
       const oldStatus = domain.status;
@@ -641,6 +651,22 @@ export default function DomainDetails() {
   const updateDomain = async (field: string, value: string) => {
     if (!domain) return;
 
+    // Verificar permissões específicas por campo
+    if (field === "platform" && !canEdit("can_select_platform")) {
+      toast.error("Você não tem permissão para alterar a plataforma");
+      return;
+    }
+
+    if (field === "traffic_source" && !canEdit("can_select_traffic_source")) {
+      toast.error("Você não tem permissão para alterar a fonte de tráfego");
+      return;
+    }
+
+    if (field === "status" && !canEdit("can_change_domain_status")) {
+      toast.error("Você não tem permissão para alterar o status");
+      return;
+    }
+
     const oldValue = domain[field as keyof Domain] as string | null;
 
     setSaving(true);
@@ -673,7 +699,13 @@ export default function DomainDetails() {
   };
 
   const handleFunnelIdKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && funnelIdInput.trim() !== "" && canChangeFunnelId) {
+    if (e.key === "Enter" && funnelIdInput.trim() !== "") {
+      // Verificar permissão antes de adicionar
+      if (!canEdit("can_insert_funnel_id")) {
+        toast.error("Você não tem permissão para adicionar IDs de funil");
+        return;
+      }
+
       e.preventDefault();
       const newTag = funnelIdInput.trim();
       const newTags = [...funnelIdTags, newTag];
@@ -687,6 +719,12 @@ export default function DomainDetails() {
   };
 
   const removeFunnelIdTag = async (tagToRemove: string) => {
+    // Verificar permissão antes de remover
+    if (!canEdit("can_insert_funnel_id")) {
+      toast.error("Você não tem permissão para remover IDs de funil");
+      return;
+    }
+
     const newTags = funnelIdTags.filter((tag) => tag !== tagToRemove);
     setFunnelIdTags(newTags);
     await updateDomain("funnel_id", newTags.join(","));
@@ -742,87 +780,68 @@ export default function DomainDetails() {
             </div>
           </div>
 
-          {canViewLogs && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-10 w-10"
-                          onClick={loadActivityLogs}
-                          disabled={!canEditLogs}
+          {hasPermission("can_view_logs") && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon" className="h-10 w-10" onClick={loadActivityLogs}>
+                  <Info className="h-5 w-5 text-blue-500" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Logs de Atividade</DialogTitle>
+                  <DialogDescription>Histórico de alterações realizadas neste domínio</DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="h-[500px] pr-4">
+                  {loadingLogs ? (
+                    <div className="flex justify-center py-8">
+                      <LoadingSpinner />
+                    </div>
+                  ) : activityLogs.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Nenhuma atividade registrada para este domínio
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {activityLogs.map((log) => (
+                        <div
+                          key={log.id}
+                          className="border rounded-lg p-4 space-y-2 bg-card hover:bg-accent/5 transition-colors"
                         >
-                          <Info className="h-5 w-5 text-blue-500" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-3xl">
-                        <DialogHeader>
-                          <DialogTitle>Logs de Atividade</DialogTitle>
-                          <DialogDescription>Histórico de alterações realizadas neste domínio</DialogDescription>
-                        </DialogHeader>
-                        <ScrollArea className="h-[500px] pr-4">
-                          {loadingLogs ? (
-                            <div className="flex justify-center py-8">
-                              <LoadingSpinner />
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <p className="font-medium text-sm">{getActionLabel(log.action_type)}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                              </p>
                             </div>
-                          ) : activityLogs.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground">
-                              Nenhuma atividade registrada para este domínio
-                            </div>
-                          ) : (
-                            <div className="space-y-4">
-                              {activityLogs.map((log) => (
-                                <div
-                                  key={log.id}
-                                  className="border rounded-lg p-4 space-y-2 bg-card hover:bg-accent/5 transition-colors"
-                                >
-                                  <div className="flex items-start justify-between">
-                                    <div className="space-y-1">
-                                      <p className="font-medium text-sm">{getActionLabel(log.action_type)}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                                      </p>
-                                    </div>
-                                    <Badge variant="outline" className="text-xs">
-                                      {log.profiles?.full_name || "Usuário desconhecido"}
-                                    </Badge>
-                                  </div>
-                                  {(log.old_value || log.new_value) && (
-                                    <div className="grid grid-cols-2 gap-4 pt-2 border-t text-xs">
-                                      {log.old_value && (
-                                        <div>
-                                          <p className="text-muted-foreground mb-1">Valor anterior:</p>
-                                          <p className="font-mono bg-muted p-2 rounded">{log.old_value}</p>
-                                        </div>
-                                      )}
-                                      {log.new_value && (
-                                        <div>
-                                          <p className="text-muted-foreground mb-1">Novo valor:</p>
-                                          <p className="font-mono bg-muted p-2 rounded">{log.new_value}</p>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
+                            <Badge variant="outline" className="text-xs">
+                              {log.profiles?.full_name || "Usuário desconhecido"}
+                            </Badge>
+                          </div>
+                          {(log.old_value || log.new_value) && (
+                            <div className="grid grid-cols-2 gap-4 pt-2 border-t text-xs">
+                              {log.old_value && (
+                                <div>
+                                  <p className="text-muted-foreground mb-1">Valor anterior:</p>
+                                  <p className="font-mono bg-muted p-2 rounded">{log.old_value}</p>
                                 </div>
-                              ))}
+                              )}
+                              {log.new_value && (
+                                <div>
+                                  <p className="text-muted-foreground mb-1">Novo valor:</p>
+                                  <p className="font-mono bg-muted p-2 rounded">{log.new_value}</p>
+                                </div>
+                              )}
                             </div>
                           )}
-                        </ScrollArea>
-                      </DialogContent>
-                    </Dialog>
-                  </span>
-                </TooltipTrigger>
-                {!canEditLogs && (
-                  <TooltipContent>
-                    <p>Você não tem permissão para ver logs</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
 
@@ -836,18 +855,22 @@ export default function DomainDetails() {
               <div className="space-y-2">
                 <Label>Status do Domínio</Label>
                 <div
-                  className={domain.manually_deactivated || !canChangeStatus ? "" : "cursor-pointer"}
+                  className={
+                    domain.manually_deactivated || !canEdit("can_change_domain_status") ? "" : "cursor-pointer"
+                  }
                   onClick={() => {
-                    if (!domain.manually_deactivated && canChangeStatus) {
+                    if (!domain.manually_deactivated && canEdit("can_change_domain_status")) {
                       setDeactivateDialogOpen(true);
+                    } else if (!canEdit("can_change_domain_status")) {
+                      toast.error("Você não tem permissão para alterar o status do domínio");
                     }
                   }}
                   title={
                     domain.manually_deactivated
                       ? "Domínio Desativado Permanentemente"
-                      : canChangeStatus
+                      : canEdit("can_change_domain_status")
                         ? "Clique para desativar o domínio"
-                        : "Você não tem permissão para alterar status"
+                        : "Você não tem permissão para alterar o status"
                   }
                 >
                   {getStatusBadge(domain.status)}
@@ -889,11 +912,15 @@ export default function DomainDetails() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={domain.registrar?.toLowerCase() !== "namecheap"}
+                            disabled={
+                              domain.registrar?.toLowerCase() !== "namecheap" || !canEdit("can_change_nameservers")
+                            }
                             title={
                               domain.registrar?.toLowerCase() !== "namecheap"
                                 ? "Apenas domínios Namecheap"
-                                : "Opções de DNS"
+                                : !canEdit("can_change_nameservers")
+                                  ? "Você não tem permissão para alterar nameservers"
+                                  : "Opções de DNS"
                             }
                           >
                             <ChevronDown className="h-4 w-4" />
@@ -901,8 +928,8 @@ export default function DomainDetails() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64">
                           <DropdownMenuItem
-                            onClick={() => canChangeNameservers && handleSetNamecheapDNS("BasicDNS")}
-                            disabled={updateNameservers.isPending || !canChangeNameservers}
+                            onClick={() => handleSetNamecheapDNS("BasicDNS")}
+                            disabled={updateNameservers.isPending}
                             className="cursor-pointer [&[data-highlighted]_.description]:text-accent-foreground"
                           >
                             <Server className="h-4 w-4 mr-2 flex-shrink-0" />
@@ -921,7 +948,7 @@ export default function DomainDetails() {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          if (!canChangeNameservers) {
+                          if (!canEdit("can_change_nameservers")) {
                             toast.error("Você não tem permissão para editar nameservers");
                             return;
                           }
@@ -931,11 +958,11 @@ export default function DomainDetails() {
                           }
                           setIsEditingNameservers(true);
                         }}
-                        disabled={domain.registrar?.toLowerCase() !== "namecheap" || !canChangeNameservers}
+                        disabled={domain.registrar?.toLowerCase() !== "namecheap"}
                         title={
                           domain.registrar?.toLowerCase() !== "namecheap"
                             ? "Apenas domínios Namecheap"
-                            : !canChangeNameservers
+                            : !canEdit("can_change_nameservers")
                               ? "Você não tem permissão para editar nameservers"
                               : "Editar nameservers"
                         }
@@ -959,11 +986,7 @@ export default function DomainDetails() {
                       >
                         Cancelar
                       </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSaveNameservers}
-                        disabled={updateNameservers.isPending || !canChangeNameservers}
-                      >
+                      <Button size="sm" onClick={handleSaveNameservers} disabled={updateNameservers.isPending}>
                         {updateNameservers.isPending ? "Salvando..." : "Salvar"}
                       </Button>
                     </div>
@@ -1096,8 +1119,8 @@ export default function DomainDetails() {
                 <Label htmlFor="platform">Plataforma</Label>
                 <Select
                   value={domain.platform || ""}
-                  onValueChange={(value) => canChangePlatform && updateDomain("platform", value)}
-                  disabled={saving || !canChangePlatform}
+                  onValueChange={(value) => updateDomain("platform", value)}
+                  disabled={saving || !canEdit("can_select_platform")}
                 >
                   <SelectTrigger id="platform">
                     <Server className="h-4 w-4 mr-2" />
@@ -1111,19 +1134,17 @@ export default function DomainDetails() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  {domain.purchase_date
-                    ? "Informação preenchida automaticamente"
-                    : "Configure manualmente a plataforma"}
-                </p>
+                {!canEdit("can_select_platform") && (
+                  <p className="text-xs text-muted-foreground">Você não tem permissão para alterar a plataforma</p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="traffic_source">Fonte de Tráfego</Label>
                 <Select
                   value={domain.traffic_source || ""}
-                  onValueChange={(value) => canChangeTraffic && updateDomain("traffic_source", value)}
-                  disabled={saving || !canChangeTraffic}
+                  onValueChange={(value) => updateDomain("traffic_source", value)}
+                  disabled={saving || !canEdit("can_select_traffic_source")}
                 >
                   <SelectTrigger id="traffic_source">
                     <Wifi className="h-4 w-4 mr-2" />
@@ -1137,6 +1158,11 @@ export default function DomainDetails() {
                     ))}
                   </SelectContent>
                 </Select>
+                {!canEdit("can_select_traffic_source") && (
+                  <p className="text-xs text-muted-foreground">
+                    Você não tem permissão para alterar a fonte de tráfego
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1148,19 +1174,24 @@ export default function DomainDetails() {
                   value={funnelIdInput}
                   onChange={(e) => setFunnelIdInput(e.target.value)}
                   onKeyPress={handleFunnelIdKeyPress}
-                  disabled={saving || !canChangeFunnelId}
+                  disabled={saving || !canEdit("can_insert_funnel_id")}
                 />
                 {funnelIdTags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {funnelIdTags.map((tag, index) => (
                       <Badge key={index} variant="secondary" className="flex items-center gap-1">
                         {tag}
-                        {canChangeFunnelId && (
+                        {canEdit("can_insert_funnel_id") && (
                           <X className="h-3 w-3 cursor-pointer" onClick={() => removeFunnelIdTag(tag)} />
                         )}
                       </Badge>
                     ))}
                   </div>
+                )}
+                {!canEdit("can_insert_funnel_id") && (
+                  <p className="text-xs text-muted-foreground">
+                    Você não tem permissão para adicionar ou remover IDs de funil
+                  </p>
                 )}
               </div>
 
