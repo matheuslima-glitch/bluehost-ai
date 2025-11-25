@@ -917,41 +917,31 @@ export default function DomainDetails() {
                       </DropdownMenu>
 
                       {/* Botão de Editar (mantido para compatibilidade) */}
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  if (!canChangeNameservers) return;
-                                  if (domain.registrar?.toLowerCase() !== "namecheap") {
-                                    toast.error(
-                                      "Apenas domínios registrados na Namecheap podem ter nameservers editados aqui",
-                                    );
-                                    return;
-                                  }
-                                  setIsEditingNameservers(true);
-                                }}
-                                disabled={domain.registrar?.toLowerCase() !== "namecheap" || !canChangeNameservers}
-                                title={
-                                  domain.registrar?.toLowerCase() !== "namecheap"
-                                    ? "Apenas domínios Namecheap"
-                                    : "Editar nameservers"
-                                }
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                            </span>
-                          </TooltipTrigger>
-                          {!canChangeNameservers && (
-                            <TooltipContent>
-                              <p>Você não tem permissão para editar nameservers</p>
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (!canChangeNameservers) {
+                            toast.error("Você não tem permissão para editar nameservers");
+                            return;
+                          }
+                          if (domain.registrar?.toLowerCase() !== "namecheap") {
+                            toast.error("Apenas domínios registrados na Namecheap podem ter nameservers editados aqui");
+                            return;
+                          }
+                          setIsEditingNameservers(true);
+                        }}
+                        disabled={domain.registrar?.toLowerCase() !== "namecheap" || !canChangeNameservers}
+                        title={
+                          domain.registrar?.toLowerCase() !== "namecheap"
+                            ? "Apenas domínios Namecheap"
+                            : !canChangeNameservers
+                              ? "Você não tem permissão para editar nameservers"
+                              : "Editar nameservers"
+                        }
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   ) : (
                     <div className="flex gap-2">
