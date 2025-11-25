@@ -8,6 +8,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
+import ResetPassword from "./pages/ResetPassword";
 import Layout from "./pages/Layout";
 import Dashboard from "./pages/Dashboard";
 import DomainSearch from "./pages/DomainSearch";
@@ -39,6 +40,7 @@ const App = () => (
               {/* Rotas públicas */}
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/accept-invite" element={<AcceptInvite />} />
               <Route path="/no-access" element={<NoAccess />} />
 
