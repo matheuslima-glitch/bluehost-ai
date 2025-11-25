@@ -21,6 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -672,7 +673,7 @@ export default function DomainDetails() {
   };
 
   const handleFunnelIdKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && funnelIdInput.trim() !== "") {
+    if (e.key === "Enter" && funnelIdInput.trim() !== "" && canChangeFunnelId) {
       e.preventDefault();
       const newTag = funnelIdInput.trim();
       const newTags = [...funnelIdTags, newTag];
@@ -741,12 +742,23 @@ export default function DomainDetails() {
             </div>
           </div>
 
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="icon" className="h-10 w-10" onClick={loadActivityLogs}>
-                <Info className="h-5 w-5 text-blue-500" />
-              </Button>
-            </DialogTrigger>
+          {canViewLogs && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-10 w-10" 
+                        onClick={loadActivityLogs}
+                        disabled={!canEditLogs}
+                      >
+                        <Info className="h-5 w-5 text-blue-500" />
+                      </Button>
+                    </DialogTrigger>
             <DialogContent className="max-w-3xl">
               <DialogHeader>
                 <DialogTitle>Logs de Atividade</DialogTitle>
@@ -802,6 +814,16 @@ export default function DomainDetails() {
               </ScrollArea>
             </DialogContent>
           </Dialog>
+                </span>
+              </TooltipTrigger>
+              {!canEditLogs && (
+                <TooltipContent>
+                  <p>Você não tem permissão para ver logs</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+          )}
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
@@ -814,16 +836,18 @@ export default function DomainDetails() {
               <div className="space-y-2">
                 <Label>Status do Domínio</Label>
                 <div
-                  className={domain.manually_deactivated ? "" : "cursor-pointer"}
+                  className={domain.manually_deactivated || !canChangeStatus ? "" : "cursor-pointer"}
                   onClick={() => {
-                    if (!domain.manually_deactivated) {
+                    if (!domain.manually_deactivated && canChangeStatus) {
                       setDeactivateDialogOpen(true);
                     }
                   }}
                   title={
                     domain.manually_deactivated
                       ? "Domínio Desativado Permanentemente"
-                      : "Clique para desativar o domínio"
+                      : canChangeStatus
+                      ? "Clique para desativar o domínio"
+                      : "Você não tem permissão para alterar status"
                   }
                 >
                   {getStatusBadge(domain.status)}
@@ -877,8 +901,8 @@ export default function DomainDetails() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64">
                           <DropdownMenuItem
-                            onClick={() => handleSetNamecheapDNS("BasicDNS")}
-                            disabled={updateNameservers.isPending}
+                            onClick={() => canChangeNameservers && handleSetNamecheapDNS("BasicDNS")}
+                            disabled={updateNameservers.isPending || !canChangeNameservers}
                             className="cursor-pointer [&[data-highlighted]_.description]:text-accent-foreground"
                           >
                             <Server className="h-4 w-4 mr-2 flex-shrink-0" />
@@ -893,25 +917,39 @@ export default function DomainDetails() {
                       </DropdownMenu>
 
                       {/* Botão de Editar (mantido para compatibilidade) */}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (domain.registrar?.toLowerCase() !== "namecheap") {
-                            toast.error("Apenas domínios registrados na Namecheap podem ter nameservers editados aqui");
-                            return;
-                          }
-                          setIsEditingNameservers(true);
-                        }}
-                        disabled={domain.registrar?.toLowerCase() !== "namecheap"}
-                        title={
-                          domain.registrar?.toLowerCase() !== "namecheap"
-                            ? "Apenas domínios Namecheap"
-                            : "Editar nameservers"
-                        }
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (!canChangeNameservers) return;
+                                  if (domain.registrar?.toLowerCase() !== "namecheap") {
+                                    toast.error("Apenas domínios registrados na Namecheap podem ter nameservers editados aqui");
+                                    return;
+                                  }
+                                  setIsEditingNameservers(true);
+                                }}
+                                disabled={domain.registrar?.toLowerCase() !== "namecheap" || !canChangeNameservers}
+                                title={
+                                  domain.registrar?.toLowerCase() !== "namecheap"
+                                    ? "Apenas domínios Namecheap"
+                                    : "Editar nameservers"
+                                }
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          {!canChangeNameservers && (
+                            <TooltipContent>
+                              <p>Você não tem permissão para editar nameservers</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   ) : (
                     <div className="flex gap-2">
@@ -929,7 +967,7 @@ export default function DomainDetails() {
                       >
                         Cancelar
                       </Button>
-                      <Button size="sm" onClick={handleSaveNameservers} disabled={updateNameservers.isPending}>
+                      <Button size="sm" onClick={handleSaveNameservers} disabled={updateNameservers.isPending || !canChangeNameservers}>
                         {updateNameservers.isPending ? "Salvando..." : "Salvar"}
                       </Button>
                     </div>
@@ -1062,8 +1100,8 @@ export default function DomainDetails() {
                 <Label htmlFor="platform">Plataforma</Label>
                 <Select
                   value={domain.platform || ""}
-                  onValueChange={(value) => updateDomain("platform", value)}
-                  disabled={saving}
+                  onValueChange={(value) => canChangePlatform && updateDomain("platform", value)}
+                  disabled={saving || !canChangePlatform}
                 >
                   <SelectTrigger id="platform">
                     <Server className="h-4 w-4 mr-2" />
@@ -1088,8 +1126,8 @@ export default function DomainDetails() {
                 <Label htmlFor="traffic_source">Fonte de Tráfego</Label>
                 <Select
                   value={domain.traffic_source || ""}
-                  onValueChange={(value) => updateDomain("traffic_source", value)}
-                  disabled={saving}
+                  onValueChange={(value) => canChangeTraffic && updateDomain("traffic_source", value)}
+                  disabled={saving || !canChangeTraffic}
                 >
                   <SelectTrigger id="traffic_source">
                     <Wifi className="h-4 w-4 mr-2" />
@@ -1114,14 +1152,16 @@ export default function DomainDetails() {
                   value={funnelIdInput}
                   onChange={(e) => setFunnelIdInput(e.target.value)}
                   onKeyPress={handleFunnelIdKeyPress}
-                  disabled={saving}
+                  disabled={saving || !canChangeFunnelId}
                 />
                 {funnelIdTags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {funnelIdTags.map((tag, index) => (
                       <Badge key={index} variant="secondary" className="flex items-center gap-1">
                         {tag}
-                        <X className="h-3 w-3 cursor-pointer" onClick={() => removeFunnelIdTag(tag)} />
+                        {canChangeFunnelId && (
+                          <X className="h-3 w-3 cursor-pointer" onClick={() => removeFunnelIdTag(tag)} />
+                        )}
                       </Badge>
                     ))}
                   </div>
