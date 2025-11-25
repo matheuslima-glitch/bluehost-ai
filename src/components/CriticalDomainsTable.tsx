@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,11 +16,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, Mail, Link as LinkIcon } from "lucide-react";
+import { AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, Mail, Link as LinkIcon, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface CriticalDomainsTableProps {
   domains: any[];
@@ -104,6 +106,9 @@ function AlertMessageRenderer({ message }: { message: string }) {
 }
 
 export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomainsTableProps) {
+  const { canEdit } = usePermissions();
+  const canEditCriticalDomains = canEdit("can_view_critical_domains");
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [domainToDelete, setDomainToDelete] = useState<any>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
@@ -330,13 +335,33 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                               <AlertCircle className="h-4 w-4" />
                             </Button>
                           )}
-                          <button
-                            onClick={() => handleDeleteClick(domain)}
-                            className="relative inline-flex h-6 w-11 items-center rounded-full bg-blue-500 hover:bg-blue-600 transition-colors"
-                            title="Desativar domínio"
-                          >
-                            <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-6" />
-                          </button>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => canEditCriticalDomains && handleDeleteClick(domain)}
+                                  disabled={!canEditCriticalDomains}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                    canEditCriticalDomains
+                                      ? "bg-blue-500 hover:bg-blue-600 cursor-pointer"
+                                      : "bg-gray-300 cursor-not-allowed opacity-50"
+                                  }`}
+                                  title={canEditCriticalDomains ? "Desativar domínio" : "Sem permissão para desativar"}
+                                >
+                                  {canEditCriticalDomains ? (
+                                    <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-6" />
+                                  ) : (
+                                    <Lock className="h-3 w-3 text-gray-600 mx-auto" />
+                                  )}
+                                </button>
+                              </TooltipTrigger>
+                              {!canEditCriticalDomains && (
+                                <TooltipContent>
+                                  <p>Você não tem permissão para desativar domínios</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </TableCell>
                     </TableRow>
