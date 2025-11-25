@@ -36,6 +36,8 @@ const WEEK_DAYS = [
   { value: "quarta", label: "Quarta" },
   { value: "quinta", label: "Quinta" },
   { value: "sexta", label: "Sexta" },
+  { value: "sabado", label: "Sábado" },
+  { value: "domingo", label: "Domingo" },
 ];
 
 // Intervalos de horário
@@ -770,7 +772,11 @@ export default function Settings() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  onMouseDown={() => setShowCurrentPassword(true)}
+                  onMouseUp={() => setShowCurrentPassword(false)}
+                  onMouseLeave={() => setShowCurrentPassword(false)}
+                  onTouchStart={() => setShowCurrentPassword(true)}
+                  onTouchEnd={() => setShowCurrentPassword(false)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -791,7 +797,11 @@ export default function Settings() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  onMouseDown={() => setShowNewPassword(true)}
+                  onMouseUp={() => setShowNewPassword(false)}
+                  onMouseLeave={() => setShowNewPassword(false)}
+                  onTouchStart={() => setShowNewPassword(true)}
+                  onTouchEnd={() => setShowNewPassword(false)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -813,7 +823,11 @@ export default function Settings() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  onMouseDown={() => setShowConfirmPassword(true)}
+                  onMouseUp={() => setShowConfirmPassword(false)}
+                  onMouseLeave={() => setShowConfirmPassword(false)}
+                  onTouchStart={() => setShowConfirmPassword(true)}
+                  onTouchEnd={() => setShowConfirmPassword(false)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
