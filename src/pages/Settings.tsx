@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { User, Bell, Palette, Filter, X, Volume2, Check, Clock } from "lucide-react";
+import { User, Bell, Palette, Filter, X, Volume2, Check, Clock, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Switch } from "@/components/ui/switch";
@@ -70,8 +70,12 @@ export default function Settings() {
   const [selectedInterval, setSelectedInterval] = useState<number>(6);
   const [selectedFrequency, setSelectedFrequency] = useState<number>(1);
   const [newEmail, setNewEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Verificar e processar confirmação de e-mail da URL
   useEffect(() => {
@@ -408,6 +412,15 @@ export default function Settings() {
   // Update password mutation
   const updatePasswordMutation = useMutation({
     mutationFn: async () => {
+      // Validações
+      if (!currentPassword) {
+        throw new Error("Por favor, digite sua senha atual");
+      }
+
+      if (!newPassword || !confirmPassword) {
+        throw new Error("Por favor, preencha todos os campos de senha");
+      }
+
       if (newPassword !== confirmPassword) {
         throw new Error("As senhas não coincidem");
       }
@@ -416,6 +429,17 @@ export default function Settings() {
         throw new Error("A senha deve ter pelo menos 6 caracteres");
       }
 
+      // Primeiro, validar a senha atual fazendo login
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user?.email || "",
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        throw new Error("Senha atual incorreta");
+      }
+
+      // Se a senha atual estiver correta, atualizar para a nova senha
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -423,6 +447,7 @@ export default function Settings() {
       if (error) throw error;
     },
     onSuccess: () => {
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       toast({
@@ -724,29 +749,82 @@ export default function Settings() {
 
           <Separator className="my-6" />
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Nova Senha</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Digite sua nova senha"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h3 className="text-lg font-semibold">Redefinir Senha</h3>
+              <p className="text-sm text-muted-foreground">
+                Para sua segurança, insira sua senha atual antes de definir uma nova senha.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Senha Atual</Label>
+              <div className="relative">
+                <Input
+                  id="current-password"
+                  type={showCurrentPassword ? "text" : "password"}
+                  placeholder="Digite sua senha atual"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Nova Senha</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showNewPassword ? "text" : "password"}
+                  placeholder="Digite sua nova senha"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">Mínimo de 6 caracteres</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirme sua nova senha"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <Button onClick={handleUpdatePassword} disabled={updatePasswordMutation.isPending}>
+              {updatePasswordMutation.isPending ? "Alterando..." : "Alterar Senha"}
+            </Button>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              placeholder="Confirme sua nova senha"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-          </div>
-          <Button onClick={handleUpdatePassword} disabled={updatePasswordMutation.isPending}>
-            {updatePasswordMutation.isPending ? "Alterando..." : "Alterar Senha"}
-          </Button>
         </CardContent>
       </Card>
 
