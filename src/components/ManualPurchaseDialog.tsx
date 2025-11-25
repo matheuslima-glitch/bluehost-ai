@@ -10,10 +10,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface ManualPurchaseDialogProps {
   open: boolean;
@@ -30,11 +31,39 @@ export default function ManualPurchaseDialog({
   price,
   onSuccess,
 }: ManualPurchaseDialogProps) {
+  const { user } = useAuth();
   const [platform, setPlatform] = useState<string>("wordpress");
   const [trafficSource, setTrafficSource] = useState<string>("");
   const [purchasing, setPurchasing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [progress, setProgress] = useState<any>(null);
+
+  // Fetch custom filters from database
+  const { data: customFilters = [] } = useQuery({
+    queryKey: ["custom-filters", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("custom_filters")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id && open,
+  });
+
+  // Combine default and custom traffic sources
+  const trafficSourceOptions = [
+    "facebook",
+    "google",
+    "native",
+    "outbrain",
+    "taboola",
+    "revcontent",
+    ...customFilters.filter((f) => f.filter_type === "traffic_source").map((f) => f.filter_value),
+  ];
 
   // Limpar estados ao abrir/fechar
   useEffect(() => {
@@ -89,7 +118,7 @@ export default function ManualPurchaseDialog({
 
   const handlePurchase = async () => {
     if (!trafficSource.trim()) {
-      toast.error("Por favor, informe a fonte de tráfego");
+      toast.error("Por favor, selecione a fonte de tráfego");
       return;
     }
 
@@ -149,6 +178,11 @@ export default function ManualPurchaseDialog({
     onOpenChange(false);
   };
 
+  // Função para formatar o nome da fonte de tráfego para exibição
+  const formatTrafficSourceLabel = (source: string) => {
+    return source.charAt(0).toUpperCase() + source.slice(1);
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
@@ -176,17 +210,22 @@ export default function ManualPurchaseDialog({
               <p className="text-xs text-muted-foreground">Estrutura do site que será criado após a compra</p>
             </div>
 
-            {/* Fonte de Tráfego */}
+            {/* Fonte de Tráfego - Agora com Select */}
             <div className="space-y-2">
               <Label htmlFor="trafficSource">Fonte de Tráfego *</Label>
-              <Input
-                id="trafficSource"
-                placeholder="Ex: Google Ads, Facebook, Orgânico..."
-                value={trafficSource}
-                onChange={(e) => setTrafficSource(e.target.value)}
-                disabled={purchasing}
-              />
-              <p className="text-xs text-muted-foreground">Informe a origem do tráfego para este domínio</p>
+              <Select value={trafficSource} onValueChange={setTrafficSource}>
+                <SelectTrigger id="trafficSource">
+                  <SelectValue placeholder="Selecione a fonte de tráfego" />
+                </SelectTrigger>
+                <SelectContent>
+                  {trafficSourceOptions.map((source) => (
+                    <SelectItem key={source} value={source}>
+                      {formatTrafficSourceLabel(source)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Selecione a origem do tráfego para este domínio</p>
             </div>
 
             {/* Resumo */}
@@ -237,7 +276,7 @@ export default function ManualPurchaseDialog({
                   }}
                 />
               </div>
-              <p className="text-xs text-center text-muted-foreground">Este processo pode levar de 2 a 5 minutos</p>
+              <p className="text-xs text-center text-muted-foreground">Este processo pode levar de 1 a 3 minutos</p>
             </div>
           </div>
         )}
