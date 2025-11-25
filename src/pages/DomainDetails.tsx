@@ -21,8 +21,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -743,86 +743,86 @@ export default function DomainDetails() {
           </div>
 
           {canViewLogs && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        className="h-10 w-10" 
-                        onClick={loadActivityLogs}
-                        disabled={!canEditLogs}
-                      >
-                        <Info className="h-5 w-5 text-blue-500" />
-                      </Button>
-                    </DialogTrigger>
-            <DialogContent className="max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>Logs de Atividade</DialogTitle>
-                <DialogDescription>Histórico de alterações realizadas neste domínio</DialogDescription>
-              </DialogHeader>
-              <ScrollArea className="h-[500px] pr-4">
-                {loadingLogs ? (
-                  <div className="flex justify-center py-8">
-                    <LoadingSpinner />
-                  </div>
-                ) : activityLogs.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Nenhuma atividade registrada para este domínio
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {activityLogs.map((log) => (
-                      <div
-                        key={log.id}
-                        className="border rounded-lg p-4 space-y-2 bg-card hover:bg-accent/5 transition-colors"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-1">
-                            <p className="font-medium text-sm">{getActionLabel(log.action_type)}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                            </p>
-                          </div>
-                          <Badge variant="outline" className="text-xs">
-                            {log.profiles?.full_name || "Usuário desconhecido"}
-                          </Badge>
-                        </div>
-                        {(log.old_value || log.new_value) && (
-                          <div className="grid grid-cols-2 gap-4 pt-2 border-t text-xs">
-                            {log.old_value && (
-                              <div>
-                                <p className="text-muted-foreground mb-1">Valor anterior:</p>
-                                <p className="font-mono bg-muted p-2 rounded">{log.old_value}</p>
-                              </div>
-                            )}
-                            {log.new_value && (
-                              <div>
-                                <p className="text-muted-foreground mb-1">Novo valor:</p>
-                                <p className="font-mono bg-muted p-2 rounded">{log.new_value}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10"
+                          onClick={loadActivityLogs}
+                          disabled={!canEditLogs}
+                        >
+                          <Info className="h-5 w-5 text-blue-500" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-3xl">
+                        <DialogHeader>
+                          <DialogTitle>Logs de Atividade</DialogTitle>
+                          <DialogDescription>Histórico de alterações realizadas neste domínio</DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="h-[500px] pr-4">
+                          {loadingLogs ? (
+                            <div className="flex justify-center py-8">
+                              <LoadingSpinner />
+                            </div>
+                          ) : activityLogs.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground">
+                              Nenhuma atividade registrada para este domínio
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {activityLogs.map((log) => (
+                                <div
+                                  key={log.id}
+                                  className="border rounded-lg p-4 space-y-2 bg-card hover:bg-accent/5 transition-colors"
+                                >
+                                  <div className="flex items-start justify-between">
+                                    <div className="space-y-1">
+                                      <p className="font-medium text-sm">{getActionLabel(log.action_type)}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                      </p>
+                                    </div>
+                                    <Badge variant="outline" className="text-xs">
+                                      {log.profiles?.full_name || "Usuário desconhecido"}
+                                    </Badge>
+                                  </div>
+                                  {(log.old_value || log.new_value) && (
+                                    <div className="grid grid-cols-2 gap-4 pt-2 border-t text-xs">
+                                      {log.old_value && (
+                                        <div>
+                                          <p className="text-muted-foreground mb-1">Valor anterior:</p>
+                                          <p className="font-mono bg-muted p-2 rounded">{log.old_value}</p>
+                                        </div>
+                                      )}
+                                      {log.new_value && (
+                                        <div>
+                                          <p className="text-muted-foreground mb-1">Novo valor:</p>
+                                          <p className="font-mono bg-muted p-2 rounded">{log.new_value}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </DialogContent>
+                    </Dialog>
+                  </span>
+                </TooltipTrigger>
+                {!canEditLogs && (
+                  <TooltipContent>
+                    <p>Você não tem permissão para ver logs</p>
+                  </TooltipContent>
                 )}
-              </ScrollArea>
-            </DialogContent>
-          </Dialog>
-                </span>
-              </TooltipTrigger>
-              {!canEditLogs && (
-                <TooltipContent>
-                  <p>Você não tem permissão para ver logs</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          </TooltipProvider>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
 
@@ -846,8 +846,8 @@ export default function DomainDetails() {
                     domain.manually_deactivated
                       ? "Domínio Desativado Permanentemente"
                       : canChangeStatus
-                      ? "Clique para desativar o domínio"
-                      : "Você não tem permissão para alterar status"
+                        ? "Clique para desativar o domínio"
+                        : "Você não tem permissão para alterar status"
                   }
                 >
                   {getStatusBadge(domain.status)}
@@ -927,7 +927,9 @@ export default function DomainDetails() {
                                 onClick={() => {
                                   if (!canChangeNameservers) return;
                                   if (domain.registrar?.toLowerCase() !== "namecheap") {
-                                    toast.error("Apenas domínios registrados na Namecheap podem ter nameservers editados aqui");
+                                    toast.error(
+                                      "Apenas domínios registrados na Namecheap podem ter nameservers editados aqui",
+                                    );
                                     return;
                                   }
                                   setIsEditingNameservers(true);
@@ -967,7 +969,11 @@ export default function DomainDetails() {
                       >
                         Cancelar
                       </Button>
-                      <Button size="sm" onClick={handleSaveNameservers} disabled={updateNameservers.isPending || !canChangeNameservers}>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveNameservers}
+                        disabled={updateNameservers.isPending || !canChangeNameservers}
+                      >
                         {updateNameservers.isPending ? "Salvando..." : "Salvar"}
                       </Button>
                     </div>
