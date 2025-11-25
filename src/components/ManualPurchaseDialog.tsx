@@ -183,6 +183,58 @@ export default function ManualPurchaseDialog({
     return source.charAt(0).toUpperCase() + source.slice(1);
   };
 
+  // Função para calcular a porcentagem do progresso baseado no step do backend
+  const getProgressPercentage = (step: string | undefined): string => {
+    switch (step) {
+      case "generating":
+        return "10%";
+      case "checking":
+        return "20%";
+      case "purchasing":
+        return "35%";
+      case "cloudflare":
+        return "50%";
+      case "nameservers":
+        return "65%";
+      case "cpanel":
+        return "75%";
+      case "supabase":
+        return "90%";
+      case "completed":
+        return "100%";
+      case "error":
+        return "0%";
+      default:
+        return "5%";
+    }
+  };
+
+  // Função para obter o label amigável do step
+  const getStepLabel = (step: string | undefined): string => {
+    switch (step) {
+      case "generating":
+        return "Iniciando";
+      case "checking":
+        return "Verificando disponibilidade";
+      case "purchasing":
+        return "Comprando domínio";
+      case "cloudflare":
+        return "Configurando Cloudflare";
+      case "nameservers":
+        return "Atualizando nameservers";
+      case "cpanel":
+        return "Configurando cPanel";
+      case "supabase":
+        return "Salvando no banco de dados";
+      case "completed":
+        return "Concluído";
+      case "error":
+        return "Erro";
+      default:
+        return "Processando";
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
@@ -253,7 +305,9 @@ export default function ManualPurchaseDialog({
               <div className="text-center space-y-2">
                 <h3 className="font-semibold">Processando compra...</h3>
                 <p className="text-sm text-muted-foreground">{progress?.message || "Iniciando processo de compra"}</p>
-                {progress?.step && <p className="text-xs text-muted-foreground">Etapa: {progress.step}</p>}
+                {progress?.step && (
+                  <p className="text-xs text-muted-foreground">Etapa: {getStepLabel(progress.step)}</p>
+                )}
               </div>
             </div>
 
@@ -263,16 +317,7 @@ export default function ManualPurchaseDialog({
                 <div
                   className="h-full bg-primary transition-all duration-500"
                   style={{
-                    width:
-                      progress?.step === "checking"
-                        ? "25%"
-                        : progress?.step === "purchasing"
-                          ? "50%"
-                          : progress?.step === "creating_wordpress"
-                            ? "75%"
-                            : progress?.step === "completed"
-                              ? "100%"
-                              : "10%",
+                    width: getProgressPercentage(progress?.step),
                   }}
                 />
               </div>
