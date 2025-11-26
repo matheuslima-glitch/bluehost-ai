@@ -226,14 +226,22 @@ export function UserManagement() {
       isAdmin: boolean;
       permissions: Partial<UserPermission>;
     }) => {
-      const redirectUrl = `${window.location.origin}/auth/callback`;
+      // PASSO 1: Pré-criar usuário no banco
+      const { data: preCreateData, error: preCreateError } = await supabase.rpc("create_invited_user", {
+        p_email: email,
+        p_invited_by: user?.id,
+        p_is_admin: isAdmin,
+        p_permissions: permissions,
+      });
 
+      if (preCreateError || !preCreateData?.success) {
+        throw new Error(preCreateData?.error || preCreateError?.message || "Erro ao preparar convite");
+      }
+
+      // PASSO 2: Enviar email de convite
+      const redirectUrl = `${window.location.origin}/auth/callback`;
       const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         redirectTo: redirectUrl,
-        data: {
-          is_admin: isAdmin,
-          permissions: JSON.stringify(permissions),
-        },
       });
 
       if (error) throw error;
