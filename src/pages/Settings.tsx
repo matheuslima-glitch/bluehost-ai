@@ -75,7 +75,7 @@ export default function Settings() {
   const queryClient = useQueryClient();
 
   const [fullName, setFullName] = useState("");
-  const [whatsappNumber, setWhatsappNumber] = useState("+55 ");
+  const [whatsappNumber, setWhatsappNumber] = useState(""); // Começa vazio igual ao nome!
   const [newPlatformFilter, setNewPlatformFilter] = useState("");
   const [newTrafficSourceFilter, setNewTrafficSourceFilter] = useState("");
   const { hasPermission, canEdit } = usePermissions();
@@ -240,11 +240,11 @@ export default function Settings() {
         setFullName(profile.full_name || "");
       }
 
-      // Atualizar WhatsApp - SEMPRE que profile mudar
+      // Atualizar WhatsApp - IGUAL ao nome (vazio se não tiver)
       if (profile.whatsapp_number) {
         setWhatsappNumber(profile.whatsapp_number);
       } else {
-        setWhatsappNumber("+55 ");
+        setWhatsappNumber(""); // Vazio igual ao nome!
       }
 
       // Atualizar som
@@ -385,6 +385,18 @@ export default function Settings() {
   // Handler para mudanças no input de WhatsApp
   const handleWhatsappChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+
+    // Se está vazio, deixar vazio (permite apagar tudo)
+    if (value === "") {
+      setWhatsappNumber("");
+      return;
+    }
+
+    // Se não começa com +55, forçar o prefixo
+    if (!value.startsWith("+55")) {
+      setWhatsappNumber("+55 ");
+      return;
+    }
 
     // Impedir que o usuário apague o +55
     if (value.length < 3) {
@@ -1014,7 +1026,7 @@ export default function Settings() {
             <Input
               id="whatsapp"
               placeholder="+55 19 98932-0129"
-              value={whatsappNumber !== "+55 " ? whatsappNumber : profile?.whatsapp_number || "+55 "}
+              value={whatsappNumber || profile?.whatsapp_number || ""}
               onChange={handleWhatsappChange}
               maxLength={20}
             />
@@ -1349,7 +1361,7 @@ export default function Settings() {
               Tem certeza que deseja remover o filtro <strong>"{filterToDelete?.name}"</strong>?
               {filterToDelete?.isDefault && (
                 <span className="block mt-2 text-orange-600 dark:text-orange-400">
-                  ⚠️ Este é um filtro padrão do sistema. Você poderá adicioná-lo novamente depois se necessário.
+                  Este é um filtro padrão do sistema. Você poderá adicioná-lo novamente depois se necessário.
                 </span>
               )}
             </AlertDialogDescription>
