@@ -1343,7 +1343,7 @@ export default function Settings() {
               Tem certeza que deseja remover o filtro <strong>"{filterToDelete?.name}"</strong>?
               {filterToDelete?.isDefault && (
                 <span className="block mt-2 text-orange-600 dark:text-orange-400">
-                  ⚠️ Este é um filtro padrão do sistema. Você poderá adicioná-lo novamente depois se necessário.
+                  Este é um filtro padrão do sistema. Você poderá adicioná-lo novamente depois se necessário.
                 </span>
               )}
             </AlertDialogDescription>
