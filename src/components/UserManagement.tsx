@@ -226,70 +226,54 @@ export function UserManagement() {
       isAdmin: boolean;
       permissions: Partial<UserPermission>;
     }) => {
-      // VERIFICAR SE O EMAIL JÁ EXISTE ANTES DE TENTAR CRIAR
-      const { data: existingProfile } = await supabase.from("profiles").select("id, email").eq("email", email).single();
-
-      const isExistingUser = !!existingProfile;
-
-      // PASSO 1: Pré-criar/atualizar usuário no banco com permissões personalizadas
+      // PASSO 1: Atualizar/criar permissões no banco
       const { data: preCreateData, error: preCreateError } = await supabase.rpc("create_invited_user", {
         p_email: email,
         p_invited_by: user?.id,
         p_is_admin: isAdmin,
-        p_permissions: permissions, // Agora a função SQL vai usar estas permissões!
+        p_permissions: permissions,
       });
 
       if (preCreateError || !preCreateData?.success) {
         throw new Error(preCreateData?.error || preCreateError?.message || "Erro ao preparar convite");
       }
 
-      // PASSO 2: Tentar enviar email de convite APENAS se for usuário novo
+      // PASSO 2: SEMPRE tentar enviar email de convite
       const redirectUrl = `${window.location.origin}/auth/callback`;
 
-      if (isExistingUser) {
-        // Usuário já existe, não tenta enviar email para evitar erro
-        return {
-          success: true,
-          isExisting: true,
-          message: "Permissões atualizadas com sucesso! O usuário pode fazer login com as novas permissões.",
-        };
-      }
-
-      // Usuário novo, enviar convite
       const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         redirectTo: redirectUrl,
       });
 
+      // Se der erro "Database error", significa que usuário já existe no auth.users
       if (error) {
-        // Se mesmo assim der erro, considerar sucesso pois permissões foram salvas
         if (
           error.message?.includes("Database error saving new user") ||
           error.message?.includes("User already registered")
         ) {
+          // Usuário já existe no auth - permissões foram atualizadas mas email não será enviado
           return {
             success: true,
-            isExisting: true,
-            message: "Permissões configuradas com sucesso! O usuário já foi convidado anteriormente.",
+            emailSent: false,
+            message: "Permissões atualizadas com sucesso! O usuário já foi convidado anteriormente.",
           };
         }
 
-        // Erro real, lançar
+        // Outros erros são lançados
         throw error;
       }
 
-      // Sucesso no envio do email
+      // Sucesso - email foi enviado
       return {
         success: true,
-        isExisting: false,
+        emailSent: true,
         data: data,
       };
     },
     onSuccess: (result: any) => {
-      let message = "O usuário receberá um e-mail com instruções para aceitar o convite.";
-
-      if (result?.isExisting) {
-        message = result.message;
-      }
+      const message = result?.emailSent
+        ? "O usuário receberá um e-mail com instruções para aceitar o convite."
+        : result?.message || "Permissões atualizadas com sucesso!";
 
       toast({
         title: "Convite processado!",
