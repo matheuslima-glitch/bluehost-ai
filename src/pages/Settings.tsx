@@ -218,55 +218,97 @@ export default function Settings() {
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
-      console.log("🔍 Buscando perfil para user ID:", user?.id);
+      if (!user?.id) {
+        console.error("⚠️ PROFILE QUERY: User ID não disponível");
+        return null;
+      }
 
+      // Usar console.error para logs que NÃO são bloqueados pelo silence-logs
+      console.error("🔍 PROFILE QUERY: Buscando perfil para user ID:", user?.id);
+
+      // MUDANÇA CRÍTICA: Usar select("*") ao invés de especificar colunas
+      // Isso garante que TODAS as colunas sejam retornadas
       const { data, error } = await supabase
         .from("profiles")
-        .select("full_name, whatsapp_number, alert_sound_preference")
+        .select("*") // ⭐ BUSCAR TODAS AS COLUNAS
         .eq("id", user?.id)
         .maybeSingle();
 
-      console.log("📦 Dados retornados da query:", data);
-      console.log("❌ Erro da query:", error);
+      // Logs detalhados usando console.error (não é bloqueado)
+      console.error("📦 PROFILE QUERY: Tipo do data:", typeof data);
+      console.error("📦 PROFILE QUERY: Data é null?:", data === null);
+      console.error("📦 PROFILE QUERY: Chaves do objeto:", data ? Object.keys(data) : "N/A");
+      console.error("📦 PROFILE QUERY: Dados completos:", JSON.stringify(data, null, 2));
+      console.error("❌ PROFILE QUERY: Erro:", error);
 
-      if (error) throw error;
+      // Se não encontrou registro, tentar criar automaticamente
+      if (!data && !error) {
+        console.error("⚠️ PROFILE QUERY: Registro não encontrado, criando automaticamente...");
+
+        const { data: newProfile, error: insertError } = await supabase
+          .from("profiles")
+          .insert({
+            id: user.id,
+            full_name:
+              user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Usuário",
+            email: user.email,
+          })
+          .select("*")
+          .single();
+
+        if (insertError) {
+          console.error("❌ PROFILE QUERY: Erro ao criar perfil:", insertError);
+          throw insertError;
+        }
+
+        console.error("✅ PROFILE QUERY: Perfil criado com sucesso:", newProfile);
+        return newProfile;
+      }
+
+      if (error) {
+        console.error("❌ PROFILE QUERY: Erro ao buscar perfil:", error);
+        throw error;
+      }
+
       return data;
     },
     enabled: !!user?.id,
-    refetchOnMount: true, // SEMPRE buscar ao montar o componente
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
 
   // useEffect para carregar dados do perfil quando profile mudar
   useEffect(() => {
-    console.log("🔄 useEffect do perfil disparado");
-    console.log("👤 User ID:", user?.id);
-    console.log("📋 Profile recebido:", profile);
+    // Usar console.error para logs que NÃO são bloqueados
+    console.error("🔄 PROFILE EFFECT: useEffect disparado");
+    console.error("👤 PROFILE EFFECT: User ID:", user?.id);
+    console.error("📋 PROFILE EFFECT: Profile recebido:", profile);
 
     if (profile) {
-      console.log("✅ Profile existe, atualizando estados...");
+      console.error("✅ PROFILE EFFECT: Profile existe, atualizando estados...");
 
       // Atualizar nome
-      console.log("📝 Nome do perfil:", profile.full_name);
+      console.error("📝 PROFILE EFFECT: Nome do perfil:", profile.full_name);
       setFullName(profile.full_name || "");
 
-      // Atualizar WhatsApp - SEMPRE setar o valor do banco (mesmo que seja null/undefined)
-      console.log("📱 WhatsApp do perfil:", profile.whatsapp_number);
+      // Atualizar WhatsApp
+      console.error("📱 PROFILE EFFECT: WhatsApp do perfil:", profile.whatsapp_number);
+      console.error("📱 PROFILE EFFECT: Tipo do whatsapp_number:", typeof profile.whatsapp_number);
       setWhatsappNumber(profile.whatsapp_number || "");
 
       // Atualizar som
-      console.log("🔊 Som do perfil:", profile.alert_sound_preference);
+      console.error("🔊 PROFILE EFFECT: Som do perfil:", profile.alert_sound_preference);
       setSelectedSound(profile.alert_sound_preference || "alert-4");
     } else {
-      console.log("⚠️ Profile não existe ou está undefined");
+      console.error("⚠️ PROFILE EFFECT: Profile não existe ou está undefined");
     }
 
     // Atualizar email do auth
     if (user?.email) {
-      console.log("📧 Email do user:", user.email);
+      console.error("📧 PROFILE EFFECT: Email do user:", user.email);
       setNewEmail(user.email);
     }
-  }, [profile, user?.email, user?.id]); // Adicionado user?.id para recarregar quando usuário estiver pronto
+  }, [profile, user?.email, user?.id]);
 
   // Debug: Log sempre que whatsappNumber mudar
   useEffect(() => {
