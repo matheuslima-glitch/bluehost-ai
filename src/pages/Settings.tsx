@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { User, Bell, Palette, Filter, X, Volume2, Check, Clock, Eye, EyeOff } from "lucide-react";
+import { User, Bell, Palette, Filter, X, Volume2, Check, Clock, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Switch } from "@/components/ui/switch";
@@ -18,6 +18,16 @@ import { useState, useEffect } from "react";
 import { ALERT_SOUNDS } from "@/components/CriticalDomainsAlert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserManagement } from "@/components/UserManagement";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // URL da API - usa variável de ambiente em produção, fallback para dev local
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -54,7 +64,7 @@ const DAILY_FREQUENCIES = [
   { value: 3, label: "3x por dia" },
 ];
 
-// FILTROS PADRÃO DO SISTEMA
+// FILTROS PADRÃO DO SISTEMA (sugestões pré-definidas)
 const DEFAULT_PLATFORM_FILTERS = ["wordpress", "atomicat"];
 const DEFAULT_TRAFFIC_SOURCE_FILTERS = ["facebook", "google", "native", "outbrain", "taboola", "revcontent"];
 
@@ -82,6 +92,21 @@ export default function Settings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Estados para o AlertDialog de confirmação de remoção
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [filterToDelete, setFilterToDelete] = useState<{ id: string; name: string; isDefault: boolean } | null>(null);
+
+  // Estado para armazenar filtros padrão removidos (usando localStorage)
+  const [removedDefaultFilters, setRemovedDefaultFilters] = useState<string[]>([]);
+
+  // Carregar filtros removidos do localStorage ao iniciar
+  useEffect(() => {
+    const stored = localStorage.getItem(`removed_filters_${user?.id}`);
+    if (stored) {
+      setRemovedDefaultFilters(JSON.parse(stored));
+    }
+  }, [user?.id]);
 
   // Verificar e processar confirmação de e-mail da URL
   useEffect(() => {
@@ -200,27 +225,36 @@ export default function Settings() {
         .maybeSingle();
 
       if (error) throw error;
-      if (data) {
-        setFullName(data.full_name || "");
-        // Garantir que sempre tenha +55
-        if (data.whatsapp_number) {
-          const cleanNumber = data.whatsapp_number.replace(/\D/g, "");
-          if (cleanNumber.startsWith("55")) {
-            setWhatsappNumber(`+${cleanNumber}`);
-          } else {
-            setWhatsappNumber(`+55${cleanNumber}`);
-          }
-        } else {
-          setWhatsappNumber("+55 ");
-        }
-        setSelectedSound(data.alert_sound_preference || "alert-4");
-        // Usar o e-mail do auth (sempre mais atualizado)
-        setNewEmail(user?.email || "");
-      }
       return data;
     },
     enabled: !!user?.id,
   });
+
+  // useEffect para carregar dados do perfil quando profile mudar
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || "");
+
+      // Garantir que sempre tenha +55
+      if (profile.whatsapp_number) {
+        const cleanNumber = profile.whatsapp_number.replace(/\D/g, "");
+        if (cleanNumber.startsWith("55")) {
+          setWhatsappNumber(`+${cleanNumber}`);
+        } else {
+          setWhatsappNumber(`+55${cleanNumber}`);
+        }
+      } else {
+        setWhatsappNumber("+55 ");
+      }
+
+      setSelectedSound(profile.alert_sound_preference || "alert-4");
+    }
+
+    // Atualizar email do auth
+    if (user?.email) {
+      setNewEmail(user.email);
+    }
+  }, [profile, user?.email]);
 
   // Fetch notification settings
   const { data: notificationSettings } = useQuery({
@@ -233,18 +267,19 @@ export default function Settings() {
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") throw error;
-
-      // Carregar configurações de recorrência
-      if (data) {
-        setSelectedDays(data.notification_days || []);
-        setSelectedInterval(data.notification_interval_hours || 6);
-        setSelectedFrequency(data.notification_frequency || 1);
-      }
-
       return data;
     },
     enabled: !!user?.id,
   });
+
+  // useEffect para carregar configurações de recorrência
+  useEffect(() => {
+    if (notificationSettings) {
+      setSelectedDays(notificationSettings.notification_days || []);
+      setSelectedInterval(notificationSettings.notification_interval_hours || 6);
+      setSelectedFrequency(notificationSettings.notification_frequency || 1);
+    }
+  }, [notificationSettings]);
 
   // Fetch custom filters
   const { data: customFilters = [] } = useQuery({
@@ -266,19 +301,33 @@ export default function Settings() {
   const customPlatformFilters = customFilters.filter((f) => f.filter_type === "platform");
   const customTrafficSourceFilters = customFilters.filter((f) => f.filter_type === "traffic_source");
 
-  // COMBINAR FILTROS PADRÃO E CUSTOMIZADOS (para exibição)
+  // COMBINAR FILTROS PADRÃO + CUSTOMIZADOS (todos removíveis, excluindo os removidos pelo usuário)
   const allPlatformFilters = [
-    ...DEFAULT_PLATFORM_FILTERS.map((value) => ({ id: `default_${value}`, filter_value: value, is_default: true })),
-    ...customPlatformFilters.map((f) => ({ ...f, is_default: false })),
+    ...DEFAULT_PLATFORM_FILTERS.filter((value) => !removedDefaultFilters.includes(`platform_${value}`)).map(
+      (value) => ({
+        id: `default_${value}`,
+        filter_value: value,
+        is_default: true,
+      }),
+    ),
+    ...customPlatformFilters.map((f) => ({
+      ...f,
+      is_default: false,
+    })),
   ];
 
   const allTrafficSourceFilters = [
-    ...DEFAULT_TRAFFIC_SOURCE_FILTERS.map((value) => ({
-      id: `default_${value}`,
-      filter_value: value,
-      is_default: true,
+    ...DEFAULT_TRAFFIC_SOURCE_FILTERS.filter((value) => !removedDefaultFilters.includes(`traffic_source_${value}`)).map(
+      (value) => ({
+        id: `default_${value}`,
+        filter_value: value,
+        is_default: true,
+      }),
+    ),
+    ...customTrafficSourceFilters.map((f) => ({
+      ...f,
+      is_default: false,
     })),
-    ...customTrafficSourceFilters.map((f) => ({ ...f, is_default: false })),
   ];
 
   // Validar número de WhatsApp em tempo real
@@ -517,20 +566,20 @@ export default function Settings() {
 
       // Verificar se já existe nos filtros padrão
       if (filter_type === "platform" && DEFAULT_PLATFORM_FILTERS.some((f) => f.toLowerCase() === normalizedValue)) {
-        throw new Error("Este filtro já existe como filtro padrão do sistema");
+        throw new Error("Este filtro já existe no sistema");
       }
 
       if (
         filter_type === "traffic_source" &&
         DEFAULT_TRAFFIC_SOURCE_FILTERS.some((f) => f.toLowerCase() === normalizedValue)
       ) {
-        throw new Error("Este filtro já existe como filtro padrão do sistema");
+        throw new Error("Este filtro já existe no sistema");
       }
 
       // Verificar se já existe nos filtros customizados
       const existingCustomFilters = customFilters.filter((f) => f.filter_type === filter_type);
       if (existingCustomFilters.some((f) => f.filter_value.toLowerCase() === normalizedValue)) {
-        throw new Error("Este filtro customizado já existe");
+        throw new Error("Este filtro já existe");
       }
 
       const { error } = await supabase.from("custom_filters").insert({
@@ -557,11 +606,10 @@ export default function Settings() {
     },
   });
 
-  // Delete custom filter mutation
+  // Delete filter mutation (para filtros customizados)
   const deleteFilterMutation = useMutation({
     mutationFn: async (filterId: string) => {
       const { error } = await supabase.from("custom_filters").delete().eq("id", filterId);
-
       if (error) throw error;
     },
     onSuccess: () => {
@@ -571,7 +619,27 @@ export default function Settings() {
         description: "Filtro removido com sucesso!",
       });
     },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao remover filtro",
+        variant: "destructive",
+      });
+    },
   });
+
+  // Função para remover filtro padrão (salvar no localStorage)
+  const removeDefaultFilter = (filterName: string, filterType: string) => {
+    const key = `${filterType}_${filterName}`;
+    const updated = [...removedDefaultFilters, key];
+    setRemovedDefaultFilters(updated);
+    localStorage.setItem(`removed_filters_${user?.id}`, JSON.stringify(updated));
+
+    toast({
+      title: "Sucesso",
+      description: "Filtro removido com sucesso!",
+    });
+  };
 
   const handleSaveProfile = async () => {
     await updateProfileMutation.mutateAsync();
@@ -615,6 +683,30 @@ export default function Settings() {
       });
       setNewTrafficSourceFilter("");
     }
+  };
+
+  // Função para abrir dialog de confirmação
+  const openDeleteDialog = (id: string, name: string, isDefault: boolean) => {
+    setFilterToDelete({ id, name, isDefault });
+    setDeleteDialogOpen(true);
+  };
+
+  // Função para confirmar remoção
+  const confirmDelete = () => {
+    if (filterToDelete) {
+      if (filterToDelete.isDefault) {
+        // Remover filtro padrão (localStorage)
+        const filterType = allPlatformFilters.some((f) => f.filter_value === filterToDelete.name)
+          ? "platform"
+          : "traffic_source";
+        removeDefaultFilter(filterToDelete.name, filterType);
+      } else {
+        // Remover filtro customizado (banco de dados)
+        deleteFilterMutation.mutate(filterToDelete.id);
+      }
+    }
+    setDeleteDialogOpen(false);
+    setFilterToDelete(null);
   };
 
   // Funções para gerenciar sons de alerta
@@ -1136,41 +1228,21 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      {/* Custom Filters */}
+      {/* Custom Filters - MANTIDO O LAYOUT ORIGINAL */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            Gerenciamento de Filtros
+            Criação de Filtros
           </CardTitle>
-          <CardDescription>Visualize e gerencie todos os filtros do sistema (padrão e customizados)</CardDescription>
+          <CardDescription>Crie filtros customizados para plataforma e fonte de tráfego</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {hasPermission("can_create_filters") && (
             <>
               {/* Platform Filters */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base">Plataformas</Label>
-                  <Badge variant="outline">{allPlatformFilters.length} filtros</Badge>
-                </div>
-
-                {/* Lista de todos os filtros de plataforma */}
-                <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
-                  {allPlatformFilters.map((filter) => (
-                    <Badge key={filter.id} variant={filter.is_default ? "default" : "secondary"} className="gap-1">
-                      {filter.filter_value}
-                      {!filter.is_default && (
-                        <X
-                          className="h-3 w-3 cursor-pointer hover:text-destructive"
-                          onClick={() => deleteFilterMutation.mutate(filter.id)}
-                        />
-                      )}
-                    </Badge>
-                  ))}
-                </div>
-
-                {/* Adicionar novo filtro */}
+                <Label>Plataformas</Label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="Nova plataforma"
@@ -1203,36 +1275,24 @@ export default function Settings() {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Filtros padrão (azul) não podem ser removidos. Filtros customizados (cinza) podem ser excluídos.
-                </p>
+                <div className="flex flex-wrap gap-2">
+                  {allPlatformFilters.map((filter) => (
+                    <Badge key={filter.id} variant="secondary" className="gap-1">
+                      {filter.filter_value}
+                      <X
+                        className="h-3 w-3 cursor-pointer hover:text-destructive"
+                        onClick={() => openDeleteDialog(filter.id, filter.filter_value, filter.is_default)}
+                      />
+                    </Badge>
+                  ))}
+                </div>
               </div>
 
               <Separator />
 
               {/* Traffic Source Filters */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base">Fontes de Tráfego</Label>
-                  <Badge variant="outline">{allTrafficSourceFilters.length} filtros</Badge>
-                </div>
-
-                {/* Lista de todos os filtros de fonte de tráfego */}
-                <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
-                  {allTrafficSourceFilters.map((filter) => (
-                    <Badge key={filter.id} variant={filter.is_default ? "default" : "secondary"} className="gap-1">
-                      {filter.filter_value}
-                      {!filter.is_default && (
-                        <X
-                          className="h-3 w-3 cursor-pointer hover:text-destructive"
-                          onClick={() => deleteFilterMutation.mutate(filter.id)}
-                        />
-                      )}
-                    </Badge>
-                  ))}
-                </div>
-
-                {/* Adicionar novo filtro */}
+                <Label>Fontes de Tráfego</Label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="Nova fonte de tráfego"
@@ -1267,9 +1327,17 @@ export default function Settings() {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Filtros padrão (azul) não podem ser removidos. Filtros customizados (cinza) podem ser excluídos.
-                </p>
+                <div className="flex flex-wrap gap-2">
+                  {allTrafficSourceFilters.map((filter) => (
+                    <Badge key={filter.id} variant="secondary" className="gap-1">
+                      {filter.filter_value}
+                      <X
+                        className="h-3 w-3 cursor-pointer hover:text-destructive"
+                        onClick={() => openDeleteDialog(filter.id, filter.filter_value, filter.is_default)}
+                      />
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </>
           )}
@@ -1278,6 +1346,36 @@ export default function Settings() {
 
       {/* Gerenciamento de Usuários */}
       <UserManagement />
+
+      {/* AlertDialog para confirmação de remoção */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+              <AlertDialogTitle>Confirmar Remoção</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover o filtro <strong>"{filterToDelete?.name}"</strong>?
+              {filterToDelete?.isDefault && (
+                <span className="block mt-2 text-orange-600 dark:text-orange-400">
+                  Este é um filtro padrão do sistema. Você poderá adicioná-lo novamente depois se necessário.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
