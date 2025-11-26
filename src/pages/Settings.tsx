@@ -218,11 +218,16 @@ export default function Settings() {
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
+      console.log("🔍 Buscando perfil para user ID:", user?.id);
+
       const { data, error } = await supabase
         .from("profiles")
         .select("full_name, whatsapp_number, alert_sound_preference")
         .eq("id", user?.id)
         .maybeSingle();
+
+      console.log("📦 Dados retornados da query:", data);
+      console.log("❌ Erro da query:", error);
 
       if (error) throw error;
       return data;
@@ -234,22 +239,39 @@ export default function Settings() {
 
   // useEffect para carregar dados do perfil quando profile mudar
   useEffect(() => {
+    console.log("🔄 useEffect do perfil disparado");
+    console.log("👤 User ID:", user?.id);
+    console.log("📋 Profile recebido:", profile);
+
     if (profile) {
+      console.log("✅ Profile existe, atualizando estados...");
+
       // Atualizar nome
+      console.log("📝 Nome do perfil:", profile.full_name);
       setFullName(profile.full_name || "");
 
       // Atualizar WhatsApp - SEMPRE setar o valor do banco (mesmo que seja null/undefined)
+      console.log("📱 WhatsApp do perfil:", profile.whatsapp_number);
       setWhatsappNumber(profile.whatsapp_number || "");
 
       // Atualizar som
+      console.log("🔊 Som do perfil:", profile.alert_sound_preference);
       setSelectedSound(profile.alert_sound_preference || "alert-4");
+    } else {
+      console.log("⚠️ Profile não existe ou está undefined");
     }
 
     // Atualizar email do auth
     if (user?.email) {
+      console.log("📧 Email do user:", user.email);
       setNewEmail(user.email);
     }
   }, [profile, user?.email, user?.id]); // Adicionado user?.id para recarregar quando usuário estiver pronto
+
+  // Debug: Log sempre que whatsappNumber mudar
+  useEffect(() => {
+    console.log("🔔 Estado whatsappNumber atualizado para:", whatsappNumber);
+  }, [whatsappNumber]);
 
   // Fetch notification settings
   const { data: notificationSettings } = useQuery({
@@ -375,6 +397,7 @@ export default function Settings() {
   // Handler para mudanças no input de WhatsApp
   const handleWhatsappChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    console.log("📱 Input WhatsApp alterado, valor atual:", value);
 
     // Se está vazio, deixar vazio (permite apagar tudo)
     if (value === "") {
@@ -1015,7 +1038,7 @@ export default function Settings() {
             <Label htmlFor="whatsapp">Número do WhatsApp</Label>
             <Input
               id="whatsapp"
-              placeholder="+55 19 98932-0129"
+              placeholder="+55 99 99999-9999"
               value={whatsappNumber}
               onChange={handleWhatsappChange}
               maxLength={20}
