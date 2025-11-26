@@ -248,7 +248,7 @@ export function UserManagement() {
       // ============================================================
       // PASSO 1: ENVIAR EMAIL PRIMEIRO (PRIORIDADE!)
       // ============================================================
-      const redirectUrl = `${window.location.origin}/auth/callback`;
+      const redirectUrl = `${window.location.origin}/accept-invite`;
 
       console.log("📧 ENVIANDO EMAIL VIA SUPABASE ADMIN...");
       const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
