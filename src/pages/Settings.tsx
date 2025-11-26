@@ -215,24 +215,41 @@ export default function Settings() {
   }, [queryClient, toast]);
 
   // Fetch profile data
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
+      console.log("🔄 Buscando profile do banco...");
       const { data, error } = await supabase
         .from("profiles")
         .select("full_name, whatsapp_number, alert_sound_preference")
         .eq("id", user?.id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Erro ao buscar profile:", error);
+        throw error;
+      }
+
+      console.log("✅ Profile retornado do banco:", data);
       return data;
     },
     enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutos - mantém os dados frescos
+    refetchOnWindowFocus: false, // Não refaz a busca ao focar na janela
   });
 
   // useEffect para carregar dados do perfil quando profile mudar
   useEffect(() => {
+    console.log("🔍 useEffect disparou - Profile:", profile);
+    console.log("🔍 Loading:", profileLoading);
+
     if (profile) {
+      console.log("✅ Setando dados do perfil:", {
+        fullName: profile.full_name,
+        whatsapp: profile.whatsapp_number,
+        sound: profile.alert_sound_preference,
+      });
+
       setFullName(profile.full_name || "");
 
       // Garantir que sempre tenha +55
@@ -248,13 +265,15 @@ export default function Settings() {
       }
 
       setSelectedSound(profile.alert_sound_preference || "alert-4");
+    } else {
+      console.log("❌ Profile está vazio/undefined");
     }
 
     // Atualizar email do auth
     if (user?.email) {
       setNewEmail(user.email);
     }
-  }, [profile, user?.email]);
+  }, [profile, user?.email, profileLoading]);
 
   // Fetch notification settings
   const { data: notificationSettings } = useQuery({
@@ -333,6 +352,27 @@ export default function Settings() {
   // Para compatibilidade com o código existente que usa platformFilters e trafficSourceFilters
   const platformFilters = customPlatformFilters;
   const trafficSourceFilters = customTrafficSourceFilters;
+
+  // Função para pegar o valor correto do WhatsApp (do estado ou do profile)
+  const getCurrentWhatsAppValue = (): string => {
+    // Se já tem valor no estado e não é só "+55 ", usar o estado
+    if (whatsappNumber && whatsappNumber !== "+55 ") {
+      return whatsappNumber;
+    }
+
+    // Senão, tentar pegar do profile
+    if (profile?.whatsapp_number) {
+      const cleanNumber = profile.whatsapp_number.replace(/\D/g, "");
+      if (cleanNumber.startsWith("55")) {
+        return `+${cleanNumber}`;
+      } else {
+        return `+55${cleanNumber}`;
+      }
+    }
+
+    // Valor padrão
+    return "+55 ";
+  };
 
   // Validar número de WhatsApp em tempo real
 
@@ -855,7 +895,7 @@ export default function Settings() {
             <Input
               id="name"
               placeholder="Digite seu nome"
-              value={fullName}
+              value={fullName || profile?.full_name || ""}
               onChange={(e) => setFullName(e.target.value)}
             />
           </div>
@@ -1008,7 +1048,7 @@ export default function Settings() {
             <Input
               id="whatsapp"
               placeholder="+55 19 98932-0129"
-              value={whatsappNumber}
+              value={getCurrentWhatsAppValue()}
               onChange={handleWhatsappChange}
               maxLength={19}
             />
@@ -1343,7 +1383,7 @@ export default function Settings() {
               Tem certeza que deseja remover o filtro <strong>"{filterToDelete?.name}"</strong>?
               {filterToDelete?.isDefault && (
                 <span className="block mt-2 text-orange-600 dark:text-orange-400">
-                  Este é um filtro padrão do sistema. Você poderá adicioná-lo novamente depois se necessário.
+                  ⚠️ Este é um filtro padrão do sistema. Você poderá adicioná-lo novamente depois se necessário.
                 </span>
               )}
             </AlertDialogDescription>
