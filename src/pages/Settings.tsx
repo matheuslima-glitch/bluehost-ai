@@ -242,13 +242,9 @@ export default function Settings() {
       }
 
       // Só atualizar whatsappNumber se o profile tiver um valor
-      if (profile.whatsapp_number) {
-        const cleanNumber = profile.whatsapp_number.replace(/\D/g, "");
-        if (cleanNumber.startsWith("55")) {
-          setWhatsappNumber(`+${cleanNumber}`);
-        } else {
-          setWhatsappNumber(`+55${cleanNumber}`);
-        }
+      // IMPORTANTE: Usar o valor DIRETO do banco (já vem formatado: "+55 11 99999-9999")
+      if (profile.whatsapp_number && profile.whatsapp_number !== "+55 ") {
+        setWhatsappNumber(profile.whatsapp_number);
       }
 
       // Só atualizar selectedSound se o profile tiver um valor
@@ -1350,7 +1346,7 @@ export default function Settings() {
               Tem certeza que deseja remover o filtro <strong>"{filterToDelete?.name}"</strong>?
               {filterToDelete?.isDefault && (
                 <span className="block mt-2 text-orange-600 dark:text-orange-400">
-                  Este é um filtro padrão do sistema. Você poderá adicioná-lo novamente depois se necessário.
+                  ⚠️ Este é um filtro padrão do sistema. Você poderá adicioná-lo novamente depois se necessário.
                 </span>
               )}
             </AlertDialogDescription>
