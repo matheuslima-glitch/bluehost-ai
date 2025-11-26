@@ -92,6 +92,7 @@ export default function Settings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isEditingWhatsApp, setIsEditingWhatsApp] = useState(false);
 
   // Estados para o AlertDialog de confirmação de remoção
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -241,9 +242,8 @@ export default function Settings() {
         setFullName(profile.full_name || "");
       }
 
-      // Só atualizar whatsappNumber se o profile tiver um valor
-      // IMPORTANTE: Usar o valor DIRETO do banco (já vem formatado: "+55 11 99999-9999")
-      if (profile.whatsapp_number && profile.whatsapp_number !== "+55 ") {
+      // Só atualizar whatsappNumber se NÃO estiver editando e o profile tiver um valor
+      if (!isEditingWhatsApp && profile.whatsapp_number && profile.whatsapp_number !== "+55 ") {
         setWhatsappNumber(profile.whatsapp_number);
       }
 
@@ -257,7 +257,7 @@ export default function Settings() {
     if (user?.email) {
       setNewEmail(user.email);
     }
-  }, [profile, user?.email]);
+  }, [profile, user?.email, isEditingWhatsApp]);
 
   // Fetch notification settings
   const { data: notificationSettings } = useQuery({
@@ -380,8 +380,12 @@ export default function Settings() {
   };
 
   // Handler para mudanças no input de WhatsApp
+  // Handler para mudanças no input de WhatsApp
   const handleWhatsappChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+
+    // Marcar que usuário está editando
+    setIsEditingWhatsApp(true);
 
     // Impedir que o usuário apague o +55
     if (value.length < 3) {
@@ -436,6 +440,7 @@ export default function Settings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      setIsEditingWhatsApp(false); // Parar de editar após salvar
       toast({
         title: "Sucesso",
         description: "Número do WhatsApp atualizado com sucesso!",
@@ -1011,9 +1016,9 @@ export default function Settings() {
             <Input
               id="whatsapp"
               placeholder="+55 19 98932-0129"
-              value={whatsappNumber && whatsappNumber !== "+55 " ? whatsappNumber : profile?.whatsapp_number || "+55 "}
+              value={isEditingWhatsApp ? whatsappNumber : profile?.whatsapp_number || whatsappNumber}
               onChange={handleWhatsappChange}
-              maxLength={19}
+              maxLength={20}
             />
             <p className="text-sm text-muted-foreground">
               💡 Ao salvar, você receberá uma mensagem de teste com os alertas dos seus domínios
