@@ -58,11 +58,22 @@ const TIMEOUT_SECONDS = 180000;
 const MIN_DISPLAY_TIME = 800;
 const MAX_DOMAINS = 10; // LIMITE MÁXIMO
 
+// Fontes de tráfego padrão
+const DEFAULT_TRAFFIC_SOURCES = [
+  { value: "facebook", label: "Facebook" },
+  { value: "google", label: "Google" },
+  { value: "native", label: "Native" },
+  { value: "outbrain", label: "Outbrain" },
+  { value: "taboola", label: "Taboola" },
+  { value: "revcontent", label: "RevContent" },
+];
+
 export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: PurchaseWithAIDialogProps) {
   const [quantity, setQuantity] = useState<number>(1);
   const [niche, setNiche] = useState("");
   const [language, setLanguage] = useState("portuguese");
   const [platform, setPlatform] = useState<"wordpress" | "atomicat">("wordpress");
+  const [trafficSource, setTrafficSource] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [currentProgress, setCurrentProgress] = useState<PurchaseProgress | null>(null);
   const [showProgress, setShowProgress] = useState(false);
@@ -78,6 +89,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const updateQueueRef = useRef<PurchaseProgress[]>([]);
   const processingRef = useRef<boolean>(false);
   const lastUpdateTimeRef = useRef<number>(0);
+  const purchasedDomainsRef = useRef<string[]>([]); // Ref para manter domínios atualizados
 
   useEffect(() => {
     if (open) {
@@ -85,7 +97,9 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       setProgressPercentage(0);
       setShowProgress(false);
       setPurchasedDomains([]); // Limpar lista
+      purchasedDomainsRef.current = []; // Limpar ref também
       setShowSuccessDialog(false);
+      setTrafficSource(""); // Limpar fonte de tráfego
       updateQueueRef.current = [];
       processingRef.current = false;
       lastUpdateTimeRef.current = 0;
@@ -141,7 +155,9 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
         if (update.status === "completed" && update.domain_name) {
           setPurchasedDomains((prev) => {
             if (!prev.includes(update.domain_name!)) {
-              return [...prev, update.domain_name!];
+              const newList = [...prev, update.domain_name!];
+              purchasedDomainsRef.current = newList; // Atualizar ref também
+              return newList;
             }
             return prev;
           });
@@ -177,7 +193,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       timeoutRef.current = null;
     }
 
-    if (success && purchasedDomains.length > 0) {
+    // Usar a ref para verificar domínios (evita problema de estado assíncrono)
+    if (success && purchasedDomainsRef.current.length > 0) {
       setShowSuccessDialog(true);
       setShowProgress(false);
     } else {
@@ -201,6 +218,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const handleGenerate = async () => {
     if (!niche.trim()) {
       toast.error("Por favor, insira o nicho");
+      return;
+    }
+
+    if (!trafficSource) {
+      toast.error("Por favor, selecione a fonte de tráfego");
       return;
     }
 
@@ -230,6 +252,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
     setCurrentProgress(null);
     setProgressPercentage(0);
     setPurchasedDomains([]); // Limpar lista ao iniciar
+    purchasedDomainsRef.current = []; // Limpar ref também
     updateQueueRef.current = [];
     processingRef.current = false;
     lastUpdateTimeRef.current = Date.now();
@@ -246,10 +269,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          nicho: niche, // Mapeamento inglês → português
-          quantidade: quantity, // Mapeamento inglês → português
-          idioma: language, // Mapeamento inglês → português
-          plataforma: platform, // Mapeamento inglês → português
+          nicho: niche,
+          quantidade: quantity,
+          idioma: language,
+          plataforma: platform,
+          trafficSource: trafficSource, // Adicionado fonte de tráfego
         }),
       });
 
@@ -310,10 +334,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const resetForm = () => {
     setQuantity(1);
     setNiche("");
+    setTrafficSource(""); // Limpar fonte de tráfego
     setCurrentProgress(null);
     setProgressPercentage(0);
     setShowProgress(false);
     setPurchasedDomains([]);
+    purchasedDomainsRef.current = []; // Limpar ref também
     setShowSuccessDialog(false);
     setCurrentSessionId(null);
   };
@@ -324,7 +350,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
 
     try {
       // Chamar endpoint de cancelamento no backend
-      const response = await fetch("/api/domains/cancel", {
+      const apiUrl = import.meta.env.VITE_API_URL || "https://domainhub-backend.onrender.com";
+
+      console.log(`🛑 Solicitando cancelamento para sessão: ${currentSessionId}`);
+
+      const response = await fetch(`${apiUrl}/api/purchase-domains/cancel`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -337,6 +367,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       const data = await response.json();
 
       if (data.success) {
+        console.log(`✅ Cancelamento confirmado pelo servidor`);
         toast.warning("🛑 Compra cancelada! Domínios já comprados não serão revertidos.", {
           duration: 5000,
         });
@@ -494,11 +525,32 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="trafficSource">Fonte de Tráfego *</Label>
+                <Select value={trafficSource} onValueChange={setTrafficSource} disabled={loading}>
+                  <SelectTrigger id="trafficSource">
+                    <SelectValue placeholder="Selecione a fonte de tráfego" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEFAULT_TRAFFIC_SOURCES.map((source) => (
+                      <SelectItem key={source.value} value={source.value}>
+                        {source.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Origem do tráfego para os domínios</p>
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" onClick={handleClose} disabled={loading} className="flex-1">
                   Cancelar
                 </Button>
-                <Button onClick={handleGenerate} disabled={loading || !isQuantityValid} className="flex-1">
+                <Button
+                  onClick={handleGenerate}
+                  disabled={loading || !isQuantityValid || !trafficSource}
+                  className="flex-1"
+                >
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
