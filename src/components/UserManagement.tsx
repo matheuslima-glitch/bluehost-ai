@@ -227,6 +227,9 @@ export function UserManagement() {
     },
   });
 
+  // ============================================================
+  // MUTATION DE CONVITE - OPÇÃO 1 (EMAIL PRIMEIRO)
+  // ============================================================
   const inviteMutation = useMutation({
     mutationFn: async ({
       email,
@@ -237,45 +240,102 @@ export function UserManagement() {
       isAdmin: boolean;
       permissions: Partial<UserPermission>;
     }) => {
-      const { data: saveData, error: saveError } = await supabase.rpc("save_invitation_with_permissions", {
-        p_email: email,
-        p_invited_by: user?.id,
-        p_is_admin: isAdmin,
-        p_permissions: permissions,
-      });
+      console.log("🚀 INICIANDO ENVIO DE CONVITE");
+      console.log("📧 Email:", email);
+      console.log("👤 Is Admin:", isAdmin);
+      console.log("🔐 Permissions:", permissions);
 
-      if (saveError || !saveData?.success) {
-        throw new Error(saveData?.error || saveError?.message || "Erro ao salvar convite");
-      }
-
+      // ============================================================
+      // PASSO 1: ENVIAR EMAIL PRIMEIRO (PRIORIDADE!)
+      // ============================================================
       const redirectUrl = `${window.location.origin}/auth/callback`;
-      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+
+      console.log("📧 ENVIANDO EMAIL VIA SUPABASE ADMIN...");
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         redirectTo: redirectUrl,
       });
 
-      if (error) {
+      console.log("📬 Resultado inviteUserByEmail:");
+      console.log("  - Data:", inviteData);
+      console.log("  - Error:", inviteError);
+
+      // Verificar erros conhecidos
+      if (inviteError) {
+        const errorMsg = inviteError.message || "";
+
+        // Erros que são OK (usuário já existe)
         if (
-          error.message?.includes("Database error saving new user") ||
-          error.message?.includes("User already registered") ||
-          error.message?.includes("already been invited")
+          errorMsg.includes("User already registered") ||
+          errorMsg.includes("already been invited") ||
+          errorMsg.includes("Database error saving new user")
         ) {
-          return {
-            success: true,
-            emailSent: false,
-            message: "Convite atualizado! O usuário já foi convidado anteriormente.",
-          };
+          console.warn("⚠️ Usuário já existe, mas continuando para salvar permissões...");
+          // Não retorna erro - continua para salvar permissões
+        } else {
+          // Erro real - lançar exceção
+          console.error("❌ ERRO ao enviar email:", inviteError);
+          throw new Error(`Erro ao enviar convite: ${errorMsg}`);
         }
-        throw error;
+      } else {
+        console.log("✅ EMAIL ENVIADO COM SUCESSO!");
       }
 
-      return { success: true, emailSent: true, data: data };
-    },
-    onSuccess: (result: any) => {
-      const message = result?.emailSent
-        ? "Convite enviado com sucesso! O usuário receberá um e-mail."
-        : result?.message || "Convite atualizado com sucesso!";
+      // ============================================================
+      // PASSO 2: SALVAR PERMISSÕES (BEST EFFORT)
+      // ============================================================
+      // Se falhar aqui, não impede que email tenha sido enviado
 
-      toast({ title: "Sucesso!", description: message });
+      console.log("💾 Salvando permissões em invitations...");
+
+      try {
+        const { data: saveData, error: saveError } = await supabase.rpc("save_invitation_with_permissions", {
+          p_email: email,
+          p_invited_by: user?.id,
+          p_is_admin: isAdmin,
+          p_permissions: permissions,
+        });
+
+        if (saveError) {
+          console.warn("⚠️ Erro ao salvar invitations:", saveError);
+          // NÃO lança erro - email já foi enviado!
+        } else if (!saveData?.success) {
+          console.warn("⚠️ Função retornou falha:", saveData);
+          // NÃO lança erro - email já foi enviado!
+        } else {
+          console.log("✅ Permissões salvas com sucesso!");
+          console.log("🎫 Token gerado:", saveData.token);
+        }
+      } catch (catchError: any) {
+        console.warn("⚠️ Exceção ao salvar invitations:", catchError);
+        // NÃO lança erro - email já foi enviado!
+      }
+
+      // ============================================================
+      // RETORNAR SUCESSO
+      // ============================================================
+      const wasEmailSent =
+        !inviteError ||
+        inviteError.message?.includes("already been invited") ||
+        inviteError.message?.includes("User already registered");
+
+      return {
+        success: true,
+        emailSent: wasEmailSent,
+        data: inviteData,
+        message: wasEmailSent
+          ? "Convite enviado com sucesso! O usuário receberá um e-mail."
+          : "Convite atualizado! O usuário já foi convidado anteriormente.",
+      };
+    },
+
+    onSuccess: (result: any) => {
+      console.log("🎉 SUCESSO GERAL:", result);
+
+      toast({
+        title: "Sucesso!",
+        description: result.message || "Convite processado com sucesso!",
+      });
+
       setInviteEmail("");
       setInvitePermissionsDialogOpen(false);
       setInviteDialogOpen(false);
@@ -283,7 +343,12 @@ export function UserManagement() {
       setInvitePermissions(DEFAULT_PERMISSIONS);
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
     },
+
     onError: (error: any) => {
+      console.error("❌ ERRO GERAL:", error);
+      console.error("  - Message:", error.message);
+      console.error("  - Stack:", error.stack);
+
       toast({
         title: "Erro ao enviar convite",
         description: error.message || "Ocorreu um erro ao processar o convite",
@@ -350,7 +415,13 @@ export function UserManagement() {
   });
 
   const handleSendInvite = () => {
+    console.log("🎯 handleSendInvite chamado");
+    console.log("📧 Email:", inviteEmail);
+    console.log("👤 Make Admin:", makeAdmin);
+    console.log("🔐 Permissions:", invitePermissions);
+
     if (!inviteEmail) {
+      console.warn("⚠️ Email vazio!");
       toast({
         title: "Email obrigatório",
         description: "Por favor, insira um email válido",
@@ -359,6 +430,7 @@ export function UserManagement() {
       return;
     }
 
+    console.log("✅ Validação OK, chamando mutation...");
     inviteMutation.mutate({ email: inviteEmail, isAdmin: makeAdmin, permissions: invitePermissions });
   };
 
