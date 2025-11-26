@@ -24,6 +24,10 @@ interface ManualPurchaseDialogProps {
   onSuccess?: () => void;
 }
 
+// Filtros padrão do sistema
+const DEFAULT_PLATFORM_OPTIONS = ["wordpress", "atomicat"];
+const DEFAULT_TRAFFIC_SOURCE_OPTIONS = ["facebook", "google", "native", "outbrain", "taboola", "revcontent"];
+
 export default function ManualPurchaseDialog({
   open,
   onOpenChange,
@@ -54,14 +58,15 @@ export default function ManualPurchaseDialog({
     enabled: !!user?.id && open,
   });
 
-  // Combine default and custom traffic sources
+  // Combinar filtros padrão e customizados para plataformas
+  const platformOptions = [
+    ...DEFAULT_PLATFORM_OPTIONS,
+    ...customFilters.filter((f) => f.filter_type === "platform").map((f) => f.filter_value),
+  ];
+
+  // Combinar filtros padrão e customizados para fontes de tráfego
   const trafficSourceOptions = [
-    "facebook",
-    "google",
-    "native",
-    "outbrain",
-    "taboola",
-    "revcontent",
+    ...DEFAULT_TRAFFIC_SOURCE_OPTIONS,
     ...customFilters.filter((f) => f.filter_type === "traffic_source").map((f) => f.filter_value),
   ];
 
@@ -225,8 +230,8 @@ export default function ManualPurchaseDialog({
   };
 
   // Função para formatar o nome da fonte de tráfego para exibição
-  const formatTrafficSourceLabel = (source: string) => {
-    return source.charAt(0).toUpperCase() + source.slice(1);
+  const formatLabel = (value: string) => {
+    return value.charAt(0).toUpperCase() + value.slice(1);
   };
 
   // Função para calcular a porcentagem do progresso baseado no step do backend
@@ -301,8 +306,11 @@ export default function ManualPurchaseDialog({
                   <SelectValue placeholder="Selecione a plataforma" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="wordpress">WordPress</SelectItem>
-                  <SelectItem value="atomicat">AtomiCat</SelectItem>
+                  {platformOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {formatLabel(option)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">Estrutura do site que será criado após a compra</p>
@@ -318,7 +326,7 @@ export default function ManualPurchaseDialog({
                 <SelectContent>
                   {trafficSourceOptions.map((source) => (
                     <SelectItem key={source} value={source}>
-                      {formatTrafficSourceLabel(source)}
+                      {formatLabel(source)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -337,8 +345,7 @@ export default function ManualPurchaseDialog({
                   <span className="text-muted-foreground">Preço:</span> <strong>${price}</strong>
                 </p>
                 <p>
-                  <span className="text-muted-foreground">Plataforma:</span>{" "}
-                  <strong>{platform === "wordpress" ? "WordPress" : "AtomiCat"}</strong>
+                  <span className="text-muted-foreground">Plataforma:</span> <strong>{formatLabel(platform)}</strong>
                 </p>
               </div>
             </div>

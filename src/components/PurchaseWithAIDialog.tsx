@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface PurchaseProgress {
   step: string;
@@ -58,17 +60,12 @@ const TIMEOUT_SECONDS = 180000;
 const MIN_DISPLAY_TIME = 800;
 const MAX_DOMAINS = 10; // LIMITE MÁXIMO
 
-// Fontes de tráfego padrão
-const DEFAULT_TRAFFIC_SOURCES = [
-  { value: "facebook", label: "Facebook" },
-  { value: "google", label: "Google" },
-  { value: "native", label: "Native" },
-  { value: "outbrain", label: "Outbrain" },
-  { value: "taboola", label: "Taboola" },
-  { value: "revcontent", label: "RevContent" },
-];
+// Filtros padrão do sistema
+const DEFAULT_PLATFORM_OPTIONS = ["wordpress", "atomicat"];
+const DEFAULT_TRAFFIC_SOURCE_OPTIONS = ["facebook", "google", "native", "outbrain", "taboola", "revcontent"];
 
 export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: PurchaseWithAIDialogProps) {
+  const { user } = useAuth();
   const [quantity, setQuantity] = useState<number>(1);
   const [niche, setNiche] = useState("");
   const [language, setLanguage] = useState("portuguese");
@@ -90,6 +87,34 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   const processingRef = useRef<boolean>(false);
   const lastUpdateTimeRef = useRef<number>(0);
   const purchasedDomainsRef = useRef<string[]>([]); // Ref para manter domínios atualizados
+
+  // Fetch custom filters from database
+  const { data: customFilters = [] } = useQuery({
+    queryKey: ["custom-filters", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("custom_filters")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id && open,
+  });
+
+  // Combinar filtros padrão e customizados para plataformas
+  const platformOptions = [
+    ...DEFAULT_PLATFORM_OPTIONS,
+    ...customFilters.filter((f) => f.filter_type === "platform").map((f) => f.filter_value),
+  ];
+
+  // Combinar filtros padrão e customizados para fontes de tráfego
+  const trafficSourceOptions = [
+    ...DEFAULT_TRAFFIC_SOURCE_OPTIONS,
+    ...customFilters.filter((f) => f.filter_type === "traffic_source").map((f) => f.filter_value),
+  ];
 
   useEffect(() => {
     if (open) {
@@ -449,6 +474,11 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
   // Verificar se quantidade é válida
   const isQuantityValid = quantity >= 1 && quantity <= MAX_DOMAINS;
 
+  // Função para formatar labels
+  const formatLabel = (value: string) => {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  };
+
   return (
     <>
       {/* POPUP DE CONFIGURAÇÃO E PROGRESSO */}
@@ -517,10 +547,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                   <SelectTrigger id="platform">
                     <SelectValue />
                   </SelectTrigger>
-
                   <SelectContent>
-                    <SelectItem value="wordpress">WordPress</SelectItem>
-                    <SelectItem value="atomicat">AtomiCat</SelectItem>
+                    {platformOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {formatLabel(option)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -532,9 +564,9 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
                     <SelectValue placeholder="Selecione a fonte de tráfego" />
                   </SelectTrigger>
                   <SelectContent>
-                    {DEFAULT_TRAFFIC_SOURCES.map((source) => (
-                      <SelectItem key={source.value} value={source.value}>
-                        {source.label}
+                    {trafficSourceOptions.map((source) => (
+                      <SelectItem key={source} value={source}>
+                        {formatLabel(source)}
                       </SelectItem>
                     ))}
                   </SelectContent>

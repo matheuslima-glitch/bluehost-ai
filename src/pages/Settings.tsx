@@ -54,6 +54,10 @@ const DAILY_FREQUENCIES = [
   { value: 3, label: "3x por dia" },
 ];
 
+// FILTROS PADRÃO DO SISTEMA
+const DEFAULT_PLATFORM_FILTERS = ["wordpress", "atomicat"];
+const DEFAULT_TRAFFIC_SOURCE_FILTERS = ["facebook", "google", "native", "outbrain", "taboola", "revcontent"];
+
 export default function Settings() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -258,9 +262,24 @@ export default function Settings() {
     enabled: !!user?.id,
   });
 
-  // Separar filtros por tipo
-  const platformFilters = customFilters.filter((f) => f.filter_type === "platform");
-  const trafficSourceFilters = customFilters.filter((f) => f.filter_type === "traffic_source");
+  // Separar filtros customizados por tipo
+  const customPlatformFilters = customFilters.filter((f) => f.filter_type === "platform");
+  const customTrafficSourceFilters = customFilters.filter((f) => f.filter_type === "traffic_source");
+
+  // COMBINAR FILTROS PADRÃO E CUSTOMIZADOS (para exibição)
+  const allPlatformFilters = [
+    ...DEFAULT_PLATFORM_FILTERS.map((value) => ({ id: `default_${value}`, filter_value: value, is_default: true })),
+    ...customPlatformFilters.map((f) => ({ ...f, is_default: false })),
+  ];
+
+  const allTrafficSourceFilters = [
+    ...DEFAULT_TRAFFIC_SOURCE_FILTERS.map((value) => ({
+      id: `default_${value}`,
+      filter_value: value,
+      is_default: true,
+    })),
+    ...customTrafficSourceFilters.map((f) => ({ ...f, is_default: false })),
+  ];
 
   // Validar número de WhatsApp em tempo real
 
@@ -399,8 +418,6 @@ export default function Settings() {
         title: "Verificação enviada!",
         description: "Verifique seu NOVO e-mail para confirmar a alteração. O link de confirmação expira em 24 horas.",
       });
-
-      // Não invalida as queries ainda, isso será feito após a confirmação
     },
     onError: (error: any) => {
       toast({
@@ -414,13 +431,13 @@ export default function Settings() {
   // Update password mutation
   const updatePasswordMutation = useMutation({
     mutationFn: async () => {
-      // Validações
+      // Validar senha atual
       if (!currentPassword) {
-        throw new Error("Por favor, digite sua senha atual");
+        throw new Error("Digite sua senha atual");
       }
 
       if (!newPassword || !confirmPassword) {
-        throw new Error("Por favor, preencha todos os campos de senha");
+        throw new Error("Digite a nova senha e confirmação");
       }
 
       if (newPassword !== confirmPassword) {
@@ -428,10 +445,10 @@ export default function Settings() {
       }
 
       if (newPassword.length < 6) {
-        throw new Error("A senha deve ter pelo menos 6 caracteres");
+        throw new Error("A nova senha deve ter pelo menos 6 caracteres");
       }
 
-      // Primeiro, validar a senha atual fazendo login
+      // Verificar senha atual
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user?.email || "",
         password: currentPassword,
@@ -441,12 +458,12 @@ export default function Settings() {
         throw new Error("Senha atual incorreta");
       }
 
-      // Se a senha atual estiver correta, atualizar para a nova senha
-      const { error } = await supabase.auth.updateUser({
+      // Atualizar senha
+      const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
-      if (error) throw error;
+      if (updateError) throw updateError;
     },
     onSuccess: () => {
       setCurrentPassword("");
@@ -493,13 +510,33 @@ export default function Settings() {
     },
   });
 
-  // Add custom filter mutation
+  // Add custom filter mutation com validação de duplicatas
   const addFilterMutation = useMutation({
     mutationFn: async ({ filter_type, filter_value }: { filter_type: string; filter_value: string }) => {
+      const normalizedValue = filter_value.trim().toLowerCase();
+
+      // Verificar se já existe nos filtros padrão
+      if (filter_type === "platform" && DEFAULT_PLATFORM_FILTERS.some((f) => f.toLowerCase() === normalizedValue)) {
+        throw new Error("Este filtro já existe como filtro padrão do sistema");
+      }
+
+      if (
+        filter_type === "traffic_source" &&
+        DEFAULT_TRAFFIC_SOURCE_FILTERS.some((f) => f.toLowerCase() === normalizedValue)
+      ) {
+        throw new Error("Este filtro já existe como filtro padrão do sistema");
+      }
+
+      // Verificar se já existe nos filtros customizados
+      const existingCustomFilters = customFilters.filter((f) => f.filter_type === filter_type);
+      if (existingCustomFilters.some((f) => f.filter_value.toLowerCase() === normalizedValue)) {
+        throw new Error("Este filtro customizado já existe");
+      }
+
       const { error } = await supabase.from("custom_filters").insert({
         user_id: user?.id,
         filter_type,
-        filter_value,
+        filter_value: filter_value.trim(),
       });
 
       if (error) throw error;
@@ -511,10 +548,10 @@ export default function Settings() {
         description: "Filtro adicionado com sucesso!",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao adicionar filtro ou filtro já existe",
+        description: error.message || "Erro ao adicionar filtro",
         variant: "destructive",
       });
     },
@@ -648,37 +685,38 @@ export default function Settings() {
     }
 
     // Salvar WhatsApp primeiro
-    try {
-      await updateWhatsAppMutation.mutateAsync();
-    } catch (error) {
-      console.error("Erro ao salvar WhatsApp:", error);
+    if (!whatsappNumber || whatsappNumber === "+55 ") {
+      toast({
+        title: "Atenção",
+        description: "Digite um número de WhatsApp válido antes de salvar as configurações",
+        variant: "destructive",
+      });
       return;
     }
 
-    // Salvar configurações de recorrência
-    updateNotificationMutation.mutate({
-      alert_suspended: notificationSettings?.alert_suspended || false,
-      alert_expired: notificationSettings?.alert_expired || false,
-      alert_expiring_soon: notificationSettings?.alert_expiring_soon || false,
-      notification_days: selectedDays,
-      notification_interval_hours: selectedInterval,
-      notification_frequency: selectedFrequency,
-    });
+    try {
+      // Atualizar WhatsApp
+      await updateWhatsAppMutation.mutateAsync();
 
-    // Enviar notificação de teste se tem WhatsApp configurado
-    if (whatsappNumber && whatsappNumber.length > 10) {
-      toast({
-        title: "Enviando notificação de teste...",
-        description: "Aguarde alguns instantes",
+      // Atualizar configurações de recorrência
+      await updateNotificationMutation.mutateAsync({
+        alert_suspended: notificationSettings?.alert_suspended ?? false,
+        alert_expired: notificationSettings?.alert_expired ?? false,
+        alert_expiring_soon: notificationSettings?.alert_expiring_soon ?? false,
+        notification_days: selectedDays,
+        notification_interval_hours: selectedInterval,
+        notification_frequency: selectedFrequency,
       });
 
+      // Enviar notificação de teste via API Node.js
       try {
-        const response = await fetch(`${API_URL}/api/whatsapp/send-test-alert`, {
+        const response = await fetch(`${API_URL}/api/test-notification`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            phoneNumber: whatsappNumber,
             userId: user?.id,
           }),
         });
@@ -687,162 +725,190 @@ export default function Settings() {
 
         if (data.success) {
           toast({
-            title: "✅ Notificação enviada!",
-            description: `Verifique seu WhatsApp! ${data.alertsSent || 0} alerta(s) enviado(s)`,
+            title: "✅ Configurações Salvas!",
+            description: "Uma mensagem de teste foi enviada para seu WhatsApp!",
           });
         } else {
-          toast({
-            title: "Erro ao enviar notificação",
-            description: data.message || "Tente novamente mais tarde",
-            variant: "destructive",
-          });
+          throw new Error(data.error || "Erro ao enviar notificação");
         }
-      } catch (error) {
-        console.error("Erro ao enviar notificação de teste:", error);
+      } catch (apiError: any) {
+        console.error("Erro ao enviar notificação de teste:", apiError);
         toast({
-          title: "Erro ao enviar notificação",
-          description: "Verifique se o número está correto e tente novamente",
+          title: "⚠️ Configurações Salvas",
+          description: "Configurações salvas, mas não foi possível enviar notificação de teste",
           variant: "destructive",
         });
       }
+    } catch (error) {
+      console.error("Erro ao salvar configurações:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar configurações de recorrência",
+        variant: "destructive",
+      });
     }
   };
 
   return (
-    <div className="container max-w-5xl mx-auto py-10 space-y-6">
-      {/* Profile Settings */}
+    <div className="space-y-6 pb-16">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
+          <p className="text-muted-foreground">Gerencie suas preferências e configurações da conta</p>
+        </div>
+      </div>
+
+      {/* Profile Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
             Perfil
           </CardTitle>
-          <CardDescription>Gerencie suas informações pessoais</CardDescription>
+          <CardDescription>Informações básicas da sua conta</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nome Completo</Label>
+            <Label htmlFor="fullName">Nome Completo</Label>
             <Input
-              id="name"
-              placeholder="Digite seu nome"
+              id="fullName"
+              placeholder="Seu nome completo"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />
           </div>
-          <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
-            {updateProfileMutation.isPending ? "Salvando..." : "Salvar Nome"}
-          </Button>
+          <Button onClick={handleSaveProfile}>Salvar Nome</Button>
+        </CardContent>
+      </Card>
 
-          <Separator className="my-6" />
-
+      {/* WhatsApp Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            WhatsApp
+          </CardTitle>
+          <CardDescription>Número para receber notificações via WhatsApp</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">E-mail</Label>
+            <Label htmlFor="whatsappNumber">Número do WhatsApp</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="Digite seu novo e-mail"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
+              id="whatsappNumber"
+              type="tel"
+              placeholder="+55 11 91234-5678"
+              value={whatsappNumber}
+              onChange={handleWhatsappChange}
+              maxLength={20}
             />
+            <p className="text-sm text-muted-foreground">Formato: +55 DDD 9XXXX-XXXX</p>
           </div>
-          <Button onClick={handleUpdateEmail} disabled={updateEmailMutation.isPending}>
-            {updateEmailMutation.isPending ? "Atualizando..." : "Atualizar E-mail"}
-          </Button>
+          <Button onClick={handleSaveWhatsApp}>Salvar WhatsApp</Button>
+        </CardContent>
+      </Card>
 
-          <Separator className="my-6" />
-
+      {/* Email and Password Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            E-mail e Senha
+          </CardTitle>
+          <CardDescription>Altere seu e-mail ou senha de acesso</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Email Section */}
           <div className="space-y-4">
-            <div className="space-y-1">
-              <h3 className="text-lg font-semibold">Redefinir Senha</h3>
-              <p className="text-sm text-muted-foreground">
-                Para sua segurança, insira sua senha atual antes de definir uma nova senha.
+            <div className="space-y-2">
+              <Label htmlFor="currentEmail">E-mail Atual</Label>
+              <Input id="currentEmail" type="email" value={user?.email || ""} disabled />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newEmail">Novo E-mail</Label>
+              <Input
+                id="newEmail"
+                type="email"
+                placeholder="novo@email.com"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Você receberá um link de confirmação no NOVO e-mail. Clique no link para confirmar a alteração.
               </p>
             </div>
+            <Button onClick={handleUpdateEmail}>Alterar E-mail</Button>
+          </div>
 
+          <Separator />
+
+          {/* Password Section */}
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="current-password">Senha Atual</Label>
+              <Label htmlFor="currentPassword">Senha Atual</Label>
               <div className="relative">
                 <Input
-                  id="current-password"
+                  id="currentPassword"
                   type={showCurrentPassword ? "text" : "password"}
-                  placeholder="Digite sua senha atual"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="pr-10"
                 />
-                <button
+                <Button
                   type="button"
-                  onMouseDown={() => setShowCurrentPassword(true)}
-                  onMouseUp={() => setShowCurrentPassword(false)}
-                  onMouseLeave={() => setShowCurrentPassword(false)}
-                  onTouchStart={() => setShowCurrentPassword(true)}
-                  onTouchEnd={() => setShowCurrentPassword(false)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                 >
                   {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+                </Button>
               </div>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="password">Nova Senha</Label>
+              <Label htmlFor="newPassword">Nova Senha</Label>
               <div className="relative">
                 <Input
-                  id="password"
+                  id="newPassword"
                   type={showNewPassword ? "text" : "password"}
-                  placeholder="Digite sua nova senha"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="pr-10"
                 />
-                <button
+                <Button
                   type="button"
-                  onMouseDown={() => setShowNewPassword(true)}
-                  onMouseUp={() => setShowNewPassword(false)}
-                  onMouseLeave={() => setShowNewPassword(false)}
-                  onTouchStart={() => setShowNewPassword(true)}
-                  onTouchEnd={() => setShowNewPassword(false)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
                 >
                   {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+                </Button>
               </div>
-              <p className="text-xs text-muted-foreground">Mínimo de 6 caracteres</p>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
+              <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
               <div className="relative">
                 <Input
-                  id="confirm-password"
+                  id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Confirme sua nova senha"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pr-10"
                 />
-                <button
+                <Button
                   type="button"
-                  onMouseDown={() => setShowConfirmPassword(true)}
-                  onMouseUp={() => setShowConfirmPassword(false)}
-                  onMouseLeave={() => setShowConfirmPassword(false)}
-                  onTouchStart={() => setShowConfirmPassword(true)}
-                  onTouchEnd={() => setShowConfirmPassword(false)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 >
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+                </Button>
               </div>
             </div>
-
-            <Button onClick={handleUpdatePassword} disabled={updatePasswordMutation.isPending}>
-              {updatePasswordMutation.isPending ? "Alterando..." : "Alterar Senha"}
-            </Button>
+            <Button onClick={handleUpdatePassword}>Alterar Senha</Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Appearance Settings */}
+      {/* Appearance Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -851,135 +917,119 @@ export default function Settings() {
           </CardTitle>
           <CardDescription>Personalize a interface do sistema</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label>Modo Escuro</Label>
-              <p className="text-sm text-muted-foreground">Alterar entre tema claro e escuro</p>
+              <p className="text-sm text-muted-foreground">Alternar entre tema claro e escuro</p>
             </div>
             <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} />
           </div>
         </CardContent>
       </Card>
 
-      {/* Notification Settings */}
+      {/* Notifications Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
-            Notificações via WhatsApp
+            Notificações
           </CardTitle>
-          <CardDescription>Receba alertas sobre seus domínios</CardDescription>
+          <CardDescription>Configure quando deseja receber alertas de domínios</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Campo de WhatsApp dentro do card de notificações */}
-          <div className="space-y-2 bg-muted/50 p-4 rounded-lg">
-            <Label htmlFor="whatsapp">Número do WhatsApp</Label>
-            <Input
-              id="whatsapp"
-              placeholder="+55 19 98932-0129"
-              value={whatsappNumber}
-              onChange={handleWhatsappChange}
-              maxLength={19}
-            />
-            <p className="text-sm text-muted-foreground">
-              💡 Ao salvar, você receberá uma mensagem de teste com os alertas dos seus domínios
-            </p>
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Domínios Suspensos</Label>
-              <p className="text-sm text-muted-foreground">Alertas quando domínios forem suspensos</p>
-            </div>
-            <Switch
-              checked={notificationSettings?.alert_suspended || false}
-              onCheckedChange={(checked) =>
-                updateNotificationMutation.mutate({
-                  alert_suspended: checked,
-                  alert_expired: notificationSettings?.alert_expired || false,
-                  alert_expiring_soon: notificationSettings?.alert_expiring_soon || false,
-                })
-              }
-            />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Domínios Expirados</Label>
-              <p className="text-sm text-muted-foreground">Alertas quando domínios expirarem</p>
-            </div>
-            <Switch
-              checked={notificationSettings?.alert_expired || false}
-              onCheckedChange={(checked) =>
-                updateNotificationMutation.mutate({
-                  alert_suspended: notificationSettings?.alert_suspended || false,
-                  alert_expired: checked,
-                  alert_expiring_soon: notificationSettings?.alert_expiring_soon || false,
-                })
-              }
-            />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Próximos a Expirar (15 dias)</Label>
-              <p className="text-sm text-muted-foreground">Alertas 15 dias antes da expiração</p>
-            </div>
-            <Switch
-              checked={notificationSettings?.alert_expiring_soon || false}
-              onCheckedChange={(checked) =>
-                updateNotificationMutation.mutate({
-                  alert_suspended: notificationSettings?.alert_suspended || false,
-                  alert_expired: notificationSettings?.alert_expired || false,
-                  alert_expiring_soon: checked,
-                })
-              }
-            />
-          </div>
-
-          <Separator className="my-6" />
-
-          {/* Configurações de Recorrência */}
-          <div className="space-y-4 bg-muted/50 p-4 rounded-lg">
-            <div className="flex items-center gap-2 mb-3">
-              <Clock className="h-4 w-4" />
-              <Label className="text-base font-semibold">Recorrência de Alertas</Label>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Domínios Suspensos</Label>
+                <p className="text-sm text-muted-foreground">Alerta quando um domínio for suspenso</p>
+              </div>
+              <Switch
+                checked={notificationSettings?.alert_suspended ?? false}
+                onCheckedChange={(checked) =>
+                  updateNotificationMutation.mutate({
+                    alert_suspended: checked,
+                    alert_expired: notificationSettings?.alert_expired ?? false,
+                    alert_expiring_soon: notificationSettings?.alert_expiring_soon ?? false,
+                  })
+                }
+              />
             </div>
 
-            {/* Dias da Semana */}
-            <div className="space-y-2">
-              <Label className="text-sm">Dias da Semana</Label>
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Domínios Expirados</Label>
+                <p className="text-sm text-muted-foreground">Alerta quando um domínio expirar</p>
+              </div>
+              <Switch
+                checked={notificationSettings?.alert_expired ?? false}
+                onCheckedChange={(checked) =>
+                  updateNotificationMutation.mutate({
+                    alert_suspended: notificationSettings?.alert_suspended ?? false,
+                    alert_expired: checked,
+                    alert_expiring_soon: notificationSettings?.alert_expiring_soon ?? false,
+                  })
+                }
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Domínios Próximos do Vencimento</Label>
+                <p className="text-sm text-muted-foreground">Alerta quando faltarem 30 dias para vencer</p>
+              </div>
+              <Switch
+                checked={notificationSettings?.alert_expiring_soon ?? false}
+                onCheckedChange={(checked) =>
+                  updateNotificationMutation.mutate({
+                    alert_suspended: notificationSettings?.alert_suspended ?? false,
+                    alert_expired: notificationSettings?.alert_expired ?? false,
+                    alert_expiring_soon: checked,
+                  })
+                }
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notification Recurrence Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Recorrência de Notificações
+          </CardTitle>
+          <CardDescription>Configure quando e com que frequência deseja receber notificações</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <Label className="text-base">Dias da Semana</Label>
               <div className="flex flex-wrap gap-2">
                 {WEEK_DAYS.map((day) => (
-                  <label
+                  <Button
                     key={day.value}
-                    className={`
-                      flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors
-                      ${
-                        selectedDays.includes(day.value)
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background hover:bg-muted border-border"
-                      }
-                    `}
+                    variant={selectedDays.includes(day.value) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleDay(day.value)}
                   >
-                    <Checkbox
-                      checked={selectedDays.includes(day.value)}
-                      onCheckedChange={() => toggleDay(day.value)}
-                      className="sr-only"
-                    />
-                    <span className="text-sm font-medium">{day.label}</span>
-                  </label>
+                    {day.label}
+                  </Button>
                 ))}
               </div>
+              <p className="text-sm text-muted-foreground">Selecione os dias em que deseja receber notificações</p>
             </div>
 
-            {/* Intervalo de Horário */}
+            <Separator />
+
             <div className="space-y-2">
-              <Label htmlFor="interval" className="text-sm">
-                Intervalo de Horário
+              <Label htmlFor="interval" className="text-base">
+                Intervalo de Notificações
               </Label>
               <Select value={selectedInterval.toString()} onValueChange={(value) => setSelectedInterval(Number(value))}>
                 <SelectTrigger id="interval">
@@ -993,12 +1043,16 @@ export default function Settings() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-sm text-muted-foreground">
+                Com que frequência deseja verificar se há domínios críticos
+              </p>
             </div>
 
-            {/* Frequência Diária */}
+            <Separator />
+
             <div className="space-y-2">
-              <Label htmlFor="frequency" className="text-sm">
-                Frequência Máxima Diária
+              <Label htmlFor="frequency" className="text-base">
+                Frequência Diária
               </Label>
               <Select
                 value={selectedFrequency.toString()}
@@ -1087,16 +1141,36 @@ export default function Settings() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            Criação de Filtros
+            Gerenciamento de Filtros
           </CardTitle>
-          <CardDescription>Crie filtros customizados para plataforma e fonte de tráfego</CardDescription>
+          <CardDescription>Visualize e gerencie todos os filtros do sistema (padrão e customizados)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {hasPermission("can_create_filters") && (
             <>
               {/* Platform Filters */}
               <div className="space-y-3">
-                <Label>Plataformas</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-base">Plataformas</Label>
+                  <Badge variant="outline">{allPlatformFilters.length} filtros</Badge>
+                </div>
+
+                {/* Lista de todos os filtros de plataforma */}
+                <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+                  {allPlatformFilters.map((filter) => (
+                    <Badge key={filter.id} variant={filter.is_default ? "default" : "secondary"} className="gap-1">
+                      {filter.filter_value}
+                      {!filter.is_default && (
+                        <X
+                          className="h-3 w-3 cursor-pointer hover:text-destructive"
+                          onClick={() => deleteFilterMutation.mutate(filter.id)}
+                        />
+                      )}
+                    </Badge>
+                  ))}
+                </div>
+
+                {/* Adicionar novo filtro */}
                 <div className="flex gap-2">
                   <Input
                     placeholder="Nova plataforma"
@@ -1129,21 +1203,36 @@ export default function Settings() {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {platformFilters.map((filter) => (
-                    <Badge key={filter.id} variant="secondary" className="gap-1">
-                      {filter.filter_value}
-                      <X className="h-3 w-3 cursor-pointer" onClick={() => deleteFilterMutation.mutate(filter.id)} />
-                    </Badge>
-                  ))}
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Filtros padrão (azul) não podem ser removidos. Filtros customizados (cinza) podem ser excluídos.
+                </p>
               </div>
 
               <Separator />
 
               {/* Traffic Source Filters */}
               <div className="space-y-3">
-                <Label>Fontes de Tráfego</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-base">Fontes de Tráfego</Label>
+                  <Badge variant="outline">{allTrafficSourceFilters.length} filtros</Badge>
+                </div>
+
+                {/* Lista de todos os filtros de fonte de tráfego */}
+                <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+                  {allTrafficSourceFilters.map((filter) => (
+                    <Badge key={filter.id} variant={filter.is_default ? "default" : "secondary"} className="gap-1">
+                      {filter.filter_value}
+                      {!filter.is_default && (
+                        <X
+                          className="h-3 w-3 cursor-pointer hover:text-destructive"
+                          onClick={() => deleteFilterMutation.mutate(filter.id)}
+                        />
+                      )}
+                    </Badge>
+                  ))}
+                </div>
+
+                {/* Adicionar novo filtro */}
                 <div className="flex gap-2">
                   <Input
                     placeholder="Nova fonte de tráfego"
@@ -1178,14 +1267,9 @@ export default function Settings() {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {trafficSourceFilters.map((filter) => (
-                    <Badge key={filter.id} variant="secondary" className="gap-1">
-                      {filter.filter_value}
-                      <X className="h-3 w-3 cursor-pointer" onClick={() => deleteFilterMutation.mutate(filter.id)} />
-                    </Badge>
-                  ))}
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Filtros padrão (azul) não podem ser removidos. Filtros customizados (cinza) podem ser excluídos.
+                </p>
               </div>
             </>
           )}
