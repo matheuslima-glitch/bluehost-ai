@@ -210,6 +210,20 @@ export default function AcceptInvite() {
         if (permissionsError) throw permissionsError;
       }
 
+      // ⭐ ATUALIZAR STATUS DO CONVITE PARA 'ACCEPTED' ⭐
+      console.log("🔄 Atualizando status do convite para 'accepted'...");
+      const { error: invitationError } = await supabase
+        .from("invitations")
+        .update({ status: "accepted" })
+        .eq("email", inviteData.email);
+
+      if (invitationError) {
+        console.error("⚠️ Erro ao atualizar convite:", invitationError);
+        // Não bloqueia o fluxo - apenas avisa no log
+      } else {
+        console.log("✅ Status do convite atualizado com sucesso!");
+      }
+
       toast.success("Conta criada com sucesso!");
       setStep("success");
 
