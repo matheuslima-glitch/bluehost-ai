@@ -170,10 +170,56 @@ export default function ManualPurchaseDialog({
     }
   };
 
+  // ============================================
+  // NOVA FUNÇÃO ADICIONADA: Cancelar compra no backend
+  // ============================================
+  const cancelPurchase = async () => {
+    if (!sessionId) return;
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "https://domainhub-backend.onrender.com";
+
+      console.log(`🛑 Solicitando cancelamento para sessão: ${sessionId}`);
+
+      const response = await fetch(`${apiUrl}/api/purchase-domains/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId: sessionId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        console.log(`✅ Cancelamento confirmado pelo servidor`);
+        toast.warning("🛑 Compra cancelada! Se o domínio já foi comprado, ele não será revertido.", {
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao cancelar:", error);
+    }
+  };
+
+  // ============================================
+  // FUNÇÃO ATUALIZADA: handleClose agora cancela no backend
+  // ============================================
   const handleClose = () => {
     if (purchasing) {
-      toast.info("Compra em andamento. Aguarde a finalização.");
-      return;
+      const confirmCancel = confirm(
+        "⚠️ O processo de compra está em andamento.\n\n" +
+          "⚠️ IMPORTANTE: Se o domínio já foi comprado, ele NÃO será revertido!\n\n" +
+          "Deseja realmente cancelar?",
+      );
+
+      if (!confirmCancel) return;
+
+      // Cancelar no backend
+      cancelPurchase();
+      setPurchasing(false);
     }
     onOpenChange(false);
   };
