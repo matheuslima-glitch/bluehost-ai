@@ -27,7 +27,19 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, Settings as SettingsIcon, Mail, Check, Shield, Eye, Edit, Ban } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Settings as SettingsIcon,
+  Mail,
+  Check,
+  Shield,
+  Eye,
+  Edit,
+  Ban,
+  Clock,
+  CheckCircle2,
+} from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
@@ -74,6 +86,7 @@ interface TeamMember {
   is_admin: boolean;
   created_at: string;
   permissions: UserPermission | null;
+  invitation_status: "accepted" | "pending" | null;
 }
 
 // Permissões padrão
@@ -191,10 +204,11 @@ export function UserManagement() {
 
   const isCurrentUserAdmin = currentUserProfile?.is_admin || false;
 
-  // Buscar todos os usuários da equipe
+  // Buscar todos os usuários da equipe + convites pendentes
   const { data: teamMembers = [], isLoading } = useQuery({
     queryKey: ["team-members"],
     queryFn: async () => {
+      // Buscar profiles (usuários que já aceitaram)
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, email, full_name, is_admin, created_at")
@@ -202,16 +216,44 @@ export function UserManagement() {
 
       if (profilesError) throw profilesError;
 
+      // Buscar permissões
       const { data: permissions, error: permissionsError } = await supabase.from("user_permissions").select("*");
 
       if (permissionsError) throw permissionsError;
 
+      // Buscar convites
+      const { data: invitations, error: invitationsError } = await supabase
+        .from("invitations")
+        .select("id, email, status, created_at, is_admin")
+        .order("created_at", { ascending: false });
+
+      if (invitationsError) throw invitationsError;
+
+      // Combinar profiles com permissões e status
       const membersWithPermissions = profiles.map((profile) => ({
         ...profile,
         permissions: permissions?.find((p) => p.user_id === profile.id) || null,
+        invitation_status: "accepted" as const,
       }));
 
-      return membersWithPermissions as TeamMember[];
+      // Adicionar convites pendentes (que não estão em profiles)
+      const pendingInvites = invitations
+        ?.filter((inv) => inv.status === "pending")
+        .filter((inv) => !profiles.some((p) => p.email === inv.email))
+        .map((inv) => ({
+          id: inv.id,
+          email: inv.email,
+          full_name: null,
+          is_admin: inv.is_admin || false,
+          created_at: inv.created_at,
+          permissions: null,
+          invitation_status: "pending" as const,
+        }));
+
+      // Combinar tudo
+      const allMembers = [...membersWithPermissions, ...(pendingInvites || [])];
+
+      return allMembers as TeamMember[];
     },
   });
 
@@ -246,7 +288,6 @@ export function UserManagement() {
       });
 
       if (error) {
-        // Se der erro, pode ser que o usuário já exista
         if (
           error.message?.includes("Database error saving new user") ||
           error.message?.includes("User already registered") ||
@@ -262,7 +303,6 @@ export function UserManagement() {
         throw error;
       }
 
-      // Sucesso - email foi enviado
       return {
         success: true,
         emailSent: true,
@@ -322,6 +362,28 @@ export function UserManagement() {
     },
   });
 
+  // Mutation para deletar convite pendente
+  const deleteInviteMutation = useMutation({
+    mutationFn: async (inviteId: string) => {
+      const { error } = await supabase.from("invitations").delete().eq("id", inviteId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Convite removido",
+        description: "O convite pendente foi removido",
+      });
+      queryClient.invalidateQueries({ queryKey: ["team-members"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao remover convite",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Mutation para salvar permissões
   const savePermissionsMutation = useMutation({
     mutationFn: async ({ userId, permissions }: { userId: string; permissions: Partial<UserPermission> }) => {
@@ -375,6 +437,10 @@ export function UserManagement() {
 
   const handleDeleteUser = (userId: string) => {
     deleteMutation.mutate(userId);
+  };
+
+  const handleDeleteInvite = (inviteId: string) => {
+    deleteInviteMutation.mutate(inviteId);
   };
 
   const openEditPermissions = (member: TeamMember) => {
@@ -574,6 +640,18 @@ export function UserManagement() {
                             Admin
                           </Badge>
                         )}
+                        {member.invitation_status === "accepted" && (
+                          <Badge variant="default" className="gap-1 bg-green-600 hover:bg-green-700">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Aceito
+                          </Badge>
+                        )}
+                        {member.invitation_status === "pending" && (
+                          <Badge variant="secondary" className="gap-1 bg-yellow-500 hover:bg-yellow-600 text-white">
+                            <Clock className="h-3 w-3" />
+                            Pendente
+                          </Badge>
+                        )}
                         {member.id === user?.id && <Badge variant="outline">Você</Badge>}
                       </div>
                       <p className="text-sm text-muted-foreground">{member.email}</p>
@@ -677,12 +755,24 @@ export function UserManagement() {
                 <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center gap-4">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium">{member.full_name || member.email}</p>
                         {member.is_admin && (
                           <Badge className="gap-1 bg-blue-600 hover:bg-blue-700 text-white">
                             <Shield className="h-3 w-3" />
                             Admin
+                          </Badge>
+                        )}
+                        {member.invitation_status === "accepted" && (
+                          <Badge variant="default" className="gap-1 bg-green-600 hover:bg-green-700">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Aceito
+                          </Badge>
+                        )}
+                        {member.invitation_status === "pending" && (
+                          <Badge variant="secondary" className="gap-1 bg-yellow-500 hover:bg-yellow-600 text-white">
+                            <Clock className="h-3 w-3" />
+                            Pendente
                           </Badge>
                         )}
                         {member.id === user?.id && <Badge variant="outline">Você</Badge>}
@@ -697,7 +787,7 @@ export function UserManagement() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {!member.is_admin && canManageUsers && (
+                    {!member.is_admin && canManageUsers && member.invitation_status === "accepted" && (
                       <Button variant="outline" size="sm" onClick={() => openEditPermissions(member)}>
                         <SettingsIcon className="h-4 w-4 mr-2" />
                         Permissões
@@ -721,7 +811,15 @@ export function UserManagement() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteUser(member.id)}>Remover</AlertDialogAction>
+                            <AlertDialogAction
+                              onClick={() =>
+                                member.invitation_status === "pending"
+                                  ? handleDeleteInvite(member.id)
+                                  : handleDeleteUser(member.id)
+                              }
+                            >
+                              Remover
+                            </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
