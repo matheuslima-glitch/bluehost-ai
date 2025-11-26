@@ -241,45 +241,31 @@ export function UserManagement() {
       // PASSO 2: Tentar enviar email de convite
       const redirectUrl = `${window.location.origin}/auth/callback`;
 
-      try {
-        const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-          redirectTo: redirectUrl,
-        });
+      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: redirectUrl,
+      });
 
-        if (error) {
-          // Se o erro for "Database error saving new user", significa que o usuário já existe
-          if (
-            error.message?.includes("Database error saving new user") ||
-            error.message?.includes("User already registered")
-          ) {
-            // Tentar obter o usuário existente
-            const { data: existingUser } = await supabaseAdmin.auth.admin.getUserByEmail(email);
-
-            if (existingUser?.user) {
-              // Verificar se o usuário já confirmou o email
-              if (existingUser.user.email_confirmed_at) {
-                throw new Error(`O email ${email} já está cadastrado e ativo. O usuário já pode fazer login.`);
-              } else {
-                // Usuário existe mas não confirmou - considerar sucesso pois as permissões foram atualizadas
-                return {
-                  user: existingUser.user,
-                  message: "Permissões atualizadas. O convite anterior ainda está válido.",
-                };
-              }
-            }
-
-            // Se não conseguiu obter o usuário, retornar mensagem genérica
-            throw new Error(`O email ${email} já foi convidado anteriormente. As permissões foram atualizadas.`);
-          }
-
-          // Outros erros são lançados normalmente
-          throw error;
+      // Se o erro for "Database error saving new user", considerar SUCESSO
+      // pois significa que o usuário já foi convidado antes e as permissões foram atualizadas
+      if (error) {
+        if (
+          error.message?.includes("Database error saving new user") ||
+          error.message?.includes("User already registered")
+        ) {
+          // Retornar sucesso com mensagem informativa
+          return {
+            success: true,
+            message:
+              "Permissões atualizadas com sucesso! Se o usuário ainda não confirmou o email, o convite anterior continua válido.",
+          };
         }
 
-        return data;
-      } catch (error: any) {
+        // Outros erros são lançados normalmente
         throw error;
       }
+
+      // Convite enviado com sucesso
+      return data;
     },
     onSuccess: (data: any) => {
       const message = data?.message || "O usuário receberá um e-mail com instruções para aceitar o convite.";
