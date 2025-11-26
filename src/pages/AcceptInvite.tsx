@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { toast } from "sonner";
 import { Mail, Lock, User, Shield, Loader2, CheckCircle2, Eye, EyeOff } from "lucide-react";
 
@@ -180,6 +181,9 @@ export default function AcceptInvite() {
     setSubmitting(true);
 
     try {
+      console.log("🚀 Iniciando processo de aceitar convite...");
+      console.log("📧 Email do convite:", inviteData.email);
+
       // Atualizar a senha do usuário
       const { error: updateError } = await supabase.auth.updateUser({
         password: password,
@@ -189,6 +193,7 @@ export default function AcceptInvite() {
       });
 
       if (updateError) throw updateError;
+      console.log("✅ Senha atualizada com sucesso");
 
       // Criar perfil no banco de dados
       const { error: profileError } = await supabase.from("profiles").upsert({
@@ -199,6 +204,7 @@ export default function AcceptInvite() {
       });
 
       if (profileError) throw profileError;
+      console.log("✅ Perfil criado com sucesso");
 
       // Criar permissões personalizadas se não for admin
       if (!inviteData.is_admin && permissions) {
@@ -208,27 +214,52 @@ export default function AcceptInvite() {
         });
 
         if (permissionsError) throw permissionsError;
+        console.log("✅ Permissões criadas com sucesso");
       }
 
-      // ⭐ CORREÇÃO: ATUALIZAR STATUS E ACCEPTED_AT DO CONVITE ⭐
-      // A função get_data_owner_id() no banco exige AMBOS:
-      // - status = 'accepted'
-      // - accepted_at IS NOT NULL
-      console.log("🔄 Atualizando status do convite para 'accepted' com accepted_at...");
-      const { error: invitationError } = await supabase
+      // ⭐ CORREÇÃO CRÍTICA: Usar supabaseAdmin para atualizar o convite ⭐
+      // O supabaseAdmin usa service_role que bypassa RLS
+      // A função get_data_owner_id() exige AMBOS: status = 'accepted' E accepted_at IS NOT NULL
+      console.log("🔄 Atualizando convite com supabaseAdmin...");
+
+      const { data: updateData, error: invitationError } = await supabaseAdmin
         .from("invitations")
         .update({
           status: "accepted",
-          accepted_at: new Date().toISOString(), // ← CORREÇÃO CRÍTICA!
+          accepted_at: new Date().toISOString(),
         })
-        .eq("email", inviteData.email);
+        .eq("email", inviteData.email)
+        .select();
 
       if (invitationError) {
-        console.error("⚠️ Erro ao atualizar convite:", invitationError);
-        // Não bloqueia o fluxo - apenas avisa no log
+        console.error("❌ Erro ao atualizar convite:", invitationError);
+        // Tentar novamente com status pending (pode ter mais de um convite)
+        const { error: retryError } = await supabaseAdmin
+          .from("invitations")
+          .update({
+            status: "accepted",
+            accepted_at: new Date().toISOString(),
+          })
+          .eq("email", inviteData.email)
+          .eq("status", "pending");
+
+        if (retryError) {
+          console.error("❌ Erro na segunda tentativa:", retryError);
+        } else {
+          console.log("✅ Convite atualizado na segunda tentativa");
+        }
       } else {
-        console.log("✅ Status do convite atualizado com sucesso!");
+        console.log("✅ Convite atualizado com sucesso:", updateData);
       }
+
+      // Verificar se a atualização funcionou
+      const { data: verifyData } = await supabaseAdmin
+        .from("invitations")
+        .select("*")
+        .eq("email", inviteData.email)
+        .single();
+
+      console.log("🔍 Verificação do convite após update:", verifyData);
 
       toast.success("Conta criada com sucesso!");
       setStep("success");
