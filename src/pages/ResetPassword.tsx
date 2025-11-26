@@ -14,7 +14,7 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(true);
   const [isValidToken, setIsValidToken] = useState(false);
-  
+
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -85,6 +85,10 @@ export default function ResetPassword() {
       setPasswordUpdated(true);
       toast.success("Senha redefinida com sucesso!");
 
+      // IMPORTANTE: Fazer logout para forçar o usuário a logar com a nova senha
+      await supabase.auth.signOut();
+      console.log("✅ Sessão encerrada - usuário precisará fazer login novamente");
+
       // Aguardar 2 segundos e redirecionar para login
       setTimeout(() => {
         navigate("/auth");
@@ -114,9 +118,7 @@ export default function ResetPassword() {
               </div>
             </div>
             <CardTitle className="text-2xl">Link Inválido</CardTitle>
-            <CardDescription>
-              O link de recuperação é inválido ou expirou. Solicite um novo link.
-            </CardDescription>
+            <CardDescription>O link de recuperação é inválido ou expirou. Solicite um novo link.</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -135,9 +137,7 @@ export default function ResetPassword() {
               </div>
             </div>
             <CardTitle className="text-2xl">Senha Atualizada!</CardTitle>
-            <CardDescription>
-              Sua senha foi redefinida com sucesso. Redirecionando para o login...
-            </CardDescription>
+            <CardDescription>Sua senha foi redefinida com sucesso. Redirecionando para o login...</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -155,9 +155,7 @@ export default function ResetPassword() {
             </div>
           </div>
           <CardTitle className="text-2xl">Redefinir Senha</CardTitle>
-          <CardDescription>
-            Digite sua nova senha para acessar sua conta
-          </CardDescription>
+          <CardDescription>Digite sua nova senha para acessar sua conta</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleResetPassword} className="space-y-4">

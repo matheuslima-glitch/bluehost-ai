@@ -59,7 +59,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       console.log("AuthContext: Estado de auth mudou:", event, newSession?.user?.email || "Nenhum");
 
-      // Atualizar estado
+      // IGNORAR evento PASSWORD_RECOVERY - não deve logar o usuário automaticamente
+      // O usuário só deve ser logado após redefinir a senha na página /reset-password
+      if (event === "PASSWORD_RECOVERY") {
+        console.log("AuthContext: Evento PASSWORD_RECOVERY ignorado - redirecionando para reset");
+        // Não atualizar sessão/usuário aqui
+        // O usuário será redirecionado pela URL do email
+        return;
+      }
+
+      // IGNORAR evento USER_UPDATED durante recuperação de senha
+      // Isso evita login automático quando a senha é atualizada
+      if (event === "USER_UPDATED") {
+        // Verificar se estamos na página de reset
+        const isResetPage = window.location.pathname === "/reset-password";
+        if (isResetPage) {
+          console.log("AuthContext: USER_UPDATED na página de reset - ignorando login automático");
+          return;
+        }
+      }
+
+      // Para outros eventos, atualizar estado normalmente
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
