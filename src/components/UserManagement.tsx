@@ -226,7 +226,7 @@ export function UserManagement() {
       isAdmin: boolean;
       permissions: Partial<UserPermission>;
     }) => {
-      // PASSO 1: Pré-criar usuário no banco
+      // PASSO 1: Pré-criar/atualizar usuário no banco
       const { data: preCreateData, error: preCreateError } = await supabase.rpc("create_invited_user", {
         p_email: email,
         p_invited_by: user?.id,
@@ -238,20 +238,55 @@ export function UserManagement() {
         throw new Error(preCreateData?.error || preCreateError?.message || "Erro ao preparar convite");
       }
 
-      // PASSO 2: Enviar email de convite
+      // PASSO 2: Tentar enviar email de convite
       const redirectUrl = `${window.location.origin}/auth/callback`;
-      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: redirectUrl,
-      });
 
-      if (error) throw error;
+      try {
+        const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+          redirectTo: redirectUrl,
+        });
 
-      return data;
+        if (error) {
+          // Se o erro for "Database error saving new user", significa que o usuário já existe
+          if (
+            error.message?.includes("Database error saving new user") ||
+            error.message?.includes("User already registered")
+          ) {
+            // Tentar obter o usuário existente
+            const { data: existingUser } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+
+            if (existingUser?.user) {
+              // Verificar se o usuário já confirmou o email
+              if (existingUser.user.email_confirmed_at) {
+                throw new Error(`O email ${email} já está cadastrado e ativo. O usuário já pode fazer login.`);
+              } else {
+                // Usuário existe mas não confirmou - considerar sucesso pois as permissões foram atualizadas
+                return {
+                  user: existingUser.user,
+                  message: "Permissões atualizadas. O convite anterior ainda está válido.",
+                };
+              }
+            }
+
+            // Se não conseguiu obter o usuário, retornar mensagem genérica
+            throw new Error(`O email ${email} já foi convidado anteriormente. As permissões foram atualizadas.`);
+          }
+
+          // Outros erros são lançados normalmente
+          throw error;
+        }
+
+        return data;
+      } catch (error: any) {
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      const message = data?.message || "O usuário receberá um e-mail com instruções para aceitar o convite.";
+
       toast({
-        title: "Convite enviado!",
-        description: "O usuário receberá um e-mail com instruções para aceitar o convite.",
+        title: "Convite processado!",
+        description: message,
       });
       setInviteEmail("");
       setInvitePermissionsDialogOpen(false);
