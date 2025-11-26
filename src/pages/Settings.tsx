@@ -75,7 +75,7 @@ export default function Settings() {
   const queryClient = useQueryClient();
 
   const [fullName, setFullName] = useState("");
-  const [whatsappNumber, setWhatsappNumber] = useState(""); // Começa vazio igual ao nome!
+  const [whatsappNumber, setWhatsappNumber] = useState(""); // Será populado pelo useEffect quando carregar o perfil
   const [newPlatformFilter, setNewPlatformFilter] = useState("");
   const [newTrafficSourceFilter, setNewTrafficSourceFilter] = useState("");
   const { hasPermission, canEdit } = usePermissions();
@@ -236,23 +236,13 @@ export default function Settings() {
   useEffect(() => {
     if (profile) {
       // Atualizar nome
-      if (profile.full_name !== undefined) {
-        setFullName(profile.full_name || "");
-      }
+      setFullName(profile.full_name || "");
 
-      // Atualizar WhatsApp - IGUAL ao nome (vazio se não tiver)
-      if (profile.whatsapp_number) {
-        setWhatsappNumber(profile.whatsapp_number);
-      } else {
-        setWhatsappNumber(""); // Vazio igual ao nome!
-      }
+      // Atualizar WhatsApp - SEMPRE setar o valor do banco (mesmo que seja null/undefined)
+      setWhatsappNumber(profile.whatsapp_number || "");
 
       // Atualizar som
-      if (profile.alert_sound_preference) {
-        setSelectedSound(profile.alert_sound_preference);
-      } else {
-        setSelectedSound("alert-4");
-      }
+      setSelectedSound(profile.alert_sound_preference || "alert-4");
     }
 
     // Atualizar email do auth
@@ -1026,7 +1016,7 @@ export default function Settings() {
             <Input
               id="whatsapp"
               placeholder="+55 19 98932-0129"
-              value={whatsappNumber || profile?.whatsapp_number || ""}
+              value={whatsappNumber}
               onChange={handleWhatsappChange}
               maxLength={20}
             />
