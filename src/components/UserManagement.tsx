@@ -228,31 +228,17 @@ export function UserManagement() {
     }) => {
       const redirectUrl = `${window.location.origin}/auth/callback`;
 
-      // PASSO 1: Criar usuário via Auth Admin
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         redirectTo: redirectUrl,
         data: {
-          invited_by: user?.id,
           is_admin: isAdmin,
+          permissions: JSON.stringify(permissions),
         },
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("Usuário não foi criado");
+      if (error) throw error;
 
-      // PASSO 2: Chamar função RPC para criar profile + permissions
-      const { data: rpcData, error: rpcError } = await supabase.rpc("process_invitation", {
-        p_user_id: authData.user.id,
-        p_email: email,
-        p_invited_by: user?.id,
-        p_is_admin: isAdmin,
-        p_permissions: permissions,
-      });
-
-      if (rpcError) throw rpcError;
-      if (!rpcData?.success) throw new Error(rpcData?.error || "Erro ao processar convite");
-
-      return authData;
+      return data;
     },
     onSuccess: () => {
       toast({
