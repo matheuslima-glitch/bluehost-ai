@@ -27,19 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Plus,
-  Trash2,
-  Settings as SettingsIcon,
-  Mail,
-  Check,
-  Shield,
-  Eye,
-  Edit,
-  Ban,
-  Clock,
-  CheckCircle2,
-} from "lucide-react";
+import { Plus, Trash2, Settings as SettingsIcon, Mail, Check, Shield, Eye, Edit, Ban, Clock } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
@@ -53,19 +41,15 @@ interface UserPermission {
   id: string;
   user_id: string;
   permission_type: "total" | "personalizado";
-  // Acesso por Aba
   can_access_dashboard: PermissionLevel;
   can_access_domain_search: PermissionLevel;
   can_access_management: PermissionLevel;
   can_access_settings: PermissionLevel;
-  // Dashboard
   can_view_critical_domains: PermissionLevel;
   can_view_integrations: PermissionLevel;
   can_view_balance: PermissionLevel;
-  // Compra de Domínios
   can_manual_purchase: PermissionLevel;
   can_ai_purchase: PermissionLevel;
-  // Gerenciamento
   can_view_domain_details: PermissionLevel;
   can_change_domain_status: PermissionLevel;
   can_select_platform: PermissionLevel;
@@ -73,7 +57,6 @@ interface UserPermission {
   can_insert_funnel_id: PermissionLevel;
   can_view_logs: PermissionLevel;
   can_change_nameservers: PermissionLevel;
-  // Configurações
   can_create_filters: PermissionLevel;
   can_manage_users: PermissionLevel;
   can_send_invites: PermissionLevel;
@@ -89,7 +72,6 @@ interface TeamMember {
   invitation_status: "accepted" | "pending" | null;
 }
 
-// Permissões padrão
 const DEFAULT_PERMISSIONS: Partial<UserPermission> = {
   permission_type: "personalizado",
   can_access_dashboard: "write",
@@ -113,7 +95,6 @@ const DEFAULT_PERMISSIONS: Partial<UserPermission> = {
   can_send_invites: "none",
 };
 
-// Componente para renderizar o selector de permissão
 function PermissionSelector({
   value,
   onChange,
@@ -179,7 +160,7 @@ export function UserManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canEdit, isAdmin } = usePermissions();
+  const { canEdit } = usePermissions();
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -190,12 +171,10 @@ export function UserManagement() {
   const [invitePermissions, setInvitePermissions] = useState<Partial<UserPermission>>(DEFAULT_PERMISSIONS);
   const [makeAdmin, setMakeAdmin] = useState(false);
 
-  // Verificar se o usuário atual é admin
   const { data: currentUserProfile } = useQuery({
     queryKey: ["current-user-profile", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("profiles").select("is_admin, full_name").eq("id", user?.id).single();
-
       if (error) throw error;
       return data;
     },
@@ -204,11 +183,9 @@ export function UserManagement() {
 
   const isCurrentUserAdmin = currentUserProfile?.is_admin || false;
 
-  // Buscar todos os usuários da equipe + convites pendentes
   const { data: teamMembers = [], isLoading } = useQuery({
     queryKey: ["team-members"],
     queryFn: async () => {
-      // Buscar profiles (usuários que já aceitaram)
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, email, full_name, is_admin, created_at")
@@ -216,12 +193,9 @@ export function UserManagement() {
 
       if (profilesError) throw profilesError;
 
-      // Buscar permissões
       const { data: permissions, error: permissionsError } = await supabase.from("user_permissions").select("*");
-
       if (permissionsError) throw permissionsError;
 
-      // Buscar convites
       const { data: invitations, error: invitationsError } = await supabase
         .from("invitations")
         .select("id, email, status, created_at, is_admin")
@@ -229,14 +203,12 @@ export function UserManagement() {
 
       if (invitationsError) throw invitationsError;
 
-      // Combinar profiles com permissões e status
       const membersWithPermissions = profiles.map((profile) => ({
         ...profile,
         permissions: permissions?.find((p) => p.user_id === profile.id) || null,
         invitation_status: "accepted" as const,
       }));
 
-      // Adicionar convites pendentes (que não estão em profiles)
       const pendingInvites = invitations
         ?.filter((inv) => inv.status === "pending")
         .filter((inv) => !profiles.some((p) => p.email === inv.email))
@@ -250,14 +222,11 @@ export function UserManagement() {
           invitation_status: "pending" as const,
         }));
 
-      // Combinar tudo
       const allMembers = [...membersWithPermissions, ...(pendingInvites || [])];
-
       return allMembers as TeamMember[];
     },
   });
 
-  // Mutation para enviar convite
   const inviteMutation = useMutation({
     mutationFn: async ({
       email,
@@ -268,7 +237,6 @@ export function UserManagement() {
       isAdmin: boolean;
       permissions: Partial<UserPermission>;
     }) => {
-      // PASSO 1: Salvar convite com permissões (NÃO cria em profiles)
       const { data: saveData, error: saveError } = await supabase.rpc("save_invitation_with_permissions", {
         p_email: email,
         p_invited_by: user?.id,
@@ -280,9 +248,7 @@ export function UserManagement() {
         throw new Error(saveData?.error || saveError?.message || "Erro ao salvar convite");
       }
 
-      // PASSO 2: Enviar email de convite
       const redirectUrl = `${window.location.origin}/auth/callback`;
-
       const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         redirectTo: redirectUrl,
       });
@@ -299,25 +265,17 @@ export function UserManagement() {
             message: "Convite atualizado! O usuário já foi convidado anteriormente.",
           };
         }
-
         throw error;
       }
 
-      return {
-        success: true,
-        emailSent: true,
-        data: data,
-      };
+      return { success: true, emailSent: true, data: data };
     },
     onSuccess: (result: any) => {
       const message = result?.emailSent
         ? "Convite enviado com sucesso! O usuário receberá um e-mail."
         : result?.message || "Convite atualizado com sucesso!";
 
-      toast({
-        title: "Sucesso!",
-        description: message,
-      });
+      toast({ title: "Sucesso!", description: message });
       setInviteEmail("");
       setInvitePermissionsDialogOpen(false);
       setInviteDialogOpen(false);
@@ -334,7 +292,6 @@ export function UserManagement() {
     },
   });
 
-  // Mutation para deletar usuário
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
       const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -347,44 +304,28 @@ export function UserManagement() {
       if (deleteProfileError) throw deleteProfileError;
     },
     onSuccess: () => {
-      toast({
-        title: "Usuário removido",
-        description: "O usuário foi removido com sucesso",
-      });
+      toast({ title: "Usuário removido", description: "O usuário foi removido com sucesso" });
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
     },
     onError: (error: any) => {
-      toast({
-        title: "Erro ao remover usuário",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao remover usuário", description: error.message, variant: "destructive" });
     },
   });
 
-  // Mutation para deletar convite pendente
   const deleteInviteMutation = useMutation({
     mutationFn: async (inviteId: string) => {
       const { error } = await supabase.from("invitations").delete().eq("id", inviteId);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({
-        title: "Convite removido",
-        description: "O convite pendente foi removido",
-      });
+      toast({ title: "Convite removido", description: "O convite pendente foi removido" });
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
     },
     onError: (error: any) => {
-      toast({
-        title: "Erro ao remover convite",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao remover convite", description: error.message, variant: "destructive" });
     },
   });
 
-  // Mutation para salvar permissões
   const savePermissionsMutation = useMutation({
     mutationFn: async ({ userId, permissions }: { userId: string; permissions: Partial<UserPermission> }) => {
       const { data: existing } = await supabase.from("user_permissions").select("id").eq("user_id", userId).single();
@@ -393,28 +334,18 @@ export function UserManagement() {
         const { error } = await supabase.from("user_permissions").update(permissions).eq("user_id", userId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("user_permissions").insert({
-          user_id: userId,
-          ...permissions,
-        });
+        const { error } = await supabase.from("user_permissions").insert({ user_id: userId, ...permissions });
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      toast({
-        title: "Permissões atualizadas",
-        description: "As permissões do usuário foram atualizadas com sucesso",
-      });
+      toast({ title: "Permissões atualizadas", description: "As permissões do usuário foram atualizadas com sucesso" });
       setPermissionsDialogOpen(false);
       setSelectedUserId(null);
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
     },
     onError: (error: any) => {
-      toast({
-        title: "Erro ao atualizar permissões",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao atualizar permissões", description: error.message, variant: "destructive" });
     },
   });
 
@@ -428,11 +359,7 @@ export function UserManagement() {
       return;
     }
 
-    inviteMutation.mutate({
-      email: inviteEmail,
-      isAdmin: makeAdmin,
-      permissions: invitePermissions,
-    });
+    inviteMutation.mutate({ email: inviteEmail, isAdmin: makeAdmin, permissions: invitePermissions });
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -455,39 +382,26 @@ export function UserManagement() {
 
   const handleSaveCustomPermissions = () => {
     if (!selectedUserId) return;
-
-    savePermissionsMutation.mutate({
-      userId: selectedUserId,
-      permissions: customPermissions,
-    });
+    savePermissionsMutation.mutate({ userId: selectedUserId, permissions: customPermissions });
   };
 
   const updatePermission = (key: keyof UserPermission, value: PermissionLevel) => {
-    setCustomPermissions((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+    setCustomPermissions((prev) => ({ ...prev, [key]: value }));
   };
 
   const updateInvitePermission = (key: keyof UserPermission, value: PermissionLevel) => {
-    setInvitePermissions((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+    setInvitePermissions((prev) => ({ ...prev, [key]: value }));
   };
 
-  // Verificar se pode gerenciar usuários
   const canManageUsers = isCurrentUserAdmin || canEdit("can_manage_users");
   const canSendInvites = isCurrentUserAdmin || canEdit("can_send_invites");
 
-  // Renderizar seção de permissões detalhadas
   const renderPermissionsSections = (
     permissions: Partial<UserPermission>,
     updateFn: (key: keyof UserPermission, value: PermissionLevel) => void,
     disabled: boolean = false,
   ) => (
     <div className="space-y-6">
-      {/* Dashboard */}
       <div>
         <h4 className="font-semibold mb-3 text-primary">Dashboard</h4>
         <div className="space-y-1 border rounded-lg p-3 bg-muted/30">
@@ -514,7 +428,6 @@ export function UserManagement() {
 
       <Separator />
 
-      {/* Compra de Domínios */}
       <div>
         <h4 className="font-semibold mb-3 text-primary">Compra de Domínios</h4>
         <div className="space-y-1 border rounded-lg p-3 bg-muted/30">
@@ -535,7 +448,6 @@ export function UserManagement() {
 
       <Separator />
 
-      {/* Gerenciamento */}
       <div>
         <h4 className="font-semibold mb-3 text-primary">Gerenciamento</h4>
         <div className="space-y-1 border rounded-lg p-3 bg-muted/30">
@@ -586,7 +498,6 @@ export function UserManagement() {
 
       <Separator />
 
-      {/* Configurações */}
       <div>
         <h4 className="font-semibold mb-3 text-primary">Configurações</h4>
         <div className="space-y-1 border rounded-lg p-3 bg-muted/30">
@@ -613,7 +524,6 @@ export function UserManagement() {
     </div>
   );
 
-  // Se não pode gerenciar usuários E não pode enviar convites, mostrar apenas visualização básica
   if (!canManageUsers && !canSendInvites && !isCurrentUserAdmin) {
     return (
       <Card>
@@ -638,12 +548,6 @@ export function UserManagement() {
                           <Badge className="gap-1 bg-blue-600 hover:bg-blue-700 text-white">
                             <Shield className="h-3 w-3" />
                             Admin
-                          </Badge>
-                        )}
-                        {member.invitation_status === "accepted" && (
-                          <Badge variant="default" className="gap-1 bg-green-600 hover:bg-green-700">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Aceito
                           </Badge>
                         )}
                         {member.invitation_status === "pending" && (
@@ -763,12 +667,6 @@ export function UserManagement() {
                             Admin
                           </Badge>
                         )}
-                        {member.invitation_status === "accepted" && (
-                          <Badge variant="default" className="gap-1 bg-green-600 hover:bg-green-700">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Aceito
-                          </Badge>
-                        )}
                         {member.invitation_status === "pending" && (
                           <Badge variant="secondary" className="gap-1 bg-yellow-500 hover:bg-yellow-600 text-white">
                             <Clock className="h-3 w-3" />
@@ -832,7 +730,6 @@ export function UserManagement() {
         </CardContent>
       </Card>
 
-      {/* Dialog de Permissões do Convite */}
       <Dialog open={invitePermissionsDialogOpen} onOpenChange={setInvitePermissionsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
@@ -888,7 +785,6 @@ export function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de Edição de Permissões */}
       <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
