@@ -210,11 +210,17 @@ export default function AcceptInvite() {
         if (permissionsError) throw permissionsError;
       }
 
-      // ⭐ ATUALIZAR STATUS DO CONVITE PARA 'ACCEPTED' ⭐
-      console.log("🔄 Atualizando status do convite para 'accepted'...");
+      // ⭐ CORREÇÃO: ATUALIZAR STATUS E ACCEPTED_AT DO CONVITE ⭐
+      // A função get_data_owner_id() no banco exige AMBOS:
+      // - status = 'accepted'
+      // - accepted_at IS NOT NULL
+      console.log("🔄 Atualizando status do convite para 'accepted' com accepted_at...");
       const { error: invitationError } = await supabase
         .from("invitations")
-        .update({ status: "accepted" })
+        .update({
+          status: "accepted",
+          accepted_at: new Date().toISOString(), // ← CORREÇÃO CRÍTICA!
+        })
         .eq("email", inviteData.email);
 
       if (invitationError) {
