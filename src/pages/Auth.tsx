@@ -9,14 +9,7 @@ import { Globe, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Auth() {
@@ -159,54 +152,14 @@ export default function Auth() {
                 </div>
 
                 <div className="flex justify-end">
-                  <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button type="button" variant="link" className="px-0 h-auto text-sm">
-                        Esqueceu a senha?
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Recuperar Senha</DialogTitle>
-                        <DialogDescription>
-                          Digite seu e-mail e enviaremos um link para você redefinir sua senha.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleResetPassword} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="reset-email">E-mail</Label>
-                          <Input
-                            id="reset-email"
-                            type="email"
-                            placeholder="seu@email.com"
-                            value={resetEmail}
-                            onChange={(e) => setResetEmail(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="flex gap-2 justify-end">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setResetDialogOpen(false)}
-                            disabled={resetLoading}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button type="submit" disabled={resetLoading}>
-                            {resetLoading ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Enviando...
-                              </>
-                            ) : (
-                              "Enviar Link"
-                            )}
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="px-0 h-auto text-sm"
+                    onClick={() => setResetDialogOpen(true)}
+                  >
+                    Esqueceu a senha?
+                  </Button>
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading}>
@@ -220,6 +173,51 @@ export default function Auth() {
                   )}
                 </Button>
               </form>
+
+              {/* Dialog de Recuperação de Senha - FORA do formulário de login */}
+              <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Recuperar Senha</DialogTitle>
+                    <DialogDescription>
+                      Digite seu e-mail e enviaremos um link para você redefinir sua senha.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleResetPassword} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="reset-email">E-mail</Label>
+                      <Input
+                        id="reset-email"
+                        type="email"
+                        placeholder="seu@email.com"
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setResetDialogOpen(false)}
+                        disabled={resetLoading}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button type="submit" disabled={resetLoading}>
+                        {resetLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Enviando...
+                          </>
+                        ) : (
+                          "Enviar Link"
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
 
             <TabsContent value="signup">
