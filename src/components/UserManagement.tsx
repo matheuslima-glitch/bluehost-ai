@@ -226,40 +226,39 @@ export function UserManagement() {
       isAdmin: boolean;
       permissions: Partial<UserPermission>;
     }) => {
-      // PASSO 1: Atualizar/criar permissões no banco
-      const { data: preCreateData, error: preCreateError } = await supabase.rpc("create_invited_user", {
+      // PASSO 1: Salvar convite com permissões (NÃO cria em profiles)
+      const { data: saveData, error: saveError } = await supabase.rpc("save_invitation_with_permissions", {
         p_email: email,
         p_invited_by: user?.id,
         p_is_admin: isAdmin,
         p_permissions: permissions,
       });
 
-      if (preCreateError || !preCreateData?.success) {
-        throw new Error(preCreateData?.error || preCreateError?.message || "Erro ao preparar convite");
+      if (saveError || !saveData?.success) {
+        throw new Error(saveData?.error || saveError?.message || "Erro ao salvar convite");
       }
 
-      // PASSO 2: SEMPRE tentar enviar email de convite
+      // PASSO 2: Enviar email de convite
       const redirectUrl = `${window.location.origin}/auth/callback`;
 
       const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         redirectTo: redirectUrl,
       });
 
-      // Se der erro "Database error", significa que usuário já existe no auth.users
       if (error) {
+        // Se der erro, pode ser que o usuário já exista
         if (
           error.message?.includes("Database error saving new user") ||
-          error.message?.includes("User already registered")
+          error.message?.includes("User already registered") ||
+          error.message?.includes("already been invited")
         ) {
-          // Usuário já existe no auth - permissões foram atualizadas mas email não será enviado
           return {
             success: true,
             emailSent: false,
-            message: "Permissões atualizadas com sucesso! O usuário já foi convidado anteriormente.",
+            message: "Convite atualizado! O usuário já foi convidado anteriormente.",
           };
         }
 
-        // Outros erros são lançados
         throw error;
       }
 
@@ -272,11 +271,11 @@ export function UserManagement() {
     },
     onSuccess: (result: any) => {
       const message = result?.emailSent
-        ? "O usuário receberá um e-mail com instruções para aceitar o convite."
-        : result?.message || "Permissões atualizadas com sucesso!";
+        ? "Convite enviado com sucesso! O usuário receberá um e-mail."
+        : result?.message || "Convite atualizado com sucesso!";
 
       toast({
-        title: "Convite processado!",
+        title: "Sucesso!",
         description: message,
       });
       setInviteEmail("");
