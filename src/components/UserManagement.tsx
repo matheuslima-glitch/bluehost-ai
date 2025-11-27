@@ -449,7 +449,7 @@ export function UserManagement() {
     // Se marcar para tornar admin, define permission_type como "total"
     const finalPermissions = makeAdminEdit
       ? { ...customPermissions, permission_type: "total" as const }
-      : customPermissions;
+      : { ...customPermissions, permission_type: "personalizado" as const };
 
     savePermissionsMutation.mutate({
       userId: selectedUserId,
@@ -740,6 +740,29 @@ export function UserManagement() {
                             Admin
                           </Badge>
                         )}
+                        {/* Tag de tipo de acesso - apenas para não-admins aceitos */}
+                        {!member.is_admin && member.invitation_status === "accepted" && member.permissions && (
+                          <Badge
+                            variant="secondary"
+                            className={`gap-1 ${
+                              member.permissions.permission_type === "total"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                : "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
+                            }`}
+                          >
+                            {member.permissions.permission_type === "total" ? (
+                              <>
+                                <Check className="h-3 w-3" />
+                                Acesso Total
+                              </>
+                            ) : (
+                              <>
+                                <SettingsIcon className="h-3 w-3" />
+                                Personalizado
+                              </>
+                            )}
+                          </Badge>
+                        )}
                         {member.invitation_status === "pending" && (
                           <Badge variant="secondary" className="gap-1 bg-yellow-500 hover:bg-yellow-600 text-white">
                             <Clock className="h-3 w-3" />
@@ -749,11 +772,6 @@ export function UserManagement() {
                         {member.id === user?.id && <Badge variant="outline">Você</Badge>}
                       </div>
                       <p className="text-sm text-muted-foreground">{member.email}</p>
-                      {member.permissions && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Tipo: {member.permissions.permission_type === "total" ? "Acesso Total" : "Personalizado"}
-                        </p>
-                      )}
                     </div>
                   </div>
 
@@ -897,7 +915,7 @@ export function UserManagement() {
                 <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 border border-blue-200 dark:border-blue-800">
                   <p className="text-sm text-blue-800 dark:text-blue-200">
                     <strong>Atenção:</strong> Administradores têm acesso total ao sistema, incluindo gerenciamento de
-                    usuários e todas as funcionalidades. As permissões abaixo serão ignoradas.
+                    usuários e todas as funcionalidades.
                   </p>
                 </div>
               )}
@@ -906,35 +924,12 @@ export function UserManagement() {
             </div>
           )}
 
-          {/* Tipo de Permissão */}
-          {!makeAdminEdit && (
-            <div className="space-y-2">
-              <Label>Tipo de Permissão</Label>
-              <Select
-                value={customPermissions.permission_type || "personalizado"}
-                onValueChange={(value: "total" | "personalizado") =>
-                  setCustomPermissions((prev) => ({ ...prev, permission_type: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="total">Acesso Total</SelectItem>
-                  <SelectItem value="personalizado">Personalizado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <ScrollArea className="h-[350px] pr-4">
-            {customPermissions.permission_type === "personalizado" && !makeAdminEdit ? (
+          <ScrollArea className="h-[400px] pr-4">
+            {!makeAdminEdit ? (
               renderPermissionsSections(customPermissions, updatePermission, false)
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                {makeAdminEdit
-                  ? "Usuário terá acesso total como Administrador"
-                  : "Usuário terá acesso total a todas as funcionalidades"}
+                Usuário terá acesso total como Administrador
               </div>
             )}
           </ScrollArea>
