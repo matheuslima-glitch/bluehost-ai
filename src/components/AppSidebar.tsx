@@ -55,7 +55,7 @@ export function AppSidebar() {
 
   // Buscar o full_name da tabela profiles
   const { data: profile } = useQuery({
-    queryKey: ["profile-sidebar", user?.id],
+    queryKey: ["profile", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("profiles").select("full_name").eq("id", user?.id).maybeSingle();
 
