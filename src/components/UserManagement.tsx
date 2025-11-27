@@ -467,7 +467,7 @@ export function UserManagement() {
   };
 
   const canManageUsers = isCurrentUserAdmin || canEdit("can_manage_users");
-  const canSendInvites = isCurrentUserAdmin || canEdit("can_send_invites");
+  const canSendInvites = isCurrentUserAdmin; // Somente admins podem enviar convites
 
   const renderPermissionsSections = (
     permissions: Partial<UserPermission>,
@@ -715,16 +715,6 @@ export function UserManagement() {
                           <Badge className="gap-1 bg-blue-600 hover:bg-blue-700 text-white">
                             <Shield className="h-3 w-3" />
                             Admin
-                          </Badge>
-                        )}
-                        {/* Tag de tipo de acesso - apenas para não-admins aceitos */}
-                        {!member.is_admin && member.invitation_status === "accepted" && member.permissions && (
-                          <Badge
-                            variant="secondary"
-                            className="gap-1 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
-                          >
-                            <SettingsIcon className="h-3 w-3" />
-                            Personalizado
                           </Badge>
                         )}
                         {member.invitation_status === "pending" && (
