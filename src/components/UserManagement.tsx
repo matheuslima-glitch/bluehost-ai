@@ -167,9 +167,11 @@ export function UserManagement() {
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [invitePermissionsDialogOpen, setInvitePermissionsDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [customPermissions, setCustomPermissions] = useState<Partial<UserPermission>>({});
   const [invitePermissions, setInvitePermissions] = useState<Partial<UserPermission>>(DEFAULT_PERMISSIONS);
   const [makeAdmin, setMakeAdmin] = useState(false);
+  const [makeAdminEdit, setMakeAdminEdit] = useState(false);
 
   const { data: currentUserProfile } = useQuery({
     queryKey: ["current-user-profile", user?.id],
@@ -193,9 +195,7 @@ export function UserManagement() {
 
       if (profilesError) throw profilesError;
 
-      // ⭐ CORREÇÃO: Usar supabaseAdmin para buscar permissões de TODOS os usuários
-      // O supabase normal só permite ver as próprias permissões devido à RLS
-      const { data: permissions, error: permissionsError } = await supabaseAdmin.from("user_permissions").select("*");
+      const { data: permissions, error: permissionsError } = await supabase.from("user_permissions").select("*");
       if (permissionsError) throw permissionsError;
 
       const { data: invitations, error: invitationsError } = await supabase
@@ -393,44 +393,42 @@ export function UserManagement() {
     },
   });
 
-  // ⭐ CORREÇÃO: Usar supabaseAdmin com UPSERT para evitar erro de duplicidade
-  // O upsert faz INSERT se não existir ou UPDATE se existir automaticamente
   const savePermissionsMutation = useMutation({
-    mutationFn: async ({ userId, permissions }: { userId: string; permissions: Partial<UserPermission> }) => {
-      console.log("🔄 Salvando permissões para userId:", userId);
-      console.log("📝 Permissões:", permissions);
-
-      // Remover campos que não devem ser enviados no upsert
-      const { id, ...permissionsWithoutId } = permissions as any;
-
-      // Usar upsert com onConflict para lidar com duplicidade automaticamente
-      const { error } = await supabaseAdmin.from("user_permissions").upsert(
-        {
-          user_id: userId,
-          ...permissionsWithoutId,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "user_id", // Coluna com unique constraint
-          ignoreDuplicates: false, // Atualizar se existir
-        },
-      );
-
-      if (error) {
-        console.error("❌ Erro ao salvar permissões:", error);
-        throw error;
+    mutationFn: async ({
+      userId,
+      permissions,
+      promoteToAdmin,
+    }: {
+      userId: string;
+      permissions: Partial<UserPermission>;
+      promoteToAdmin?: boolean;
+    }) => {
+      // Se promover a admin, atualizar profiles.is_admin
+      if (promoteToAdmin) {
+        const { error: adminError } = await supabase.from("profiles").update({ is_admin: true }).eq("id", userId);
+        if (adminError) throw adminError;
       }
 
-      console.log("✅ Permissões salvas com sucesso!");
+      // Salvar permissões
+      const { data: existing } = await supabase.from("user_permissions").select("id").eq("user_id", userId).single();
+
+      if (existing) {
+        const { error } = await supabase.from("user_permissions").update(permissions).eq("user_id", userId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("user_permissions").insert({ user_id: userId, ...permissions });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       toast({ title: "Permissões atualizadas", description: "As permissões do usuário foram atualizadas com sucesso" });
       setPermissionsDialogOpen(false);
       setSelectedUserId(null);
+      setSelectedMember(null);
+      setMakeAdminEdit(false);
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
     },
     onError: (error: any) => {
-      console.error("❌ Erro na mutation:", error);
       toast({ title: "Erro ao atualizar permissões", description: error.message, variant: "destructive" });
     },
   });
@@ -465,6 +463,8 @@ export function UserManagement() {
 
   const openEditPermissions = (member: TeamMember) => {
     setSelectedUserId(member.id);
+    setSelectedMember(member);
+    setMakeAdminEdit(false); // Resetar ao abrir
     if (member.permissions) {
       setCustomPermissions(member.permissions);
     } else {
@@ -475,7 +475,17 @@ export function UserManagement() {
 
   const handleSaveCustomPermissions = () => {
     if (!selectedUserId) return;
-    savePermissionsMutation.mutate({ userId: selectedUserId, permissions: customPermissions });
+
+    // Se marcar para tornar admin, define permission_type como "total"
+    const finalPermissions = makeAdminEdit
+      ? { ...customPermissions, permission_type: "total" as const }
+      : customPermissions;
+
+    savePermissionsMutation.mutate({
+      userId: selectedUserId,
+      permissions: finalPermissions,
+      promoteToAdmin: makeAdminEdit,
+    });
   };
 
   const updatePermission = (key: keyof UserPermission, value: PermissionLevel) => {
@@ -878,15 +888,85 @@ export function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
+      <Dialog
+        open={permissionsDialogOpen}
+        onOpenChange={(open) => {
+          setPermissionsDialogOpen(open);
+          if (!open) {
+            setMakeAdminEdit(false);
+            setSelectedMember(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Editar Permissões</DialogTitle>
-            <DialogDescription>Configure as permissões personalizadas do usuário</DialogDescription>
+            <DialogDescription>
+              Configure as permissões de {selectedMember?.full_name || selectedMember?.email}
+            </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="h-[500px] pr-4">
-            {renderPermissionsSections(customPermissions, updatePermission)}
+          {/* ⭐ Opção de tornar admin - apenas para admins */}
+          {isCurrentUserAdmin && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
+                <input
+                  type="checkbox"
+                  id="makeAdminEdit"
+                  checked={makeAdminEdit}
+                  onChange={(e) => setMakeAdminEdit(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <Label htmlFor="makeAdminEdit" className="cursor-pointer flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-500" />
+                  Tornar Administrador
+                </Label>
+              </div>
+
+              {makeAdminEdit && (
+                <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Atenção:</strong> Administradores têm acesso total ao sistema, incluindo gerenciamento de
+                    usuários e todas as funcionalidades. As permissões abaixo serão ignoradas.
+                  </p>
+                </div>
+              )}
+
+              <Separator />
+            </div>
+          )}
+
+          {/* Tipo de Permissão */}
+          {!makeAdminEdit && (
+            <div className="space-y-2">
+              <Label>Tipo de Permissão</Label>
+              <Select
+                value={customPermissions.permission_type || "personalizado"}
+                onValueChange={(value: "total" | "personalizado") =>
+                  setCustomPermissions((prev) => ({ ...prev, permission_type: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="total">Acesso Total</SelectItem>
+                  <SelectItem value="personalizado">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <ScrollArea className="h-[350px] pr-4">
+            {customPermissions.permission_type === "personalizado" && !makeAdminEdit ? (
+              renderPermissionsSections(customPermissions, updatePermission, false)
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                {makeAdminEdit
+                  ? "Usuário terá acesso total como Administrador"
+                  : "Usuário terá acesso total a todas as funcionalidades"}
+              </div>
+            )}
           </ScrollArea>
 
           <DialogFooter>
@@ -898,6 +978,11 @@ export function UserManagement() {
                 <>
                   <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-background border-t-foreground" />
                   Salvando...
+                </>
+              ) : makeAdminEdit ? (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Promover a Admin
                 </>
               ) : (
                 <>
