@@ -242,24 +242,14 @@ export function UserManagement() {
       isAdmin: boolean;
       permissions: Partial<UserPermission>;
     }) => {
-      console.log("🚀 INICIANDO ENVIO DE CONVITE");
-      console.log("📧 Email:", email);
-      console.log("👤 Is Admin:", isAdmin);
-      console.log("🔐 Permissions:", permissions);
-
       // ============================================================
       // PASSO 1: ENVIAR EMAIL PRIMEIRO (PRIORIDADE!)
       // ============================================================
       const redirectUrl = `${window.location.origin}/accept-invite`;
 
-      console.log("📧 ENVIANDO EMAIL VIA SUPABASE ADMIN...");
       const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         redirectTo: redirectUrl,
       });
-
-      console.log("📬 Resultado inviteUserByEmail:");
-      console.log("  - Data:", inviteData);
-      console.log("  - Error:", inviteError);
 
       // Verificar erros conhecidos
       if (inviteError) {
@@ -271,23 +261,18 @@ export function UserManagement() {
           errorMsg.includes("already been invited") ||
           errorMsg.includes("Database error saving new user")
         ) {
-          console.warn("⚠️ Usuário já existe, mas continuando para salvar permissões...");
           // Não retorna erro - continua para salvar permissões
         } else {
           // Erro real - lançar exceção
-          console.error("❌ ERRO ao enviar email:", inviteError);
           throw new Error(`Erro ao enviar convite: ${errorMsg}`);
         }
       } else {
-        console.log("✅ EMAIL ENVIADO COM SUCESSO!");
       }
 
       // ============================================================
       // PASSO 2: SALVAR PERMISSÕES (BEST EFFORT)
       // ============================================================
       // Se falhar aqui, não impede que email tenha sido enviado
-
-      console.log("💾 Salvando permissões em invitations...");
 
       try {
         const { data: saveData, error: saveError } = await supabase.rpc("save_invitation_with_permissions", {
@@ -298,17 +283,12 @@ export function UserManagement() {
         });
 
         if (saveError) {
-          console.warn("⚠️ Erro ao salvar invitations:", saveError);
           // NÃO lança erro - email já foi enviado!
         } else if (!saveData?.success) {
-          console.warn("⚠️ Função retornou falha:", saveData);
           // NÃO lança erro - email já foi enviado!
         } else {
-          console.log("✅ Permissões salvas com sucesso!");
-          console.log("🎫 Token gerado:", saveData.token);
         }
       } catch (catchError: any) {
-        console.warn("⚠️ Exceção ao salvar invitations:", catchError);
         // NÃO lança erro - email já foi enviado!
       }
 
@@ -331,8 +311,6 @@ export function UserManagement() {
     },
 
     onSuccess: (result: any) => {
-      console.log("🎉 SUCESSO GERAL:", result);
-
       toast({
         title: "Sucesso!",
         description: result.message || "Convite processado com sucesso!",
@@ -347,10 +325,6 @@ export function UserManagement() {
     },
 
     onError: (error: any) => {
-      console.error("❌ ERRO GERAL:", error);
-      console.error("  - Message:", error.message);
-      console.error("  - Stack:", error.stack);
-
       toast({
         title: "Erro ao enviar convite",
         description: error.message || "Ocorreu um erro ao processar o convite",
@@ -409,19 +383,22 @@ export function UserManagement() {
         if (adminError) throw adminError;
       }
 
-      // Salvar permissões
-      const { data: existing } = await supabase.from("user_permissions").select("id").eq("user_id", userId).single();
+      // Salvar permissões usando upsert para evitar erro de duplicidade
+      const { error } = await supabase
+        .from("user_permissions")
+        .upsert({ user_id: userId, ...permissions }, { onConflict: "user_id" });
 
-      if (existing) {
-        const { error } = await supabase.from("user_permissions").update(permissions).eq("user_id", userId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("user_permissions").insert({ user_id: userId, ...permissions });
-        if (error) throw error;
-      }
+      if (error) throw error;
+
+      return { promoteToAdmin };
     },
-    onSuccess: () => {
-      toast({ title: "Permissões atualizadas", description: "As permissões do usuário foram atualizadas com sucesso" });
+    onSuccess: (result) => {
+      toast({
+        title: result?.promoteToAdmin ? "Usuário promovido!" : "Permissões atualizadas",
+        description: result?.promoteToAdmin
+          ? "O usuário agora é um administrador com acesso total"
+          : "As permissões do usuário foram atualizadas com sucesso",
+      });
       setPermissionsDialogOpen(false);
       setSelectedUserId(null);
       setSelectedMember(null);
@@ -434,13 +411,7 @@ export function UserManagement() {
   });
 
   const handleSendInvite = () => {
-    console.log("🎯 handleSendInvite chamado");
-    console.log("📧 Email:", inviteEmail);
-    console.log("👤 Make Admin:", makeAdmin);
-    console.log("🔐 Permissions:", invitePermissions);
-
     if (!inviteEmail) {
-      console.warn("⚠️ Email vazio!");
       toast({
         title: "Email obrigatório",
         description: "Por favor, insira um email válido",
@@ -449,7 +420,6 @@ export function UserManagement() {
       return;
     }
 
-    console.log("✅ Validação OK, chamando mutation...");
     inviteMutation.mutate({ email: inviteEmail, isAdmin: makeAdmin, permissions: invitePermissions });
   };
 
