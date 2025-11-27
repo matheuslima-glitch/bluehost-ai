@@ -111,33 +111,31 @@ export default function Dashboard() {
 
       status.namecheap = !!balanceData;
     } catch (error) {
-      console.error("Erro ao verificar status Namecheap:", error);
+      // Silenciar erro
     }
 
-    // Verificar Cloudflare: fazer chamada de teste
+    // Verificar Cloudflare: verificar se existem domínios com cloudflare configurado no banco
     try {
-      const { data, error } = await supabase.functions.invoke("cloudflare-integration", {
-        body: { action: "zones" },
-      });
+      const { data: cloudflareData, count } = await supabase
+        .from("domains")
+        .select("id", { count: "exact", head: true })
+        .not("cloudflare_zone_id", "is", null);
 
-      // Se não houver erro de credenciais, está configurado
-      status.cloudflare = !error || (error && !error.message.includes("credentials not configured"));
-    } catch (error: any) {
-      // Se o erro não for de credenciais faltantes, considera configurado
-      status.cloudflare = !error?.message?.includes("credentials not configured");
+      status.cloudflare = (count || 0) > 0;
+    } catch (error) {
+      // Silenciar erro
     }
 
-    // Verificar cPanel: fazer chamada de teste
+    // Verificar cPanel: verificar se existem domínios com cpanel configurado no banco
     try {
-      const { data, error } = await supabase.functions.invoke("cpanel-integration", {
-        body: { action: "domains" },
-      });
+      const { data: cpanelData, count } = await supabase
+        .from("domains")
+        .select("id", { count: "exact", head: true })
+        .eq("integration_source", "cpanel");
 
-      // Se não houver erro de credenciais, está configurado
-      status.cpanel = !error || (error && !error.message.includes("credentials not configured"));
-    } catch (error: any) {
-      // Se o erro não for de credenciais faltantes, considera configurado
-      status.cpanel = !error?.message?.includes("credentials not configured");
+      status.cpanel = (count || 0) > 0;
+    } catch (error) {
+      // Silenciar erro
     }
 
     return status;
@@ -296,91 +294,47 @@ export default function Dashboard() {
         });
       }
 
-      // Load expired domains from Namecheap API
-      try {
-        const { data: expiredData, error: expiredError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "EXPIRED" },
-        });
+      // Usar dados do banco de dados (já carregados acima via domainsData)
+      // Os dados são sincronizados pelo backend no Render
 
-        if (!expiredError && expiredData?.domains) {
-          console.log("Domínios expirados:", expiredData.domains);
-          setExpiredDomains(expiredData.domains.length);
-        } else {
-          console.error("Erro ao carregar domínios expirados:", expiredError);
-        }
-      } catch (expiredErr) {
-        console.error("Error loading expired domains:", expiredErr);
-      }
+      // Domínios expirados - usar dados do banco
+      const expiredCount = domainsData?.filter((d) => d.status === "expired").length || 0;
+      setExpiredDomains(expiredCount);
 
-      // Load expiring domains from Namecheap API
-      try {
-        const { data: expiringData, error: expiringError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "EXPIRING" },
-        });
+      // Domínios expirando - usar dados do banco
+      const now = new Date();
+      const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
 
-        if (!expiringError && expiringData?.domains) {
-          console.log("Domínios expirando:", expiringData.domains);
-          setExpiringDomains(expiringData.domains.length);
+      const expiringCount =
+        domainsData?.filter((d) => {
+          if (!d.expiration_date) return false;
+          const expDate = new Date(d.expiration_date);
+          return expDate > now && expDate < thirtyDaysFromNow;
+        }).length || 0;
+      setExpiringDomains(expiringCount);
 
-          // Filter critical domains (expiring in 15 days)
-          const now = new Date();
-          const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+      // Domínios críticos (expirando em 15 dias)
+      const criticalCount =
+        domainsData?.filter((d) => {
+          if (!d.expiration_date) return false;
+          const expDate = new Date(d.expiration_date);
+          return expDate > now && expDate < fifteenDaysFromNow;
+        }).length || 0;
+      setCriticalDomains(criticalCount);
 
-          const critical = expiringData.domains.filter((d: any) => {
-            const expDate = new Date(d.expirationDate);
-            return expDate <= fifteenDaysFromNow;
-          });
+      // Domínios suspensos - usar dados do banco
+      const suspendedCount = domainsData?.filter((d) => d.status === "suspended").length || 0;
+      setSuspendedDomains(suspendedCount);
 
-          console.log("Domínios críticos (15 dias):", critical);
-          setCriticalDomains(critical.length);
-        } else {
-          console.error("Erro ao carregar domínios expirando:", expiringError);
-        }
-      } catch (expiringErr) {
-        console.error("Error loading expiring domains:", expiringErr);
-      }
-
-      // Load suspended domains from Namecheap API (they might be in the all domains list)
-      try {
-        const { data: allDomainsData, error: allDomainsError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list" },
-        });
-
-        if (!allDomainsError && allDomainsData?.domains) {
-          // Namecheap doesn't have a direct "suspended" status
-          // We need to check the domains in the database that have suspended status
-          const suspendedCount = domainsData?.filter((d) => d.status === "suspended").length || 0;
-          console.log("Domínios suspensos:", suspendedCount);
-          setSuspendedDomains(suspendedCount);
-        }
-      } catch (suspendedErr) {
-        console.error("Error loading suspended domains:", suspendedErr);
-        // Fallback to database count
-        const suspendedCount = domainsData?.filter((d) => d.status === "suspended").length || 0;
-        setSuspendedDomains(suspendedCount);
-      }
-
-      // Load alert domains from Namecheap API
-      try {
-        const { data: alertData, error: alertError } = await supabase.functions.invoke("namecheap-domains", {
-          body: { action: "list_domains", listType: "ALERT" },
-        });
-
-        if (!alertError && alertData?.domains) {
-          console.log("Domínios com alerta:", alertData.domains);
-          setAlertDomains(alertData.domains.length);
-        } else {
-          console.error("Erro ao carregar domínios com alerta:", alertError);
-        }
-      } catch (alertErr) {
-        console.error("Error loading alert domains:", alertErr);
-      }
+      // Domínios com alerta - considerar expirados + suspensos
+      const alertCount = expiredCount + suspendedCount;
+      setAlertDomains(alertCount);
 
       // CORREÇÃO 3: Verificar status das integrações de forma correta
       const integrationsStatus = await checkIntegrationsStatus();
       setIntegrationStatus(integrationsStatus);
     } catch (error: any) {
-      console.error("Dashboard load error:", error);
       toast.error("Erro ao carregar dados do dashboard");
     } finally {
       setLoading(false);
