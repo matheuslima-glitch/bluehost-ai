@@ -586,12 +586,6 @@ export function UserManagement() {
             onChange={(value) => updateFn("can_manage_users", value)}
             disabled={disabled}
           />
-          <PermissionSelector
-            label="Enviar Convites"
-            value={permissions.can_send_invites || "none"}
-            onChange={(value) => updateFn("can_send_invites", value)}
-            disabled={disabled}
-          />
         </div>
       </div>
     </div>
