@@ -30,14 +30,20 @@ export default function DomainSearch() {
 
   const loadBalance = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke("namecheap-domains", {
-        body: { action: "balance" },
-      });
+      // Buscar saldo do banco de dados (sincronizado pelo backend no Render)
+      const { data, error } = await supabase
+        .from("namecheap_balance")
+        .select("balance_usd")
+        .order("last_synced_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (error) throw error;
-      setBalance(data.balance);
+      if (data) {
+        setBalance(data.balance_usd);
+      }
     } catch (error: any) {
-      console.error("Erro ao carregar saldo:", error);
+      // Silenciar erro
     }
   };
 
