@@ -23,7 +23,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
   PieChart,
@@ -41,10 +41,9 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { hasPermission, canEdit } = usePermissions();
 
-  // ⭐ CORREÇÃO: Verificar se pode interagir (editar) ou apenas visualizar
+  // ⭐ Variáveis de permissão para modo leitura
   const canEditIntegrations = canEdit("can_view_integrations");
-  const canEditBalance = canEdit("can_view_balance");
-  const canEditCriticalDomains = canEdit("can_view_critical_domains");
+
   const [firstName, setFirstName] = useState("");
   const [stats, setStats] = useState({
     total: 0,
@@ -482,7 +481,7 @@ export default function Dashboard() {
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
                 Status das Integrações
-                {/* ⭐ INDICADOR DE MODO SOMENTE LEITURA */}
+                {/* ⭐ Badge de somente leitura */}
                 {!canEditIntegrations && (
                   <Badge variant="secondary" className="ml-2 gap-1">
                     <Lock className="h-3 w-3" />
@@ -501,22 +500,22 @@ export default function Dashboard() {
                       <XCircle className="h-5 w-5 text-red-500" />
                     )}
                     <div>
-                      {/* ⭐ CORREÇÃO: Link desabilitado quando somente leitura */}
+                      {/* ⭐ Nome sempre visível, link só se tiver permissão */}
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <p
                               className={`text-sm font-medium ${
                                 canEditIntegrations
-                                  ? "cursor-pointer hover:text-blue-500"
-                                  : "cursor-not-allowed text-muted-foreground"
+                                  ? "cursor-pointer hover:text-blue-500 hover:underline"
+                                  : "cursor-default"
                               }`}
                               onClick={() =>
                                 canEditIntegrations &&
                                 window.open("https://www.namecheap.com/myaccount/login/?ReturnUrl=%2f", "_blank")
                               }
                             >
-                              {!canEditIntegrations && <Lock className="inline h-3 w-3 mr-1" />}
+                              {!canEditIntegrations && <Lock className="inline h-3 w-3 mr-1 text-muted-foreground" />}
                               Namecheap
                             </p>
                           </TooltipTrigger>
@@ -542,21 +541,21 @@ export default function Dashboard() {
                       <XCircle className="h-5 w-5 text-red-500" />
                     )}
                     <div>
-                      {/* ⭐ CORREÇÃO: Link desabilitado quando somente leitura */}
+                      {/* ⭐ Nome sempre visível, link só se tiver permissão */}
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <p
                               className={`text-sm font-medium ${
                                 canEditIntegrations
-                                  ? "cursor-pointer hover:text-blue-500"
-                                  : "cursor-not-allowed text-muted-foreground"
+                                  ? "cursor-pointer hover:text-blue-500 hover:underline"
+                                  : "cursor-default"
                               }`}
                               onClick={() =>
                                 canEditIntegrations && window.open("https://nexus.servidor.net.br:2083/", "_blank")
                               }
                             >
-                              {!canEditIntegrations && <Lock className="inline h-3 w-3 mr-1" />}
+                              {!canEditIntegrations && <Lock className="inline h-3 w-3 mr-1 text-muted-foreground" />}
                               cPanel
                             </p>
                           </TooltipTrigger>
@@ -567,8 +566,6 @@ export default function Dashboard() {
                           )}
                         </Tooltip>
                       </TooltipProvider>
-                      {/* LINHA REMOVIDA ABAIXO */}
-                      {/* <p className="text-xs text-muted-foreground">{integrations.cpanel} domínios</p> */}
                     </div>
                   </div>
                   <Badge variant={integrationStatus.cpanel ? "default" : "destructive"}>
@@ -584,21 +581,21 @@ export default function Dashboard() {
                       <XCircle className="h-5 w-5 text-red-500" />
                     )}
                     <div>
-                      {/* ⭐ CORREÇÃO: Link desabilitado quando somente leitura */}
+                      {/* ⭐ Nome sempre visível, link só se tiver permissão */}
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <p
                               className={`text-sm font-medium ${
                                 canEditIntegrations
-                                  ? "cursor-pointer hover:text-blue-500"
-                                  : "cursor-not-allowed text-muted-foreground"
+                                  ? "cursor-pointer hover:text-blue-500 hover:underline"
+                                  : "cursor-default"
                               }`}
                               onClick={() =>
                                 canEditIntegrations && window.open("https://dash.cloudflare.com/login", "_blank")
                               }
                             >
-                              {!canEditIntegrations && <Lock className="inline h-3 w-3 mr-1" />}
+                              {!canEditIntegrations && <Lock className="inline h-3 w-3 mr-1 text-muted-foreground" />}
                               Cloudflare
                             </p>
                           </TooltipTrigger>
@@ -609,8 +606,6 @@ export default function Dashboard() {
                           )}
                         </Tooltip>
                       </TooltipProvider>
-                      {/* LINHA REMOVIDA ABAIXO */}
-                      {/* <p className="text-xs text-muted-foreground">{integrations.cloudflare} zonas</p> */}
                     </div>
                   </div>
                   <Badge variant={integrationStatus.cloudflare ? "default" : "destructive"}>
@@ -629,13 +624,6 @@ export default function Dashboard() {
               <CardTitle className="flex items-center gap-2">
                 <Wallet className="h-5 w-5" />
                 Saldo Namecheap
-                {/* ⭐ INDICADOR DE MODO SOMENTE LEITURA */}
-                {!canEditBalance && (
-                  <Badge variant="secondary" className="ml-2 gap-1">
-                    <Lock className="h-3 w-3" />
-                    Somente Leitura
-                  </Badge>
-                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -691,7 +679,6 @@ export default function Dashboard() {
       {/* Critical Domains Management Table */}
       {hasPermission("can_view_critical_domains") && (
         <div data-critical-domains-table className="critical-domains-table scroll-mt-4">
-          {/* ⭐ O componente CriticalDomainsTable agora usa usePermissions internamente */}
           <CriticalDomainsTable domains={domains} onDomainsChange={loadDashboardData} />
         </div>
       )}
@@ -711,7 +698,7 @@ export default function Dashboard() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <RechartsTooltip />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -729,7 +716,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
+                <RechartsTooltip />
                 <Legend />
                 <Bar dataKey="dominios" fill="hsl(var(--primary))" />
               </BarChart>
@@ -760,7 +747,7 @@ export default function Dashboard() {
                   domain={["auto", "auto"]}
                   scale="linear"
                 />
-                <Tooltip
+                <RechartsTooltip
                   formatter={(value: number) => [value.toLocaleString("pt-BR") + " visitas", "Visitas"]}
                   labelFormatter={(label) => `Mês: ${label}`}
                 />
