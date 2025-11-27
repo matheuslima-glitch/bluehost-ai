@@ -262,6 +262,12 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       return;
     }
 
+    // ✅ CORREÇÃO: Verificar se o usuário está autenticado
+    if (!user?.id) {
+      toast.error("Usuário não autenticado. Faça login novamente.");
+      return;
+    }
+
     setLoading(true);
 
     if (channelRef.current) {
@@ -287,6 +293,7 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
       const apiUrl = import.meta.env.VITE_API_URL || "https://domainhub-backend.onrender.com";
 
       console.log(`📡 Chamando API: ${apiUrl}/api/purchase-domains`);
+      console.log(`👤 User ID: ${user.id}`); // Log para debug
 
       const response = await fetch(`${apiUrl}/api/purchase-domains`, {
         method: "POST",
@@ -298,7 +305,8 @@ export default function PurchaseWithAIDialog({ open, onOpenChange, onSuccess }: 
           quantidade: quantity,
           idioma: language,
           plataforma: platform,
-          trafficSource: trafficSource, // Adicionado fonte de tráfego
+          trafficSource: trafficSource,
+          userId: user.id, // ✅ CORREÇÃO: Agora envia o userId do usuário logado
         }),
       });
 
