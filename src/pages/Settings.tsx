@@ -107,9 +107,9 @@ export default function Settings() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // ⭐ Estados para compartilhamento de filtros (apenas admins)
-  const [sharePlatformFilter, setSharePlatformFilter] = useState(false);
-  const [shareTrafficSourceFilter, setShareTrafficSourceFilter] = useState(false);
+  // ⭐ Estados para dialog de compartilhamento de filtros (apenas admins)
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [pendingFilter, setPendingFilter] = useState<{ type: string; value: string } | null>(null);
 
   // Estados para o AlertDialog de confirmação de remoção
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -693,19 +693,21 @@ export default function Settings() {
         user_id: user?.id,
         filter_type,
         filter_value: filter_value.trim(),
-        is_shared: is_shared || false, // ⭐ Novo campo para compartilhamento
+        is_shared: is_shared || false,
       });
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["custom-filters", user?.id] });
-      // ⭐ Resetar checkboxes de compartilhamento após adicionar
-      setSharePlatformFilter(false);
-      setShareTrafficSourceFilter(false);
+      // ⭐ Fechar dialog e limpar estados
+      setShareDialogOpen(false);
+      setPendingFilter(null);
       toast({
         title: "Sucesso",
-        description: "Filtro adicionado com sucesso!",
+        description: variables.is_shared
+          ? "Filtro adicionado e compartilhado com o time!"
+          : "Filtro adicionado com sucesso!",
       });
     },
     onError: (error: any) => {
@@ -759,23 +761,62 @@ export default function Settings() {
 
   const handleAddPlatformFilter = () => {
     if (newPlatformFilter.trim()) {
-      addFilterMutation.mutate({
-        filter_type: "platform",
-        filter_value: newPlatformFilter.trim(),
-        is_shared: isAdmin ? sharePlatformFilter : false, // ⭐ Compartilhar apenas se admin
-      });
+      if (isAdmin) {
+        // ⭐ Admin: abre dialog para escolher se compartilha ou não
+        setPendingFilter({ type: "platform", value: newPlatformFilter.trim() });
+        setShareDialogOpen(true);
+      } else {
+        // ⭐ Não-admin: salva direto
+        addFilterMutation.mutate({
+          filter_type: "platform",
+          filter_value: newPlatformFilter.trim(),
+          is_shared: false,
+        });
+      }
       setNewPlatformFilter("");
     }
   };
 
   const handleAddTrafficSourceFilter = () => {
     if (newTrafficSourceFilter.trim()) {
-      addFilterMutation.mutate({
-        filter_type: "traffic_source",
-        filter_value: newTrafficSourceFilter.trim(),
-        is_shared: isAdmin ? shareTrafficSourceFilter : false, // ⭐ Compartilhar apenas se admin
-      });
+      if (isAdmin) {
+        // ⭐ Admin: abre dialog para escolher se compartilha ou não
+        setPendingFilter({ type: "traffic_source", value: newTrafficSourceFilter.trim() });
+        setShareDialogOpen(true);
+      } else {
+        // ⭐ Não-admin: salva direto
+        addFilterMutation.mutate({
+          filter_type: "traffic_source",
+          filter_value: newTrafficSourceFilter.trim(),
+          is_shared: false,
+        });
+      }
       setNewTrafficSourceFilter("");
+    }
+  };
+
+  // ⭐ Funções para o dialog de compartilhamento
+  const handleSaveFilterOnly = () => {
+    if (pendingFilter) {
+      addFilterMutation.mutate({
+        filter_type: pendingFilter.type,
+        filter_value: pendingFilter.value,
+        is_shared: false,
+      });
+      setShareDialogOpen(false);
+      setPendingFilter(null);
+    }
+  };
+
+  const handleShareWithTeam = () => {
+    if (pendingFilter) {
+      addFilterMutation.mutate({
+        filter_type: pendingFilter.type,
+        filter_value: pendingFilter.value,
+        is_shared: true,
+      });
+      setShareDialogOpen(false);
+      setPendingFilter(null);
     }
   };
 
@@ -1366,21 +1407,6 @@ export default function Settings() {
                   </TooltipProvider>
                 </div>
 
-                {/* ⭐ Checkbox de compartilhamento - apenas para admins */}
-                {isAdmin && (
-                  <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <Checkbox
-                      id="sharePlatform"
-                      checked={sharePlatformFilter}
-                      onCheckedChange={(checked) => setSharePlatformFilter(checked as boolean)}
-                    />
-                    <Label htmlFor="sharePlatform" className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Users className="h-4 w-4 text-blue-500" />
-                      Compartilhar com o time
-                    </Label>
-                  </div>
-                )}
-
                 <div className="flex flex-wrap gap-2">
                   {allPlatformFilters.map((filter: any) => (
                     <Badge
@@ -1454,21 +1480,6 @@ export default function Settings() {
                   </TooltipProvider>
                 </div>
 
-                {/* ⭐ Checkbox de compartilhamento - apenas para admins */}
-                {isAdmin && (
-                  <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <Checkbox
-                      id="shareTrafficSource"
-                      checked={shareTrafficSourceFilter}
-                      onCheckedChange={(checked) => setShareTrafficSourceFilter(checked as boolean)}
-                    />
-                    <Label htmlFor="shareTrafficSource" className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Users className="h-4 w-4 text-blue-500" />
-                      Compartilhar com o time
-                    </Label>
-                  </div>
-                )}
-
                 <div className="flex flex-wrap gap-2">
                   {allTrafficSourceFilters.map((filter: any) => (
                     <Badge
@@ -1535,6 +1546,47 @@ export default function Settings() {
               <AlertTriangle className="h-4 w-4 mr-2" />
               Remover
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ⭐ Dialog para escolher se compartilha filtro com o time (apenas admins) */}
+      <AlertDialog
+        open={shareDialogOpen}
+        onOpenChange={(open) => {
+          setShareDialogOpen(open);
+          if (!open) setPendingFilter(null);
+        }}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center justify-center mb-4">
+              <div className="p-4 bg-blue-100 dark:bg-blue-900 rounded-full">
+                <Users className="h-10 w-10 text-blue-500" />
+              </div>
+            </div>
+            <AlertDialogTitle className="text-center">Adicionar Filtro</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              <span className="block mb-2">
+                Como deseja adicionar o filtro <strong>"{pendingFilter?.value}"</strong>?
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {pendingFilter?.type === "platform" ? "Plataforma" : "Fonte de Tráfego"}
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex flex-col gap-3 mt-4">
+            <Button onClick={handleSaveFilterOnly} variant="outline" className="w-full py-6">
+              <User className="h-5 w-5 mr-2" />
+              Salvar apenas para mim
+            </Button>
+            <Button onClick={handleShareWithTeam} className="w-full py-6 bg-blue-500 hover:bg-blue-600">
+              <Users className="h-5 w-5 mr-2" />
+              Compartilhar com o time
+            </Button>
+          </div>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="w-full">Cancelar</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
