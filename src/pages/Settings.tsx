@@ -174,7 +174,7 @@ export default function Settings() {
             }
 
             // Invalidar queries para atualizar dados
-            await queryClient.invalidateQueries({ queryKey: ["profile", session.user.id] });
+            await queryClient.invalidateQueries({ queryKey: ["profile-settings", session.user.id] });
 
             // Limpar a URL (remove os parâmetros)
             window.history.replaceState({}, document.title, "/settings");
@@ -216,7 +216,7 @@ export default function Settings() {
 
   // Fetch profile data
   const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ["profile", user?.id],
+    queryKey: ["profile-settings", user?.id], // ⭐ Key diferente para buscar TODOS os campos
     queryFn: async () => {
       if (!user?.id) {
         console.error("⚠️ PROFILE QUERY: User ID não disponível");
@@ -477,7 +477,7 @@ export default function Settings() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile-settings", user?.id] });
       toast({
         title: "Sucesso",
         description: "Perfil atualizado com sucesso!",
@@ -505,7 +505,7 @@ export default function Settings() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile-settings", user?.id] });
       toast({
         title: "Sucesso",
         description: "Número do WhatsApp atualizado com sucesso!",
@@ -817,7 +817,7 @@ export default function Settings() {
 
       if (error) throw error;
 
-      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile-settings", user?.id] });
 
       toast({
         title: "✅ Som salvo com sucesso!",
