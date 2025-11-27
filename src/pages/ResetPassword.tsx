@@ -30,21 +30,15 @@ export default function ResetPassword() {
         const accessToken = hashParams.get("access_token");
         const type = hashParams.get("type");
 
-        console.log("Token type:", type);
-        console.log("Access token presente:", !!accessToken);
-
         if (type === "recovery" && accessToken) {
           // Token válido encontrado
           setIsValidToken(true);
-          console.log("✅ Token de recuperação válido detectado");
         } else {
           // Sem token ou tipo inválido
-          console.log("❌ Token de recuperação não encontrado ou inválido");
           toast.error("Link de recuperação inválido ou expirado");
           setTimeout(() => navigate("/auth"), 2000);
         }
       } catch (error) {
-        console.error("Erro ao verificar token:", error);
         toast.error("Erro ao verificar link de recuperação");
         setTimeout(() => navigate("/auth"), 2000);
       } finally {
@@ -81,20 +75,17 @@ export default function ResetPassword() {
         throw error;
       }
 
-      console.log("✅ Senha atualizada com sucesso");
       setPasswordUpdated(true);
       toast.success("Senha redefinida com sucesso!");
 
       // IMPORTANTE: Fazer logout para forçar o usuário a logar com a nova senha
       await supabase.auth.signOut();
-      console.log("✅ Sessão encerrada - usuário precisará fazer login novamente");
 
       // Aguardar 2 segundos e redirecionar para login
       setTimeout(() => {
         navigate("/auth");
       }, 2000);
     } catch (error: any) {
-      console.error("❌ Erro ao redefinir senha:", error);
       toast.error(error.message || "Erro ao redefinir senha");
     } finally {
       setLoading(false);

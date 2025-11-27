@@ -104,8 +104,6 @@ export function usePermissions() {
         throw new Error("Usuário não autenticado");
       }
 
-      console.log("usePermissions: Buscando permissões para user:", user.id);
-
       // Buscar se é admin
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
@@ -114,16 +112,12 @@ export function usePermissions() {
         .single();
 
       if (profileError) {
-        console.error("usePermissions: Erro ao buscar perfil:", profileError);
         // Se não encontrar perfil, retornar permissões padrão
         return DEFAULT_USER_PERMISSIONS;
       }
 
-      console.log("usePermissions: Profile encontrado, is_admin:", profile?.is_admin);
-
       // Se é admin, tem todas as permissões em nível "write"
       if (profile?.is_admin) {
-        console.log("usePermissions: Usuário é ADMIN, retornando permissões totais");
         return ADMIN_PERMISSIONS;
       }
 
@@ -135,12 +129,9 @@ export function usePermissions() {
         .single();
 
       if (permissionsError) {
-        console.log("usePermissions: Usuário sem permissões específicas, usando padrão");
         // Se não tem permissões, retornar permissões padrão
         return DEFAULT_USER_PERMISSIONS;
       }
-
-      console.log("usePermissions: Permissões encontradas:", userPermissions);
 
       // Retornar permissões do banco com valores padrão para campos faltantes
       return {

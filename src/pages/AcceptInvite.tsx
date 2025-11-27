@@ -59,8 +59,6 @@ export default function AcceptInvite() {
       const tokenHash = searchParams.get("token_hash");
       const type = searchParams.get("type");
 
-      console.log("AcceptInvite - Processando convite:", { tokenHash: !!tokenHash, type });
-
       if (!tokenHash || type !== "invite") {
         // Verificar se já existe uma sessão (usuário pode ter clicado no link depois de já estar logado)
         const {
@@ -181,9 +179,6 @@ export default function AcceptInvite() {
     setSubmitting(true);
 
     try {
-      console.log("🚀 Iniciando processo de aceitar convite...");
-      console.log("📧 Email do convite:", inviteData.email);
-
       // Atualizar a senha do usuário
       const { error: updateError } = await supabase.auth.updateUser({
         password: password,
@@ -193,7 +188,6 @@ export default function AcceptInvite() {
       });
 
       if (updateError) throw updateError;
-      console.log("✅ Senha atualizada com sucesso");
 
       // Criar perfil no banco de dados
       const { error: profileError } = await supabase.from("profiles").upsert({

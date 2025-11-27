@@ -15,11 +15,8 @@ export default function AuthCallback() {
         const tokenHash = searchParams.get("token_hash");
         const type = searchParams.get("type");
 
-        console.log("AuthCallback - type:", type, "tokenHash:", !!tokenHash);
-
         // Se for um convite, redirecionar para a página de aceitar convite
         if (type === "invite" && tokenHash) {
-          console.log("Detectado convite, redirecionando para AcceptInvite...");
           // Passar os parâmetros para a página de aceitar convite
           navigate(`/accept-invite?token_hash=${tokenHash}&type=invite`, { replace: true });
           return;
@@ -33,7 +30,6 @@ export default function AuthCallback() {
         } = await supabase.auth.getSession();
 
         if (error) {
-          console.error("Erro ao obter sessão:", error);
           navigate("/auth", { replace: true });
           return;
         }

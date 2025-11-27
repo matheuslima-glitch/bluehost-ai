@@ -129,17 +129,10 @@ export default function Settings() {
   // Verificar e processar confirmação de e-mail da URL
   useEffect(() => {
     const handleEmailConfirmation = async () => {
-      console.log("🔍 Verificando confirmação de e-mail...");
-      console.log("URL completa:", window.location.href);
-      console.log("Hash:", window.location.hash);
-
       // Verificar se há parâmetros de confirmação na URL (com #)
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const type = hashParams.get("type");
       const accessToken = hashParams.get("access_token");
-
-      console.log("Type:", type);
-      console.log("Access Token presente:", !!accessToken);
 
       // Também verificar query params (com ?)
       const searchParams = new URLSearchParams(window.location.search);
@@ -149,12 +142,7 @@ export default function Settings() {
       const finalType = type || typeQuery;
       const finalToken = accessToken || accessTokenQuery;
 
-      console.log("Type final:", finalType);
-      console.log("Token final presente:", !!finalToken);
-
       if (finalType === "email_change" && finalToken) {
-        console.log("✅ Confirmação de e-mail detectada!");
-
         try {
           // Aguardar um momento para o Supabase processar
           await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -165,29 +153,19 @@ export default function Settings() {
             error: sessionError,
           } = await supabase.auth.getSession();
 
-          console.log("Sessão atual:", session);
-          console.log("Erro de sessão:", sessionError);
-
           if (sessionError) {
             throw sessionError;
           }
 
           if (session && session.user) {
-            console.log("E-mail na sessão:", session.user.email);
-            console.log("User ID:", session.user.id);
-
             // Atualizar o e-mail na tabela profiles
-            const { data: profileData, error: profileError } = await supabase
+            const { error: profileError } = await supabase
               .from("profiles")
               .update({ email: session.user.email })
               .eq("id", session.user.id)
               .select();
 
-            console.log("Profile atualizado:", profileData);
-            console.log("Erro ao atualizar profile:", profileError);
-
             if (profileError) {
-              console.error("❌ Erro ao atualizar perfil:", profileError);
               throw profileError;
             }
 
@@ -219,8 +197,6 @@ export default function Settings() {
             variant: "destructive",
           });
         }
-      } else {
-        console.log("ℹ️ Nenhuma confirmação de e-mail detectada");
       }
     };
 
@@ -234,35 +210,16 @@ export default function Settings() {
 
   // Fetch profile data
   const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ["profile-settings", user?.id], // ⭐ Key diferente para buscar TODOS os campos
+    queryKey: ["profile-settings", user?.id],
     queryFn: async () => {
       if (!user?.id) {
-        console.error("⚠️ PROFILE QUERY: User ID não disponível");
         return null;
       }
 
-      // Usar console.error para logs que NÃO são bloqueados pelo silence-logs
-      console.error("🔍 PROFILE QUERY: Buscando perfil para user ID:", user?.id);
-
-      // MUDANÇA CRÍTICA: Usar select("*") ao invés de especificar colunas
-      // Isso garante que TODAS as colunas sejam retornadas
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*") // ⭐ BUSCAR TODAS AS COLUNAS
-        .eq("id", user?.id)
-        .maybeSingle();
-
-      // Logs detalhados usando console.error (não é bloqueado)
-      console.error("📦 PROFILE QUERY: Tipo do data:", typeof data);
-      console.error("📦 PROFILE QUERY: Data é null?:", data === null);
-      console.error("📦 PROFILE QUERY: Chaves do objeto:", data ? Object.keys(data) : "N/A");
-      console.error("📦 PROFILE QUERY: Dados completos:", JSON.stringify(data, null, 2));
-      console.error("❌ PROFILE QUERY: Erro:", error);
+      const { data, error } = await supabase.from("profiles").select("*").eq("id", user?.id).maybeSingle();
 
       // Se não encontrou registro, tentar criar automaticamente
       if (!data && !error) {
-        console.error("⚠️ PROFILE QUERY: Registro não encontrado, criando automaticamente...");
-
         const { data: newProfile, error: insertError } = await supabase
           .from("profiles")
           .insert({
@@ -275,16 +232,13 @@ export default function Settings() {
           .single();
 
         if (insertError) {
-          console.error("❌ PROFILE QUERY: Erro ao criar perfil:", insertError);
           throw insertError;
         }
 
-        console.error("✅ PROFILE QUERY: Perfil criado com sucesso:", newProfile);
         return newProfile;
       }
 
       if (error) {
-        console.error("❌ PROFILE QUERY: Erro ao buscar perfil:", error);
         throw error;
       }
 
@@ -297,41 +251,16 @@ export default function Settings() {
 
   // useEffect para carregar dados do perfil quando profile mudar
   useEffect(() => {
-    // Usar console.error para logs que NÃO são bloqueados
-    console.error("🔄 PROFILE EFFECT: useEffect disparado");
-    console.error("👤 PROFILE EFFECT: User ID:", user?.id);
-    console.error("📋 PROFILE EFFECT: Profile recebido:", profile);
-
     if (profile) {
-      console.error("✅ PROFILE EFFECT: Profile existe, atualizando estados...");
-
-      // Atualizar nome
-      console.error("📝 PROFILE EFFECT: Nome do perfil:", profile.full_name);
       setFullName(profile.full_name || "");
-
-      // Atualizar WhatsApp
-      console.error("📱 PROFILE EFFECT: WhatsApp do perfil:", profile.whatsapp_number);
-      console.error("📱 PROFILE EFFECT: Tipo do whatsapp_number:", typeof profile.whatsapp_number);
       setWhatsappNumber(profile.whatsapp_number || "");
-
-      // Atualizar som
-      console.error("🔊 PROFILE EFFECT: Som do perfil:", profile.alert_sound_preference);
       setSelectedSound(profile.alert_sound_preference || "alert-4");
-    } else {
-      console.error("⚠️ PROFILE EFFECT: Profile não existe ou está undefined");
     }
 
-    // Atualizar email do auth
     if (user?.email) {
-      console.error("📧 PROFILE EFFECT: Email do user:", user.email);
       setNewEmail(user.email);
     }
   }, [profile, user?.email, user?.id]);
-
-  // Debug: Log sempre que whatsappNumber mudar
-  useEffect(() => {
-    console.log("🔔 Estado whatsappNumber atualizado para:", whatsappNumber);
-  }, [whatsappNumber]);
 
   // Fetch notification settings
   const { data: notificationSettings } = useQuery({
@@ -458,7 +387,6 @@ export default function Settings() {
   // Handler para mudanças no input de WhatsApp
   const handleWhatsappChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    console.log("📱 Input WhatsApp alterado, valor atual:", value);
 
     // Se está vazio, deixar vazio (permite apagar tudo)
     if (value === "") {
