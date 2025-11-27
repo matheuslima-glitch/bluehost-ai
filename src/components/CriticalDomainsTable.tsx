@@ -254,7 +254,8 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   };
 
   const handleAlertClick = (domain: any) => {
-    const alertMessage = domain.alert_message || "Atenção: Este domínio foi suspenso pela registradora.";
+    // ⭐ CORREÇÃO: A coluna correta é has_alert (tipo text), não alert_message
+    const alertMessage = domain.has_alert || "Atenção: Este domínio foi suspenso pela registradora.";
     setCurrentAlertMessage(alertMessage);
     setAlertDialogOpen(true);
   };
@@ -495,7 +496,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
             </DialogTitle>
             <DialogDescription asChild>
               <div className="pt-4">
-                {/* CORREÇÃO: Passar canInteract para controlar botões */}
+                {/* ⭐ CORREÇÃO: Passar canInteract para controlar botões */}
                 <AlertMessageRenderer message={currentAlertMessage} canInteract={canEditCriticalDomains} />
               </div>
             </DialogDescription>
