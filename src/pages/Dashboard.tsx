@@ -698,7 +698,16 @@ export default function Dashboard() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <RechartsTooltip />
+                <RechartsTooltip
+                  contentStyle={{
+                    backgroundColor: "white",
+                    color: "black",
+                    border: "1px solid #ccc",
+                    borderRadius: "6px",
+                  }}
+                  itemStyle={{ color: "black" }}
+                  labelStyle={{ color: "black", fontWeight: "bold" }}
+                />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -716,7 +725,17 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <RechartsTooltip />
+                <RechartsTooltip
+                  contentStyle={{
+                    backgroundColor: "white",
+                    color: "black",
+                    border: "1px solid #ccc",
+                    borderRadius: "6px",
+                  }}
+                  itemStyle={{ color: "black" }}
+                  labelStyle={{ color: "black", fontWeight: "bold" }}
+                  cursor={{ fill: "transparent" }}
+                />
                 <Legend />
                 <Bar dataKey="dominios" fill="hsl(var(--primary))" />
               </BarChart>
@@ -750,6 +769,14 @@ export default function Dashboard() {
                 <RechartsTooltip
                   formatter={(value: number) => [value.toLocaleString("pt-BR") + " visitas", "Visitas"]}
                   labelFormatter={(label) => `Mês: ${label}`}
+                  contentStyle={{
+                    backgroundColor: "white",
+                    color: "black",
+                    border: "1px solid #ccc",
+                    borderRadius: "6px",
+                  }}
+                  itemStyle={{ color: "black" }}
+                  labelStyle={{ color: "black", fontWeight: "bold" }}
                 />
                 <Legend />
                 <Line type="monotone" dataKey="visitas" stroke="hsl(var(--primary))" strokeWidth={2} name="Visitas" />
