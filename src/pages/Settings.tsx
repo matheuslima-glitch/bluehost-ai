@@ -3,7 +3,21 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { User, Bell, Palette, Filter, X, Volume2, Check, Clock, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import {
+  User,
+  Bell,
+  Palette,
+  Filter,
+  X,
+  Volume2,
+  Check,
+  Clock,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  Share2,
+  Users,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Switch } from "@/components/ui/switch";
@@ -78,7 +92,7 @@ export default function Settings() {
   const [whatsappNumber, setWhatsappNumber] = useState(""); // Será populado pelo useEffect quando carregar o perfil
   const [newPlatformFilter, setNewPlatformFilter] = useState("");
   const [newTrafficSourceFilter, setNewTrafficSourceFilter] = useState("");
-  const { hasPermission, canEdit } = usePermissions();
+  const { hasPermission, canEdit, isAdmin } = usePermissions();
   const canCreateFilters = canEdit("can_create_filters");
   const [selectedSound, setSelectedSound] = useState("alert-4");
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
@@ -92,6 +106,10 @@ export default function Settings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // ⭐ Estados para compartilhamento de filtros (apenas admins)
+  const [sharePlatformFilter, setSharePlatformFilter] = useState(false);
+  const [shareTrafficSourceFilter, setShareTrafficSourceFilter] = useState(false);
 
   // Estados para o AlertDialog de confirmação de remoção
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -344,10 +362,11 @@ export default function Settings() {
   const { data: customFilters = [] } = useQuery({
     queryKey: ["custom-filters", user?.id],
     queryFn: async () => {
+      // ⭐ CORREÇÃO: Buscar TODOS os filtros acessíveis (próprios + do owner/time)
+      // A RLS policy cuida de retornar apenas os filtros permitidos
       const { data, error } = await supabase
         .from("custom_filters")
         .select("*")
-        .eq("user_id", user?.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -641,7 +660,15 @@ export default function Settings() {
   // Add custom filter mutation
   // Add custom filter mutation com validação de duplicatas
   const addFilterMutation = useMutation({
-    mutationFn: async ({ filter_type, filter_value }: { filter_type: string; filter_value: string }) => {
+    mutationFn: async ({
+      filter_type,
+      filter_value,
+      is_shared,
+    }: {
+      filter_type: string;
+      filter_value: string;
+      is_shared?: boolean;
+    }) => {
       const normalizedValue = filter_value.trim().toLowerCase();
 
       // Verificar se já existe nos filtros padrão
@@ -666,12 +693,16 @@ export default function Settings() {
         user_id: user?.id,
         filter_type,
         filter_value: filter_value.trim(),
+        is_shared: is_shared || false, // ⭐ Novo campo para compartilhamento
       });
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["custom-filters", user?.id] });
+      // ⭐ Resetar checkboxes de compartilhamento após adicionar
+      setSharePlatformFilter(false);
+      setShareTrafficSourceFilter(false);
       toast({
         title: "Sucesso",
         description: "Filtro adicionado com sucesso!",
@@ -731,6 +762,7 @@ export default function Settings() {
       addFilterMutation.mutate({
         filter_type: "platform",
         filter_value: newPlatformFilter.trim(),
+        is_shared: isAdmin ? sharePlatformFilter : false, // ⭐ Compartilhar apenas se admin
       });
       setNewPlatformFilter("");
     }
@@ -741,6 +773,7 @@ export default function Settings() {
       addFilterMutation.mutate({
         filter_type: "traffic_source",
         filter_value: newTrafficSourceFilter.trim(),
+        is_shared: isAdmin ? shareTrafficSourceFilter : false, // ⭐ Compartilhar apenas se admin
       });
       setNewTrafficSourceFilter("");
     }
@@ -1332,14 +1365,50 @@ export default function Settings() {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
+
+                {/* ⭐ Checkbox de compartilhamento - apenas para admins */}
+                {isAdmin && (
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <Checkbox
+                      id="sharePlatform"
+                      checked={sharePlatformFilter}
+                      onCheckedChange={(checked) => setSharePlatformFilter(checked as boolean)}
+                    />
+                    <Label htmlFor="sharePlatform" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Users className="h-4 w-4 text-blue-500" />
+                      Compartilhar com o time
+                    </Label>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-2">
-                  {allPlatformFilters.map((filter) => (
-                    <Badge key={filter.id} variant="secondary" className="gap-1">
+                  {allPlatformFilters.map((filter: any) => (
+                    <Badge
+                      key={filter.id}
+                      variant="secondary"
+                      className={`gap-1 ${filter.is_shared ? "bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700" : ""}`}
+                    >
+                      {/* ⭐ Ícone de compartilhado */}
+                      {filter.is_shared && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Users className="h-3 w-3 text-blue-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Filtro compartilhado com o time</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                       {filter.filter_value}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => openDeleteDialog(filter.id, filter.filter_value, filter.is_default)}
-                      />
+                      {/* ⭐ Só pode excluir filtros próprios */}
+                      {(filter.is_default || filter.user_id === user?.id) && (
+                        <X
+                          className="h-3 w-3 cursor-pointer hover:text-destructive"
+                          onClick={() => openDeleteDialog(filter.id, filter.filter_value, filter.is_default)}
+                        />
+                      )}
                     </Badge>
                   ))}
                 </div>
@@ -1384,14 +1453,50 @@ export default function Settings() {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
+
+                {/* ⭐ Checkbox de compartilhamento - apenas para admins */}
+                {isAdmin && (
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <Checkbox
+                      id="shareTrafficSource"
+                      checked={shareTrafficSourceFilter}
+                      onCheckedChange={(checked) => setShareTrafficSourceFilter(checked as boolean)}
+                    />
+                    <Label htmlFor="shareTrafficSource" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Users className="h-4 w-4 text-blue-500" />
+                      Compartilhar com o time
+                    </Label>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-2">
-                  {allTrafficSourceFilters.map((filter) => (
-                    <Badge key={filter.id} variant="secondary" className="gap-1">
+                  {allTrafficSourceFilters.map((filter: any) => (
+                    <Badge
+                      key={filter.id}
+                      variant="secondary"
+                      className={`gap-1 ${filter.is_shared ? "bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700" : ""}`}
+                    >
+                      {/* ⭐ Ícone de compartilhado */}
+                      {filter.is_shared && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Users className="h-3 w-3 text-blue-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Filtro compartilhado com o time</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                       {filter.filter_value}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => openDeleteDialog(filter.id, filter.filter_value, filter.is_default)}
-                      />
+                      {/* ⭐ Só pode excluir filtros próprios */}
+                      {(filter.is_default || filter.user_id === user?.id) && (
+                        <X
+                          className="h-3 w-3 cursor-pointer hover:text-destructive"
+                          onClick={() => openDeleteDialog(filter.id, filter.filter_value, filter.is_default)}
+                        />
+                      )}
                     </Badge>
                   ))}
                 </div>
