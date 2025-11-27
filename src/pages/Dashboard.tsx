@@ -23,7 +23,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip as RechartsTooltip,
+  Tooltip,
   Legend,
   ResponsiveContainer,
   PieChart,
@@ -711,7 +711,7 @@ export default function Dashboard() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <RechartsTooltip />
+                <Tooltip />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -729,7 +729,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <RechartsTooltip />
+                <Tooltip />
                 <Legend />
                 <Bar dataKey="dominios" fill="hsl(var(--primary))" />
               </BarChart>
@@ -760,7 +760,7 @@ export default function Dashboard() {
                   domain={["auto", "auto"]}
                   scale="linear"
                 />
-                <RechartsTooltip
+                <Tooltip
                   formatter={(value: number) => [value.toLocaleString("pt-BR") + " visitas", "Visitas"]}
                   labelFormatter={(label) => `Mês: ${label}`}
                 />
