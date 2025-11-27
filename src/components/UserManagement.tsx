@@ -393,43 +393,35 @@ export function UserManagement() {
     },
   });
 
-  // ⭐ CORREÇÃO: Usar supabaseAdmin para verificar e atualizar permissões
-  // Isso bypassa a RLS que impede ver/atualizar permissões de outros usuários
+  // ⭐ CORREÇÃO: Usar supabaseAdmin com UPSERT para evitar erro de duplicidade
+  // O upsert faz INSERT se não existir ou UPDATE se existir automaticamente
   const savePermissionsMutation = useMutation({
     mutationFn: async ({ userId, permissions }: { userId: string; permissions: Partial<UserPermission> }) => {
       console.log("🔄 Salvando permissões para userId:", userId);
       console.log("📝 Permissões:", permissions);
 
-      // Usar supabaseAdmin para verificar se já existe (bypassa RLS)
-      const { data: existing, error: selectError } = await supabaseAdmin
-        .from("user_permissions")
-        .select("id")
-        .eq("user_id", userId)
-        .single();
+      // Remover campos que não devem ser enviados no upsert
+      const { id, ...permissionsWithoutId } = permissions as any;
 
-      if (selectError && selectError.code !== "PGRST116") {
-        // PGRST116 = não encontrado, outros erros são reais
-        console.error("❌ Erro ao verificar permissões existentes:", selectError);
-        throw selectError;
+      // Usar upsert com onConflict para lidar com duplicidade automaticamente
+      const { error } = await supabaseAdmin.from("user_permissions").upsert(
+        {
+          user_id: userId,
+          ...permissionsWithoutId,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id", // Coluna com unique constraint
+          ignoreDuplicates: false, // Atualizar se existir
+        },
+      );
+
+      if (error) {
+        console.error("❌ Erro ao salvar permissões:", error);
+        throw error;
       }
 
-      if (existing) {
-        console.log("📝 Atualizando permissões existentes...");
-        const { error } = await supabaseAdmin.from("user_permissions").update(permissions).eq("user_id", userId);
-        if (error) {
-          console.error("❌ Erro ao atualizar:", error);
-          throw error;
-        }
-        console.log("✅ Permissões atualizadas com sucesso!");
-      } else {
-        console.log("📝 Inserindo novas permissões...");
-        const { error } = await supabaseAdmin.from("user_permissions").insert({ user_id: userId, ...permissions });
-        if (error) {
-          console.error("❌ Erro ao inserir:", error);
-          throw error;
-        }
-        console.log("✅ Permissões inseridas com sucesso!");
-      }
+      console.log("✅ Permissões salvas com sucesso!");
     },
     onSuccess: () => {
       toast({ title: "Permissões atualizadas", description: "As permissões do usuário foram atualizadas com sucesso" });
