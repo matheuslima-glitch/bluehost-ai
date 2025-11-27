@@ -301,11 +301,7 @@ export default function Dashboard() {
       const expiredCount = domainsData?.filter((d) => d.status === "expired").length || 0;
       setExpiredDomains(expiredCount);
 
-      // Domínios expirando - usar dados do banco
-      const now = new Date();
-      const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-      const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
-
+      // Domínios expirando - usar dados do banco (reutilizando variáveis já declaradas acima)
       const expiringCount =
         domainsData?.filter((d) => {
           if (!d.expiration_date) return false;
