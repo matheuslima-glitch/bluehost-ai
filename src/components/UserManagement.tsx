@@ -678,29 +678,6 @@ export function UserManagement() {
                         onChange={(e) => setInviteEmail(e.target.value)}
                       />
                     </div>
-
-                    {isCurrentUserAdmin && (
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="makeAdmin"
-                          checked={makeAdmin}
-                          onChange={(e) => setMakeAdmin(e.target.checked)}
-                          className="rounded border-gray-300"
-                        />
-                        <Label htmlFor="makeAdmin" className="cursor-pointer">
-                          Tornar administrador
-                        </Label>
-                      </div>
-                    )}
-
-                    {makeAdmin && (
-                      <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3">
-                        <p className="text-sm text-blue-800 dark:text-blue-200">
-                          Administradores têm acesso total ao sistema, incluindo gerenciamento de usuários.
-                        </p>
-                      </div>
-                    )}
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
@@ -744,23 +721,10 @@ export function UserManagement() {
                         {!member.is_admin && member.invitation_status === "accepted" && member.permissions && (
                           <Badge
                             variant="secondary"
-                            className={`gap-1 ${
-                              member.permissions.permission_type === "total"
-                                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                                : "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
-                            }`}
+                            className="gap-1 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
                           >
-                            {member.permissions.permission_type === "total" ? (
-                              <>
-                                <Check className="h-3 w-3" />
-                                Acesso Total
-                              </>
-                            ) : (
-                              <>
-                                <SettingsIcon className="h-3 w-3" />
-                                Personalizado
-                              </>
-                            )}
+                            <SettingsIcon className="h-3 w-3" />
+                            Personalizado
                           </Badge>
                         )}
                         {member.invitation_status === "pending" && (
@@ -821,7 +785,15 @@ export function UserManagement() {
         </CardContent>
       </Card>
 
-      <Dialog open={invitePermissionsDialogOpen} onOpenChange={setInvitePermissionsDialogOpen}>
+      <Dialog
+        open={invitePermissionsDialogOpen}
+        onOpenChange={(open) => {
+          setInvitePermissionsDialogOpen(open);
+          if (!open) {
+            setMakeAdmin(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Definir Permissões do Convite</DialogTitle>
@@ -830,26 +802,49 @@ export function UserManagement() {
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Tipo de Permissão</Label>
+              <Label>Tipo de Acesso</Label>
               <Select
-                value={invitePermissions.permission_type}
-                onValueChange={(value: "total" | "personalizado") =>
-                  setInvitePermissions((prev) => ({ ...prev, permission_type: value }))
-                }
-                disabled={makeAdmin}
+                value={makeAdmin ? "admin" : "personalizado"}
+                onValueChange={(value: "admin" | "personalizado") => {
+                  if (value === "admin") {
+                    setMakeAdmin(true);
+                    setInvitePermissions((prev) => ({ ...prev, permission_type: "total" }));
+                  } else {
+                    setMakeAdmin(false);
+                    setInvitePermissions((prev) => ({ ...prev, permission_type: "personalizado" }));
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="total">Acesso Total</SelectItem>
-                  <SelectItem value="personalizado">Personalizado</SelectItem>
+                  <SelectItem value="admin">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-blue-500" />
+                      Administrador
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="personalizado">
+                    <div className="flex items-center gap-2">
+                      <SettingsIcon className="h-4 w-4" />
+                      Personalizado
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {invitePermissions.permission_type === "personalizado" && !makeAdmin && (
-              <ScrollArea className="h-[500px] pr-4">
+            {makeAdmin && (
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 border border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Administrador:</strong> Terá acesso total ao sistema, incluindo gerenciamento de usuários.
+                </p>
+              </div>
+            )}
+
+            {!makeAdmin && (
+              <ScrollArea className="h-[400px] pr-4">
                 {renderPermissionsSections(invitePermissions, updateInvitePermission)}
               </ScrollArea>
             )}
@@ -894,33 +889,44 @@ export function UserManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* ⭐ Opção de tornar admin - apenas para admins */}
+          {/* Tipo de Acesso - apenas para admins */}
           {isCurrentUserAdmin && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
-                <input
-                  type="checkbox"
-                  id="makeAdminEdit"
-                  checked={makeAdminEdit}
-                  onChange={(e) => setMakeAdminEdit(e.target.checked)}
-                  className="rounded border-gray-300"
-                />
-                <Label htmlFor="makeAdminEdit" className="cursor-pointer flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-blue-500" />
-                  Tornar Administrador
-                </Label>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Tipo de Acesso</Label>
+                <Select
+                  value={makeAdminEdit ? "admin" : "personalizado"}
+                  onValueChange={(value: "admin" | "personalizado") => {
+                    setMakeAdminEdit(value === "admin");
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-blue-500" />
+                        Administrador
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="personalizado">
+                      <div className="flex items-center gap-2">
+                        <SettingsIcon className="h-4 w-4" />
+                        Personalizado
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {makeAdminEdit && (
                 <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 border border-blue-200 dark:border-blue-800">
                   <p className="text-sm text-blue-800 dark:text-blue-200">
-                    <strong>Atenção:</strong> Administradores têm acesso total ao sistema, incluindo gerenciamento de
-                    usuários e todas as funcionalidades.
+                    <strong>Administrador:</strong> Terá acesso total ao sistema, incluindo gerenciamento de usuários.
                   </p>
                 </div>
               )}
-
-              <Separator />
             </div>
           )}
 
