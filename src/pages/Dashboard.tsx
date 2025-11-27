@@ -114,28 +114,30 @@ export default function Dashboard() {
       // Silenciar erro
     }
 
-    // Verificar Cloudflare: verificar se existem domínios com cloudflare configurado no banco
+    // Verificar Cloudflare: verificar se existem domínios com dns_provider = cloudflare
     try {
-      const { data: cloudflareData, count } = await supabase
+      const { count } = await supabase
         .from("domains")
         .select("id", { count: "exact", head: true })
-        .not("cloudflare_zone_id", "is", null);
+        .eq("dns_provider", "cloudflare");
 
       status.cloudflare = (count || 0) > 0;
     } catch (error) {
-      // Silenciar erro
+      // Se der erro, assumir que não está configurado
+      status.cloudflare = false;
     }
 
-    // Verificar cPanel: verificar se existem domínios com cpanel configurado no banco
+    // Verificar cPanel: verificar se existem domínios com hosting_provider = cpanel
     try {
-      const { data: cpanelData, count } = await supabase
+      const { count } = await supabase
         .from("domains")
         .select("id", { count: "exact", head: true })
-        .eq("integration_source", "cpanel");
+        .eq("hosting_provider", "cpanel");
 
       status.cpanel = (count || 0) > 0;
     } catch (error) {
-      // Silenciar erro
+      // Se der erro, assumir que não está configurado
+      status.cpanel = false;
     }
 
     return status;
