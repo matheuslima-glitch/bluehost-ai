@@ -1,8 +1,3 @@
-/**
- * Silenciador de logs em produção
- * Importar este arquivo no main.tsx para ativar
- */
-
 const isDevelopment = import.meta.env.DEV;
 
 if (!isDevelopment) {
@@ -32,6 +27,10 @@ if (!isDevelopment) {
     "email na sessão",
     "User ID:",
     "is_admin",
+    "Multiple GoTrueClient",
+    "GoTrueClient instances",
+    "same browser context",
+    "same storage key",
   ];
 
   const shouldBlock = (message: string): boolean => {

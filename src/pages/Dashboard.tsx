@@ -111,32 +111,22 @@ export default function Dashboard() {
 
       status.namecheap = !!balanceData;
     } catch (error) {
-      // Silenciar erro
+      status.namecheap = false;
     }
 
-    // Verificar Cloudflare: verificar se existem domínios com dns_provider = cloudflare
+    // Verificar Cloudflare e cPanel via Edge Function de health check
     try {
-      const { count } = await supabase
-        .from("domains")
-        .select("id", { count: "exact", head: true })
-        .eq("dns_provider", "cloudflare");
+      const { data, error } = await supabase.functions.invoke("integrations-health-check", {
+        body: { integration: "all" },
+      });
 
-      status.cloudflare = (count || 0) > 0;
+      if (!error && data?.integrations) {
+        status.cloudflare = data.integrations.cloudflare || false;
+        status.cpanel = data.integrations.cpanel || false;
+      }
     } catch (error) {
-      // Se der erro, assumir que não está configurado
+      // Se a Edge Function não existir ou der erro, manter como false
       status.cloudflare = false;
-    }
-
-    // Verificar cPanel: verificar se existem domínios com hosting_provider = cpanel
-    try {
-      const { count } = await supabase
-        .from("domains")
-        .select("id", { count: "exact", head: true })
-        .eq("hosting_provider", "cpanel");
-
-      status.cpanel = (count || 0) > 0;
-    } catch (error) {
-      // Se der erro, assumir que não está configurado
       status.cpanel = false;
     }
 
