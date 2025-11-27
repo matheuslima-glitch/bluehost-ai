@@ -67,6 +67,7 @@ interface TeamMember {
   email: string;
   full_name: string | null;
   is_admin: boolean;
+  is_owner: boolean;
   created_at: string;
   permissions: UserPermission | null;
   invitation_status: "accepted" | "pending" | null;
@@ -205,10 +206,15 @@ export function UserManagement() {
 
       if (invitationsError) throw invitationsError;
 
+      // Emails de usuários que foram convidados (existem na tabela invitations)
+      const invitedEmails = new Set(invitations?.map((inv) => inv.email.toLowerCase()) || []);
+
       const membersWithPermissions = profiles.map((profile) => ({
         ...profile,
         permissions: permissions?.find((p) => p.user_id === profile.id) || null,
         invitation_status: "accepted" as const,
+        // Owner é admin que NÃO foi convidado (não existe na tabela invitations)
+        is_owner: profile.is_admin && !invitedEmails.has(profile.email.toLowerCase()),
       }));
 
       const pendingInvites = invitations
@@ -219,6 +225,7 @@ export function UserManagement() {
           email: inv.email,
           full_name: null,
           is_admin: inv.is_admin || false,
+          is_owner: false,
           created_at: inv.created_at,
           permissions: null,
           invitation_status: "pending" as const,
@@ -372,14 +379,22 @@ export function UserManagement() {
       userId,
       permissions,
       promoteToAdmin,
+      demoteFromAdmin,
     }: {
       userId: string;
       permissions: Partial<UserPermission>;
       promoteToAdmin?: boolean;
+      demoteFromAdmin?: boolean;
     }) => {
-      // Se promover a admin, atualizar profiles.is_admin
+      // Se promover a admin, atualizar profiles.is_admin = true
       if (promoteToAdmin) {
         const { error: adminError } = await supabase.from("profiles").update({ is_admin: true }).eq("id", userId);
+        if (adminError) throw adminError;
+      }
+
+      // Se rebaixar de admin, atualizar profiles.is_admin = false
+      if (demoteFromAdmin) {
+        const { error: adminError } = await supabase.from("profiles").update({ is_admin: false }).eq("id", userId);
         if (adminError) throw adminError;
       }
 
@@ -390,15 +405,21 @@ export function UserManagement() {
 
       if (error) throw error;
 
-      return { promoteToAdmin };
+      return { promoteToAdmin, demoteFromAdmin };
     },
     onSuccess: (result) => {
-      toast({
-        title: result?.promoteToAdmin ? "Usuário promovido!" : "Permissões atualizadas",
-        description: result?.promoteToAdmin
-          ? "O usuário agora é um administrador com acesso total"
-          : "As permissões do usuário foram atualizadas com sucesso",
-      });
+      let title = "Permissões atualizadas";
+      let description = "As permissões do usuário foram atualizadas com sucesso";
+
+      if (result?.promoteToAdmin) {
+        title = "Usuário promovido!";
+        description = "O usuário agora é um administrador com acesso total";
+      } else if (result?.demoteFromAdmin) {
+        title = "Admin rebaixado";
+        description = "O usuário não é mais administrador";
+      }
+
+      toast({ title, description });
       setPermissionsDialogOpen(false);
       setSelectedUserId(null);
       setSelectedMember(null);
@@ -434,7 +455,8 @@ export function UserManagement() {
   const openEditPermissions = (member: TeamMember) => {
     setSelectedUserId(member.id);
     setSelectedMember(member);
-    setMakeAdminEdit(false); // Resetar ao abrir
+    // Se o membro já é admin, iniciar com makeAdminEdit true
+    setMakeAdminEdit(member.is_admin);
     if (member.permissions) {
       setCustomPermissions(member.permissions);
     } else {
@@ -444,7 +466,14 @@ export function UserManagement() {
   };
 
   const handleSaveCustomPermissions = () => {
-    if (!selectedUserId) return;
+    if (!selectedUserId || !selectedMember) return;
+
+    // Detectar se está promovendo ou rebaixando
+    const wasAdmin = selectedMember.is_admin;
+    const willBeAdmin = makeAdminEdit;
+
+    const promoteToAdmin = !wasAdmin && willBeAdmin;
+    const demoteFromAdmin = wasAdmin && !willBeAdmin;
 
     // Se marcar para tornar admin, define permission_type como "total"
     const finalPermissions = makeAdminEdit
@@ -454,7 +483,8 @@ export function UserManagement() {
     savePermissionsMutation.mutate({
       userId: selectedUserId,
       permissions: finalPermissions,
-      promoteToAdmin: makeAdminEdit,
+      promoteToAdmin,
+      demoteFromAdmin,
     });
   };
 
@@ -724,14 +754,18 @@ export function UserManagement() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {!member.is_admin && canManageUsers && member.invitation_status === "accepted" && (
-                      <Button variant="outline" size="sm" onClick={() => openEditPermissions(member)}>
-                        <SettingsIcon className="h-4 w-4 mr-2" />
-                        Permissões
-                      </Button>
-                    )}
+                    {/* Botão Permissões: para não-admins OU admins que não são owner */}
+                    {canManageUsers &&
+                      member.invitation_status === "accepted" &&
+                      !member.is_owner &&
+                      member.id !== user?.id && (
+                        <Button variant="outline" size="sm" onClick={() => openEditPermissions(member)}>
+                          <SettingsIcon className="h-4 w-4 mr-2" />
+                          Permissões
+                        </Button>
+                      )}
 
-                    {member.id !== user?.id && isCurrentUserAdmin && (
+                    {member.id !== user?.id && isCurrentUserAdmin && !member.is_owner && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="sm">
@@ -928,13 +962,22 @@ export function UserManagement() {
             <Button variant="outline" onClick={() => setPermissionsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveCustomPermissions} disabled={savePermissionsMutation.isPending}>
+            <Button
+              onClick={handleSaveCustomPermissions}
+              disabled={savePermissionsMutation.isPending}
+              variant={selectedMember?.is_admin && !makeAdminEdit ? "destructive" : "default"}
+            >
               {savePermissionsMutation.isPending ? (
                 <>
                   <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-background border-t-foreground" />
                   Salvando...
                 </>
-              ) : makeAdminEdit ? (
+              ) : selectedMember?.is_admin && !makeAdminEdit ? (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Rebaixar Admin
+                </>
+              ) : !selectedMember?.is_admin && makeAdminEdit ? (
                 <>
                   <Shield className="h-4 w-4 mr-2" />
                   Promover a Admin
