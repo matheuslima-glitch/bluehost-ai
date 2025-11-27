@@ -193,7 +193,9 @@ export function UserManagement() {
 
       if (profilesError) throw profilesError;
 
-      const { data: permissions, error: permissionsError } = await supabase.from("user_permissions").select("*");
+      // ⭐ CORREÇÃO: Usar supabaseAdmin para buscar permissões de TODOS os usuários
+      // O supabase normal só permite ver as próprias permissões devido à RLS
+      const { data: permissions, error: permissionsError } = await supabaseAdmin.from("user_permissions").select("*");
       if (permissionsError) throw permissionsError;
 
       const { data: invitations, error: invitationsError } = await supabase
@@ -391,16 +393,42 @@ export function UserManagement() {
     },
   });
 
+  // ⭐ CORREÇÃO: Usar supabaseAdmin para verificar e atualizar permissões
+  // Isso bypassa a RLS que impede ver/atualizar permissões de outros usuários
   const savePermissionsMutation = useMutation({
     mutationFn: async ({ userId, permissions }: { userId: string; permissions: Partial<UserPermission> }) => {
-      const { data: existing } = await supabase.from("user_permissions").select("id").eq("user_id", userId).single();
+      console.log("🔄 Salvando permissões para userId:", userId);
+      console.log("📝 Permissões:", permissions);
+
+      // Usar supabaseAdmin para verificar se já existe (bypassa RLS)
+      const { data: existing, error: selectError } = await supabaseAdmin
+        .from("user_permissions")
+        .select("id")
+        .eq("user_id", userId)
+        .single();
+
+      if (selectError && selectError.code !== "PGRST116") {
+        // PGRST116 = não encontrado, outros erros são reais
+        console.error("❌ Erro ao verificar permissões existentes:", selectError);
+        throw selectError;
+      }
 
       if (existing) {
-        const { error } = await supabase.from("user_permissions").update(permissions).eq("user_id", userId);
-        if (error) throw error;
+        console.log("📝 Atualizando permissões existentes...");
+        const { error } = await supabaseAdmin.from("user_permissions").update(permissions).eq("user_id", userId);
+        if (error) {
+          console.error("❌ Erro ao atualizar:", error);
+          throw error;
+        }
+        console.log("✅ Permissões atualizadas com sucesso!");
       } else {
-        const { error } = await supabase.from("user_permissions").insert({ user_id: userId, ...permissions });
-        if (error) throw error;
+        console.log("📝 Inserindo novas permissões...");
+        const { error } = await supabaseAdmin.from("user_permissions").insert({ user_id: userId, ...permissions });
+        if (error) {
+          console.error("❌ Erro ao inserir:", error);
+          throw error;
+        }
+        console.log("✅ Permissões inseridas com sucesso!");
       }
     },
     onSuccess: () => {
@@ -410,6 +438,7 @@ export function UserManagement() {
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
     },
     onError: (error: any) => {
+      console.error("❌ Erro na mutation:", error);
       toast({ title: "Erro ao atualizar permissões", description: error.message, variant: "destructive" });
     },
   });
