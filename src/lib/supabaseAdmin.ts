@@ -14,9 +14,11 @@ if (!supabaseServiceRoleKey) {
 }
 
 // Cliente Admin com Service Role Key
+// storageKey diferente para evitar conflito com o cliente principal
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
+    storageKey: "supabase-admin-auth",
   },
 });
