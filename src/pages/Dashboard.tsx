@@ -1,10 +1,21 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Globe, TrendingUp, AlertCircle, Clock, CheckCircle2, AlertTriangle, XCircle, Wallet } from "lucide-react";
+import {
+  Globe,
+  TrendingUp,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Wallet,
+  Lock,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   BarChart,
@@ -28,7 +39,12 @@ import { usePermissions } from "@/hooks/usePermissions";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, canEdit } = usePermissions();
+
+  // ⭐ CORREÇÃO: Verificar se pode interagir (editar) ou apenas visualizar
+  const canEditIntegrations = canEdit("can_view_integrations");
+  const canEditBalance = canEdit("can_view_balance");
+  const canEditCriticalDomains = canEdit("can_view_critical_domains");
   const [firstName, setFirstName] = useState("");
   const [stats, setStats] = useState({
     total: 0,
@@ -466,6 +482,13 @@ export default function Dashboard() {
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
                 Status das Integrações
+                {/* ⭐ INDICADOR DE MODO SOMENTE LEITURA */}
+                {!canEditIntegrations && (
+                  <Badge variant="secondary" className="ml-2 gap-1">
+                    <Lock className="h-3 w-3" />
+                    Somente Leitura
+                  </Badge>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -478,14 +501,32 @@ export default function Dashboard() {
                       <XCircle className="h-5 w-5 text-red-500" />
                     )}
                     <div>
-                      <p
-                        className="text-sm font-medium cursor-pointer"
-                        onClick={() =>
-                          window.open("https://www.namecheap.com/myaccount/login/?ReturnUrl=%2f", "_blank")
-                        }
-                      >
-                        Namecheap
-                      </p>
+                      {/* ⭐ CORREÇÃO: Link desabilitado quando somente leitura */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p
+                              className={`text-sm font-medium ${
+                                canEditIntegrations
+                                  ? "cursor-pointer hover:text-blue-500"
+                                  : "cursor-not-allowed text-muted-foreground"
+                              }`}
+                              onClick={() =>
+                                canEditIntegrations &&
+                                window.open("https://www.namecheap.com/myaccount/login/?ReturnUrl=%2f", "_blank")
+                              }
+                            >
+                              {!canEditIntegrations && <Lock className="inline h-3 w-3 mr-1" />}
+                              Namecheap
+                            </p>
+                          </TooltipTrigger>
+                          {!canEditIntegrations && (
+                            <TooltipContent>
+                              <p>Você não tem permissão para acessar links externos</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </div>
                   <Badge variant={integrationStatus.namecheap ? "default" : "destructive"}>
@@ -501,12 +542,31 @@ export default function Dashboard() {
                       <XCircle className="h-5 w-5 text-red-500" />
                     )}
                     <div>
-                      <p
-                        className="text-sm font-medium cursor-pointer"
-                        onClick={() => window.open("https://nexus.servidor.net.br:2083/", "_blank")}
-                      >
-                        cPanel
-                      </p>
+                      {/* ⭐ CORREÇÃO: Link desabilitado quando somente leitura */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p
+                              className={`text-sm font-medium ${
+                                canEditIntegrations
+                                  ? "cursor-pointer hover:text-blue-500"
+                                  : "cursor-not-allowed text-muted-foreground"
+                              }`}
+                              onClick={() =>
+                                canEditIntegrations && window.open("https://nexus.servidor.net.br:2083/", "_blank")
+                              }
+                            >
+                              {!canEditIntegrations && <Lock className="inline h-3 w-3 mr-1" />}
+                              cPanel
+                            </p>
+                          </TooltipTrigger>
+                          {!canEditIntegrations && (
+                            <TooltipContent>
+                              <p>Você não tem permissão para acessar links externos</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
                       {/* LINHA REMOVIDA ABAIXO */}
                       {/* <p className="text-xs text-muted-foreground">{integrations.cpanel} domínios</p> */}
                     </div>
@@ -524,12 +584,31 @@ export default function Dashboard() {
                       <XCircle className="h-5 w-5 text-red-500" />
                     )}
                     <div>
-                      <p
-                        className="text-sm font-medium cursor-pointer"
-                        onClick={() => window.open("https://dash.cloudflare.com/login", "_blank")}
-                      >
-                        Cloudflare
-                      </p>
+                      {/* ⭐ CORREÇÃO: Link desabilitado quando somente leitura */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p
+                              className={`text-sm font-medium ${
+                                canEditIntegrations
+                                  ? "cursor-pointer hover:text-blue-500"
+                                  : "cursor-not-allowed text-muted-foreground"
+                              }`}
+                              onClick={() =>
+                                canEditIntegrations && window.open("https://dash.cloudflare.com/login", "_blank")
+                              }
+                            >
+                              {!canEditIntegrations && <Lock className="inline h-3 w-3 mr-1" />}
+                              Cloudflare
+                            </p>
+                          </TooltipTrigger>
+                          {!canEditIntegrations && (
+                            <TooltipContent>
+                              <p>Você não tem permissão para acessar links externos</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
                       {/* LINHA REMOVIDA ABAIXO */}
                       {/* <p className="text-xs text-muted-foreground">{integrations.cloudflare} zonas</p> */}
                     </div>
@@ -550,6 +629,13 @@ export default function Dashboard() {
               <CardTitle className="flex items-center gap-2">
                 <Wallet className="h-5 w-5" />
                 Saldo Namecheap
+                {/* ⭐ INDICADOR DE MODO SOMENTE LEITURA */}
+                {!canEditBalance && (
+                  <Badge variant="secondary" className="ml-2 gap-1">
+                    <Lock className="h-3 w-3" />
+                    Somente Leitura
+                  </Badge>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -605,6 +691,7 @@ export default function Dashboard() {
       {/* Critical Domains Management Table */}
       {hasPermission("can_view_critical_domains") && (
         <div data-critical-domains-table className="critical-domains-table scroll-mt-4">
+          {/* ⭐ O componente CriticalDomainsTable agora usa usePermissions internamente */}
           <CriticalDomainsTable domains={domains} onDomainsChange={loadDashboardData} />
         </div>
       )}

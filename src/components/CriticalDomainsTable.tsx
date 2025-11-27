@@ -15,11 +15,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, Mail, Link as LinkIcon } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, Mail, Link as LinkIcon, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface CriticalDomainsTableProps {
   domains: any[];
@@ -28,7 +30,7 @@ interface CriticalDomainsTableProps {
 
 // Componente para renderizar mensagem com BOTÕES de links e e-mails
 // O texto já vem em português do Supabase, apenas organizamos o conteúdo
-function AlertMessageRenderer({ message }: { message: string }) {
+function AlertMessageRenderer({ message, canInteract }: { message: string; canInteract: boolean }) {
   if (!message) return null;
 
   // Extrair e-mails e links
@@ -70,15 +72,33 @@ function AlertMessageRenderer({ message }: { message: string }) {
       {urls.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {urls.map((url, index) => (
-            <Button
-              key={`url-${index}`}
-              size="sm"
-              className="bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700"
-              onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
-            >
-              <LinkIcon className="h-4 w-4 mr-2" />
-              Acessar Link de Suporte
-            </Button>
+            <TooltipProvider key={`url-${index}`}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="sm"
+                      className={`${
+                        canInteract
+                          ? "bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700"
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400"
+                      }`}
+                      onClick={() => canInteract && window.open(url, "_blank", "noopener,noreferrer")}
+                      disabled={!canInteract}
+                    >
+                      {!canInteract && <Lock className="h-3 w-3 mr-1" />}
+                      <LinkIcon className="h-4 w-4 mr-2" />
+                      Acessar Link de Suporte
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canInteract && (
+                  <TooltipContent>
+                    <p>Você não tem permissão para acessar links</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           ))}
         </div>
       )}
@@ -87,15 +107,33 @@ function AlertMessageRenderer({ message }: { message: string }) {
       {emails.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {emails.map((email, index) => (
-            <Button
-              key={`email-${index}`}
-              size="sm"
-              className="bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700"
-              onClick={() => (window.location.href = `mailto:${email}`)}
-            >
-              <Mail className="h-4 w-4 mr-2" />
-              Falar com Suporte
-            </Button>
+            <TooltipProvider key={`email-${index}`}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="sm"
+                      className={`${
+                        canInteract
+                          ? "bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-700"
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400"
+                      }`}
+                      onClick={() => canInteract && (window.location.href = `mailto:${email}`)}
+                      disabled={!canInteract}
+                    >
+                      {!canInteract && <Lock className="h-3 w-3 mr-1" />}
+                      <Mail className="h-4 w-4 mr-2" />
+                      Falar com Suporte
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canInteract && (
+                  <TooltipContent>
+                    <p>Você não tem permissão para enviar e-mails</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           ))}
         </div>
       )}
@@ -104,6 +142,10 @@ function AlertMessageRenderer({ message }: { message: string }) {
 }
 
 export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomainsTableProps) {
+  // ⭐ CORREÇÃO: Usar hook de permissões para verificar se pode editar
+  const { canEdit } = usePermissions();
+  const canEditCriticalDomains = canEdit("can_view_critical_domains");
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [domainToDelete, setDomainToDelete] = useState<any>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
@@ -208,12 +250,11 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
       }
     }
 
-    return <Badge className="bg-green-500 text-white hover:bg-green-600 transition-colors">Ativo</Badge>;
+    return <Badge>Desconhecido</Badge>;
   };
 
   const handleAlertClick = (domain: any) => {
-    const alertMessage = domain.has_alert || "Status suspenso no registrador.";
-    // Texto já vem em português do Supabase, não precisa traduzir
+    const alertMessage = domain.alert_message || "Atenção: Este domínio foi suspenso pela registradora.";
     setCurrentAlertMessage(alertMessage);
     setAlertDialogOpen(true);
   };
@@ -237,12 +278,24 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   };
 
   const handleDeleteClick = (domain: any) => {
+    // ⭐ CORREÇÃO: Verificar permissão antes de abrir dialog
+    if (!canEditCriticalDomains) {
+      toast.error("Você não tem permissão para desativar domínios");
+      return;
+    }
     setDomainToDelete(domain);
     setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
     if (!domainToDelete) return;
+
+    // ⭐ CORREÇÃO: Verificar permissão antes de executar ação
+    if (!canEditCriticalDomains) {
+      toast.error("Você não tem permissão para desativar domínios");
+      setDeleteDialogOpen(false);
+      return;
+    }
 
     try {
       const { error } = await supabase
@@ -293,6 +346,13 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5" />
             Gestão de Domínios Críticos
+            {/* ⭐ INDICADOR DE MODO SOMENTE LEITURA */}
+            {!canEditCriticalDomains && (
+              <Badge variant="secondary" className="ml-2 gap-1">
+                <Lock className="h-3 w-3" />
+                Somente Leitura
+              </Badge>
+            )}
           </CardTitle>
           <CardDescription>Domínios expirados, expirando em breve, críticos e suspensos</CardDescription>
         </CardHeader>
@@ -330,13 +390,37 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                               <AlertCircle className="h-4 w-4" />
                             </Button>
                           )}
-                          <button
-                            onClick={() => handleDeleteClick(domain)}
-                            className="relative inline-flex h-6 w-11 items-center rounded-full bg-blue-500 hover:bg-blue-600 transition-colors"
-                            title="Desativar domínio"
-                          >
-                            <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-6" />
-                          </button>
+                          {/* ⭐ CORREÇÃO: Toggle desabilitado quando não tem permissão de edição */}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => handleDeleteClick(domain)}
+                                  disabled={!canEditCriticalDomains}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                    canEditCriticalDomains
+                                      ? "bg-blue-500 hover:bg-blue-600 cursor-pointer"
+                                      : "bg-gray-300 dark:bg-gray-600 cursor-not-allowed"
+                                  }`}
+                                  title={canEditCriticalDomains ? "Desativar domínio" : "Sem permissão para desativar"}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                      canEditCriticalDomains ? "translate-x-6" : "translate-x-6 opacity-50"
+                                    }`}
+                                  />
+                                  {!canEditCriticalDomains && (
+                                    <Lock className="absolute left-1 h-3 w-3 text-gray-500" />
+                                  )}
+                                </button>
+                              </TooltipTrigger>
+                              {!canEditCriticalDomains && (
+                                <TooltipContent>
+                                  <p>Você não tem permissão para desativar domínios</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -411,7 +495,8 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
             </DialogTitle>
             <DialogDescription asChild>
               <div className="pt-4">
-                <AlertMessageRenderer message={currentAlertMessage} />
+                {/* CORREÇÃO: Passar canInteract para controlar botões */}
+                <AlertMessageRenderer message={currentAlertMessage} canInteract={canEditCriticalDomains} />
               </div>
             </DialogDescription>
           </DialogHeader>
