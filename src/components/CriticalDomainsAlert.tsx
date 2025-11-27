@@ -48,7 +48,6 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
 
       // Definir o som preferido ou usar o padrão (True Tone)
       const soundPreference = data?.alert_sound_preference || "alert-4";
-      console.log("Preferência de som carregada:", soundPreference);
       setAlertSound(soundPreference);
       setUserDataLoaded(true);
     };
@@ -86,7 +85,6 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
 
       // Se nunca mostrou antes (primeira vez do dia), mostrar
       if (!lastAlertTime) {
-        console.log("Primeira vez mostrando o alerta - exibindo popup");
         return true;
       }
 
@@ -94,20 +92,13 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
       const currentTime = Date.now();
       const timeDifference = currentTime - lastTime;
 
-      console.log("Último alerta:", new Date(lastTime).toLocaleString());
-      console.log("Tempo desde último alerta:", Math.floor(timeDifference / 1000 / 60), "minutos");
-
       // Se passaram 6 horas ou mais, mostrar novamente
       if (timeDifference >= SIX_HOURS_MS) {
-        console.log("6 horas passaram - exibindo popup");
         return true;
       }
 
-      const remainingMinutes = Math.floor((SIX_HOURS_MS - timeDifference) / 1000 / 60);
-      console.log("Próximo alerta em:", remainingMinutes, "minutos");
       return false;
     } catch (error) {
-      console.error("Erro ao verificar tempo do último alerta:", error);
       return true; // Em caso de erro, mostrar o alerta
     }
   };
@@ -117,29 +108,25 @@ export function CriticalDomainsAlert({ suspendedCount, expiredCount }: CriticalD
     try {
       const currentTime = Date.now();
       localStorage.setItem(LAST_ALERT_KEY, currentTime.toString());
-      console.log("Timestamp do alerta salvo:", new Date(currentTime).toLocaleString());
     } catch (error) {
-      console.error("Erro ao salvar timestamp do alerta:", error);
+      // Silenciar erro
     }
   };
 
   const playAlertSound = () => {
     if (!alertSound) {
-      console.log("Som ainda não carregado");
       return;
     }
 
     const soundUrl = ALERT_SOUNDS[alertSound];
     if (!soundUrl) {
-      console.error("Som não encontrado:", alertSound);
       return;
     }
 
-    console.log("Tocando som:", alertSound, "URL:", soundUrl);
     const audio = new Audio(soundUrl);
     audio.volume = 1.0;
-    audio.play().catch((error) => {
-      console.error("Erro ao reproduzir som:", error);
+    audio.play().catch(() => {
+      // Silenciar erro de reprodução
     });
   };
 
