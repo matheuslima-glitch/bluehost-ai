@@ -803,16 +803,15 @@ export function UserManagement() {
                   <div className="flex items-center gap-2">
                     {/* 
                       Botão Permissões:
-                      - Owner pode gerenciar TODOS (exceto ele mesmo)
+                      - Owner NUNCA pode ter permissões editadas por ninguém
+                      - Owner pode gerenciar todos os outros
                       - Admin (não owner) pode gerenciar todos EXCETO owners
                       - Usuário comum não pode gerenciar ninguém
                     */}
                     {canManageUsers &&
                       member.invitation_status === "accepted" &&
                       member.id !== user?.id &&
-                      // Se eu sou owner, posso gerenciar qualquer um
-                      // Se não sou owner, só posso gerenciar quem não é owner
-                      (isCurrentUserOwner || !member.is_owner) && (
+                      !member.is_owner && (
                         <Button variant="outline" size="sm" onClick={() => openEditPermissions(member)}>
                           <SettingsIcon className="h-4 w-4 mr-2" />
                           Permissões
