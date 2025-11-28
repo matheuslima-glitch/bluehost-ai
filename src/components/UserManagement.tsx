@@ -252,9 +252,14 @@ export function UserManagement() {
         const wasInvited = !!invitation;
         const invitedBy = invitation?.invited_by;
 
-        // É owner APENAS se: é admin E (não foi convidado OU invited_by é null)
-        // Se foi convidado por alguém (invited_by tem valor), NÃO é owner
+        // É owner APENAS se: é admin (na tabela profiles) E (não foi convidado OU invited_by é null)
+        // IMPORTANTE: Usa is_admin da tabela PROFILES, não da INVITATIONS
         const isOwner = profile.is_admin && (!wasInvited || invitedBy === null);
+
+        // Debug log
+        console.log(
+          `👤 ${profile.email}: is_admin=${profile.is_admin}, wasInvited=${wasInvited}, invitedBy=${invitedBy}, isOwner=${isOwner}`,
+        );
 
         return {
           ...profile,
@@ -433,7 +438,10 @@ export function UserManagement() {
       promoteToAdmin?: boolean;
       demoteFromAdmin?: boolean;
     }) => {
-      // Se promover a admin, atualizar profiles.is_admin = true
+      // Buscar email do usuário para atualizar invitations
+      const { data: userProfile } = await supabase.from("profiles").select("email").eq("id", userId).single();
+
+      // Se promover a admin, atualizar profiles.is_admin = true E invitations.is_admin = true
       // Usar supabaseAdmin para bypassa RLS
       if (promoteToAdmin) {
         const { error: adminError } = await supabaseAdmin.from("profiles").update({ is_admin: true }).eq("id", userId);
@@ -441,15 +449,25 @@ export function UserManagement() {
           console.error("Erro ao promover admin:", adminError);
           throw adminError;
         }
+
+        // Também atualizar na tabela invitations para manter consistência
+        if (userProfile?.email) {
+          await supabaseAdmin.from("invitations").update({ is_admin: true }).eq("email", userProfile.email);
+        }
       }
 
-      // Se rebaixar de admin, atualizar profiles.is_admin = false
+      // Se rebaixar de admin, atualizar profiles.is_admin = false E invitations.is_admin = false
       // Usar supabaseAdmin para bypassa RLS
       if (demoteFromAdmin) {
         const { error: adminError } = await supabaseAdmin.from("profiles").update({ is_admin: false }).eq("id", userId);
         if (adminError) {
           console.error("Erro ao rebaixar admin:", adminError);
           throw adminError;
+        }
+
+        // Também atualizar na tabela invitations para manter consistência
+        if (userProfile?.email) {
+          await supabaseAdmin.from("invitations").update({ is_admin: false }).eq("email", userProfile.email);
         }
       }
 
