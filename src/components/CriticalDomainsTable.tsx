@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
+import { DomainDeactivationDialog } from "./DomainDeactivationDialog";
 
 interface CriticalDomainsTableProps {
   domains: any[];
@@ -142,7 +143,7 @@ function AlertMessageRenderer({ message, canInteract }: { message: string; canIn
 }
 
 export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomainsTableProps) {
-  // ⭐ CORREÇÃO: Usar hook de permissões para verificar se pode editar
+  //  CORREÇÃO: Usar hook de permissões para verificar se pode editar
   const { canEdit } = usePermissions();
   const canEditCriticalDomains = canEdit("can_view_critical_domains");
 
@@ -151,6 +152,10 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
   const [currentAlertMessage, setCurrentAlertMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
+
+  //  NOVO: Estados para o diálogo de desativação completa
+  const [deactivationDialogOpen, setDeactivationDialogOpen] = useState(false);
+  const [domainToDeactivate, setDomainToDeactivate] = useState<any>(null);
 
   // Filtrar apenas domínios com status críticos
   const now = new Date();
@@ -254,7 +259,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
   };
 
   const handleAlertClick = (domain: any) => {
-    // ⭐ CORREÇÃO: A coluna correta é has_alert (tipo text), não alert_message
+    // CORREÇÃO: A coluna correta é has_alert (tipo text), não alert_message
     const alertMessage = domain.has_alert || "Atenção: Este domínio foi suspenso pela registradora.";
     setCurrentAlertMessage(alertMessage);
     setAlertDialogOpen(true);
@@ -278,20 +283,21 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
     setCurrentPage((prev) => Math.min(totalPages - 1, prev + 1));
   };
 
+  // MODIFICADO: Agora abre o novo diálogo de desativação completa
   const handleDeleteClick = (domain: any) => {
-    // ⭐ CORREÇÃO: Verificar permissão antes de abrir dialog
+    // CORREÇÃO: Verificar permissão antes de abrir dialog
     if (!canEditCriticalDomains) {
       toast.error("Você não tem permissão para desativar domínios");
       return;
     }
-    setDomainToDelete(domain);
-    setDeleteDialogOpen(true);
+    setDomainToDeactivate(domain);
+    setDeactivationDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
     if (!domainToDelete) return;
 
-    // ⭐ CORREÇÃO: Verificar permissão antes de executar ação
+    // CORREÇÃO: Verificar permissão antes de executar ação
     if (!canEditCriticalDomains) {
       toast.error("Você não tem permissão para desativar domínios");
       setDeleteDialogOpen(false);
@@ -317,6 +323,12 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
       console.error("Erro ao desativar domínio:", error);
       toast.error("Erro ao desativar domínio");
     }
+  };
+
+  // NOVO: Callback quando desativação completa termina
+  const handleDeactivationComplete = () => {
+    setDomainToDeactivate(null);
+    onDomainsChange();
   };
 
   if (sortedCriticalDomains.length === 0) {
@@ -347,7 +359,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5" />
             Gestão de Domínios Críticos
-            {/* ⭐ INDICADOR DE MODO SOMENTE LEITURA */}
+            {/* INDICADOR DE MODO SOMENTE LEITURA */}
             {!canEditCriticalDomains && (
               <Badge variant="secondary" className="ml-2 gap-1">
                 <Lock className="h-3 w-3" />
@@ -391,7 +403,7 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                               <AlertCircle className="h-4 w-4" />
                             </Button>
                           )}
-                          {/* ⭐ CORREÇÃO: Toggle desabilitado quando não tem permissão de edição */}
+                          {/* CORREÇÃO: Toggle desabilitado quando não tem permissão de edição */}
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -496,13 +508,21 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
             </DialogTitle>
             <DialogDescription asChild>
               <div className="pt-4">
-                {/* ⭐ CORREÇÃO: Passar canInteract para controlar botões */}
+                {/* CORREÇÃO: Passar canInteract para controlar botões */}
                 <AlertMessageRenderer message={currentAlertMessage} canInteract={canEditCriticalDomains} />
               </div>
             </DialogDescription>
           </DialogHeader>
         </DialogContent>
       </Dialog>
+
+      {/* NOVO: Diálogo de desativação completa */}
+      <DomainDeactivationDialog
+        open={deactivationDialogOpen}
+        onOpenChange={setDeactivationDialogOpen}
+        domain={domainToDeactivate}
+        onDeactivationComplete={handleDeactivationComplete}
+      />
     </>
   );
 }
