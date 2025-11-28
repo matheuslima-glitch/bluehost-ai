@@ -227,9 +227,9 @@ export default function AcceptInvite() {
       });
 
       if (profileError) throw profileError;
-      console.log("✅ Perfil criado com sucesso (is_admin:", finalIsAdmin, ")");
+      console.log("Perfil criado com sucesso (is_admin:", finalIsAdmin, ")");
 
-      // ⭐ CORREÇÃO CRÍTICA: Criar permissões para TODOS os usuários
+      // CORREÇÃO CRÍTICA: Criar permissões para TODOS os usuários
       // Admins recebem permissões totais, não-admins recebem as permissões configuradas
       if (finalIsAdmin) {
         // Admin: criar permissões totais

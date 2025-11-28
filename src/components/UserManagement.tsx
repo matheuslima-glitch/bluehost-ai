@@ -27,7 +27,19 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, Settings as SettingsIcon, Mail, Check, Shield, Eye, Edit, Ban, Clock } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Settings as SettingsIcon,
+  Mail,
+  Check,
+  Shield,
+  Eye,
+  Edit,
+  Ban,
+  Clock,
+  RefreshCw,
+} from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
@@ -197,6 +209,13 @@ export function UserManagement() {
   const [invitePermissions, setInvitePermissions] = useState<Partial<UserPermission>>(DEFAULT_PERMISSIONS);
   const [makeAdmin, setMakeAdmin] = useState(false);
   const [makeAdminEdit, setMakeAdminEdit] = useState(false);
+
+  // Estados para edição de convites pendentes
+  const [editPendingDialogOpen, setEditPendingDialogOpen] = useState(false);
+  const [selectedPendingInvite, setSelectedPendingInvite] = useState<TeamMember | null>(null);
+  const [pendingInvitePermissions, setPendingInvitePermissions] =
+    useState<Partial<UserPermission>>(DEFAULT_PERMISSIONS);
+  const [pendingMakeAdmin, setPendingMakeAdmin] = useState(false);
 
   const { data: currentUserProfile } = useQuery({
     queryKey: ["current-user-profile", user?.id],
@@ -464,6 +483,90 @@ export function UserManagement() {
     },
   });
 
+  // ============================================================
+  // MUTATION PARA REENVIAR CONVITE
+  // ============================================================
+  const resendInviteMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const redirectUrl = `${window.location.origin}/accept-invite`;
+
+      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) {
+        // Se o erro for "já convidado", ainda é sucesso (email será reenviado)
+        if (error.message?.includes("already been invited") || error.message?.includes("User already registered")) {
+          return { success: true, message: "Convite reenviado!" };
+        }
+        throw error;
+      }
+
+      return { success: true, data };
+    },
+    onSuccess: () => {
+      toast({
+        title: "Convite reenviado!",
+        description: "O usuário receberá um novo e-mail com o link de convite.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao reenviar convite",
+        description: error.message || "Não foi possível reenviar o convite",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // ============================================================
+  // MUTATION PARA ATUALIZAR PERMISSÕES DE CONVITE PENDENTE
+  // ============================================================
+  const updatePendingInviteMutation = useMutation({
+    mutationFn: async ({
+      inviteId,
+      email,
+      isAdmin,
+      permissions,
+    }: {
+      inviteId: string;
+      email: string;
+      isAdmin: boolean;
+      permissions: Partial<UserPermission>;
+    }) => {
+      // Atualizar na tabela invitations
+      const { error } = await supabaseAdmin
+        .from("invitations")
+        .update({
+          is_admin: isAdmin,
+          permissions: permissions,
+        })
+        .eq("id", inviteId);
+
+      if (error) throw error;
+
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast({
+        title: "Permissões atualizadas!",
+        description: "As permissões do convite foram atualizadas com sucesso.",
+      });
+      setEditPendingDialogOpen(false);
+      setSelectedPendingInvite(null);
+      setPendingMakeAdmin(false);
+      setPendingInvitePermissions(DEFAULT_PERMISSIONS);
+      queryClient.invalidateQueries({ queryKey: ["team-members"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar permissões",
+        description: error.message || "Não foi possível atualizar as permissões",
+        variant: "destructive",
+      });
+    },
+  });
+
   const savePermissionsMutation = useMutation({
     mutationFn: async ({
       userId,
@@ -578,6 +681,51 @@ export function UserManagement() {
 
   const handleDeleteInvite = (inviteId: string) => {
     deleteInviteMutation.mutate(inviteId);
+  };
+
+  // ============================================================
+  // HANDLERS PARA CONVITES PENDENTES
+  // ============================================================
+  const handleResendInvite = (email: string) => {
+    resendInviteMutation.mutate(email);
+  };
+
+  const openEditPendingInvite = async (member: TeamMember) => {
+    setSelectedPendingInvite(member);
+    setPendingMakeAdmin(member.is_admin);
+
+    // Buscar permissões atuais do convite
+    const { data: inviteData } = await supabaseAdmin
+      .from("invitations")
+      .select("permissions, is_admin")
+      .eq("id", member.id)
+      .single();
+
+    if (inviteData?.permissions) {
+      setPendingInvitePermissions(inviteData.permissions as Partial<UserPermission>);
+    } else {
+      setPendingInvitePermissions(member.is_admin ? ADMIN_PERMISSIONS : DEFAULT_PERMISSIONS);
+    }
+
+    setEditPendingDialogOpen(true);
+  };
+
+  const handleSavePendingPermissions = () => {
+    if (!selectedPendingInvite) return;
+
+    // Se marcou como admin, usar ADMIN_PERMISSIONS
+    const finalPermissions = pendingMakeAdmin ? ADMIN_PERMISSIONS : pendingInvitePermissions;
+
+    updatePendingInviteMutation.mutate({
+      inviteId: selectedPendingInvite.id,
+      email: selectedPendingInvite.email,
+      isAdmin: pendingMakeAdmin,
+      permissions: finalPermissions as Partial<UserPermission>,
+    });
+  };
+
+  const updatePendingPermission = (key: keyof UserPermission, value: PermissionLevel) => {
+    setPendingInvitePermissions((prev) => ({ ...prev, [key]: value }));
   };
 
   const openEditPermissions = (member: TeamMember) => {
@@ -883,7 +1031,36 @@ export function UserManagement() {
 
                   <div className="flex items-center gap-2">
                     {/* 
-                      Botão Permissões:
+                      Botões para CONVITES PENDENTES:
+                      - Reenviar convite
+                      - Editar permissões antes de aceitar
+                    */}
+                    {member.invitation_status === "pending" && canSendInvites && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleResendInvite(member.email)}
+                          disabled={resendInviteMutation.isPending}
+                        >
+                          {resendInviteMutation.isPending ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                          ) : (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Reenviar
+                            </>
+                          )}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => openEditPendingInvite(member)}>
+                          <SettingsIcon className="h-4 w-4 mr-2" />
+                          Permissões
+                        </Button>
+                      </>
+                    )}
+
+                    {/* 
+                      Botão Permissões para USUÁRIOS ACEITOS:
                       - Owner NUNCA pode ter permissões editadas por ninguém
                       - Owner pode gerenciar todos os outros
                       - Admin (não owner) pode gerenciar todos EXCETO owners
@@ -1123,6 +1300,99 @@ export function UserManagement() {
                 <>
                   <Shield className="h-4 w-4 mr-2" />
                   Promover a Admin
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Salvar Permissões
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============================================================
+          DIALOG PARA EDITAR PERMISSÕES DE CONVITE PENDENTE
+          ============================================================ */}
+      <Dialog
+        open={editPendingDialogOpen}
+        onOpenChange={(open) => {
+          setEditPendingDialogOpen(open);
+          if (!open) {
+            setPendingMakeAdmin(false);
+            setSelectedPendingInvite(null);
+            setPendingInvitePermissions(DEFAULT_PERMISSIONS);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Editar Permissões do Convite</DialogTitle>
+            <DialogDescription>
+              Altere as permissões de {selectedPendingInvite?.email} antes de aceitar o convite
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Tipo de Acesso</Label>
+              <Select
+                value={pendingMakeAdmin ? "admin" : "personalizado"}
+                onValueChange={(value: "admin" | "personalizado") => {
+                  if (value === "admin") {
+                    setPendingMakeAdmin(true);
+                    setPendingInvitePermissions(ADMIN_PERMISSIONS as Partial<UserPermission>);
+                  } else {
+                    setPendingMakeAdmin(false);
+                    setPendingInvitePermissions(DEFAULT_PERMISSIONS);
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-blue-500" />
+                      Administrador
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="personalizado">
+                    <div className="flex items-center gap-2">
+                      <SettingsIcon className="h-4 w-4" />
+                      Personalizado
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {pendingMakeAdmin && (
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 border border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Administrador:</strong> Terá acesso total ao sistema, incluindo gerenciamento de usuários.
+                </p>
+              </div>
+            )}
+
+            {!pendingMakeAdmin && (
+              <ScrollArea className="h-[400px] pr-4">
+                {renderPermissionsSections(pendingInvitePermissions, updatePendingPermission)}
+              </ScrollArea>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPendingDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSavePendingPermissions} disabled={updatePendingInviteMutation.isPending}>
+              {updatePendingInviteMutation.isPending ? (
+                <>
+                  <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-background border-t-foreground" />
+                  Salvando...
                 </>
               ) : (
                 <>
