@@ -821,10 +821,11 @@ export function UserManagement() {
 
                     {/* 
                       Botão Excluir:
-                      - Owner pode excluir TODOS (exceto ele mesmo)
-                      - Admin (não owner) pode excluir todos EXCETO owners
+                      - Owner NUNCA pode ser excluído por ninguém
+                      - Owner pode excluir qualquer outro usuário
+                      - Admin (não owner) pode excluir usuários não-owners
                     */}
-                    {member.id !== user?.id && isCurrentUserAdmin && (isCurrentUserOwner || !member.is_owner) && (
+                    {member.id !== user?.id && isCurrentUserAdmin && !member.is_owner && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="sm">
