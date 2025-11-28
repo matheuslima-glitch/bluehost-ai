@@ -198,7 +198,6 @@ export default function AcceptInvite() {
       });
 
       if (profileError) throw profileError;
-      console.log("✅ Perfil criado com sucesso");
 
       // Criar permissões personalizadas se não for admin
       if (!inviteData.is_admin && permissions) {
@@ -208,52 +207,53 @@ export default function AcceptInvite() {
         });
 
         if (permissionsError) throw permissionsError;
-        console.log("✅ Permissões criadas com sucesso");
       }
 
-      // ⭐ CORREÇÃO CRÍTICA: Usar supabaseAdmin para atualizar o convite ⭐
-      // O supabaseAdmin usa service_role que bypassa RLS
-      // A função get_data_owner_id() exige AMBOS: status = 'accepted' E accepted_at IS NOT NULL
-      console.log("🔄 Atualizando convite com supabaseAdmin...");
+      // ⭐ ATUALIZAR CONVITE - MÉTODO DIRETO COM SUPABASEADMIN ⭐
+      const updatePayload = {
+        status: "accepted",
+        accepted_at: new Date().toISOString(),
+      };
 
-      const { data: updateData, error: invitationError } = await supabaseAdmin
+      const { data: updateResult, error: updateInviteError } = await supabaseAdmin
         .from("invitations")
-        .update({
-          status: "accepted",
-          accepted_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq("email", inviteData.email)
+        .eq("status", "pending")
         .select();
 
-      if (invitationError) {
-        console.error("❌ Erro ao atualizar convite:", invitationError);
-        // Tentar novamente com status pending (pode ter mais de um convite)
-        const { error: retryError } = await supabaseAdmin
-          .from("invitations")
-          .update({
-            status: "accepted",
-            accepted_at: new Date().toISOString(),
-          })
-          .eq("email", inviteData.email)
-          .eq("status", "pending");
-
-        if (retryError) {
-          console.error("❌ Erro na segunda tentativa:", retryError);
-        } else {
-          console.log("✅ Convite atualizado na segunda tentativa");
-        }
-      } else {
-        console.log("✅ Convite atualizado com sucesso:", updateData);
+      if (updateInviteError) {
+        console.error("Erro ao atualizar convite:", updateInviteError);
+        // Mesmo com erro, não bloquear o fluxo
       }
 
-      // Verificar se a atualização funcionou
-      const { data: verifyData } = await supabaseAdmin
-        .from("invitations")
-        .select("*")
-        .eq("email", inviteData.email)
-        .single();
+      if (!updateResult || updateResult.length === 0) {
+        // Se não atualizou com status pending, tentar sem filtro de status
+        const { data: retryResult, error: retryError } = await supabaseAdmin
+          .from("invitations")
+          .update(updatePayload)
+          .eq("email", inviteData.email)
+          .select();
 
-      console.log("🔍 Verificação do convite após update:", verifyData);
+        if (retryError) {
+          console.error("Erro na segunda tentativa:", retryError);
+        }
+      }
+
+      toast.success("Conta criada com sucesso!");
+      setStep("success");
+
+      // Redirecionar após 2 segundos
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 2000);
+    } catch (error: any) {
+      console.error("Erro ao criar conta:", error);
+      toast.error(error.message || "Erro ao criar conta");
+      setSubmitting(false);
+    }
+  };
+      }
 
       toast.success("Conta criada com sucesso!");
       setStep("success");
