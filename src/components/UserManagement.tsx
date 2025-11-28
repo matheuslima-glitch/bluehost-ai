@@ -419,21 +419,34 @@ export function UserManagement() {
 
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-      if (deleteUserError) throw deleteUserError;
+      // Usar a função do banco que deleta o usuário completamente
+      // (profiles, user_permissions, invitations, auth.users, etc.)
+      const { data, error } = await supabase.rpc("delete_user_completely", {
+        p_user_id: userId,
+      });
 
-      const { error: deletePermissionsError } = await supabase.from("user_permissions").delete().eq("user_id", userId);
-      if (deletePermissionsError) throw deletePermissionsError;
+      if (error) throw error;
 
-      const { error: deleteProfileError } = await supabase.from("profiles").delete().eq("id", userId);
-      if (deleteProfileError) throw deleteProfileError;
+      // Verificar se a função retornou sucesso
+      if (data && !data.success) {
+        throw new Error(data.error || "Erro ao excluir usuário");
+      }
+
+      return data;
     },
-    onSuccess: () => {
-      toast({ title: "Usuário removido", description: "O usuário foi removido com sucesso" });
+    onSuccess: (data) => {
+      toast({
+        title: "Usuário removido",
+        description: data?.message || "O usuário foi removido completamente do sistema",
+      });
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
     },
     onError: (error: any) => {
-      toast({ title: "Erro ao remover usuário", description: error.message, variant: "destructive" });
+      toast({
+        title: "Erro ao remover usuário",
+        description: error.message || "Não foi possível remover o usuário",
+        variant: "destructive",
+      });
     },
   });
 
