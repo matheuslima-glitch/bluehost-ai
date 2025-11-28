@@ -253,21 +253,6 @@ export default function AcceptInvite() {
       setSubmitting(false);
     }
   };
-      }
-
-      toast.success("Conta criada com sucesso!");
-      setStep("success");
-
-      // Redirecionar após 2 segundos
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 2000);
-    } catch (error: any) {
-      console.error("Erro ao criar conta:", error);
-      toast.error(error.message || "Erro ao criar conta");
-      setSubmitting(false);
-    }
-  };
 
   const getPermissionSummary = () => {
     if (inviteData?.is_admin) {
