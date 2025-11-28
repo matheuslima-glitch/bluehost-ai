@@ -11,18 +11,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  AlertTriangle, 
-  CheckCircle2, 
-  XCircle, 
-  Loader2, 
-  Globe, 
-  Server, 
+import {
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Globe,
+  Server,
   Cloud,
   Database,
-  SkipForward
+  SkipForward,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // URL base da API - ajuste conforme necessário
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://domainhub-backend.onrender.com";
@@ -58,18 +59,18 @@ export function DomainDeactivationDialog({
   onDeactivationComplete,
 }: DomainDeactivationDialogProps) {
   // Estados do fluxo
-  const [currentStep, setCurrentStep] = useState<
-    "warning" | "confirmation" | "detecting" | "executing" | "complete"
-  >("warning");
-  
+  const [currentStep, setCurrentStep] = useState<"warning" | "confirmation" | "detecting" | "executing" | "complete">(
+    "warning",
+  );
+
   // Estado da confirmação por texto
   const [confirmationText, setConfirmationText] = useState("");
   const expectedText = domain ? `quero desinstalar o ${domain.domain_name}` : "";
-  
+
   // Estado das integrações detectadas
   const [integrations, setIntegrations] = useState<DomainIntegrations | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
-  
+
   // Estado da execução
   const [steps, setSteps] = useState<DeactivationStep[]>([]);
   const [currentExecutingStep, setCurrentExecutingStep] = useState<number>(-1);
@@ -107,25 +108,23 @@ export function DomainDeactivationDialog({
   // Detectar integrações
   const detectIntegrations = async () => {
     if (!domain) return;
-    
+
     setIsDetecting(true);
     setCurrentStep("detecting");
-    
+
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/domains/deactivation/detect/${domain.domain_name}`
-      );
-      
+      const response = await fetch(`${API_BASE_URL}/api/domains/deactivation/detect/${domain.domain_name}`);
+
       if (!response.ok) {
         throw new Error("Erro ao detectar integrações");
       }
-      
+
       const data = await response.json();
       setIntegrations(data.integrations);
-      
+
       // Configurar steps baseado nas integrações
       const newSteps: DeactivationStep[] = [];
-      
+
       if (data.integrations.wordpress.exists) {
         newSteps.push({
           id: "wordpress",
@@ -134,7 +133,7 @@ export function DomainDeactivationDialog({
           status: "pending",
         });
       }
-      
+
       if (data.integrations.cpanel.exists) {
         newSteps.push({
           id: "cpanel",
@@ -143,7 +142,7 @@ export function DomainDeactivationDialog({
           status: "pending",
         });
       }
-      
+
       if (data.integrations.cloudflare.exists) {
         newSteps.push({
           id: "cloudflare",
@@ -152,7 +151,7 @@ export function DomainDeactivationDialog({
           status: "pending",
         });
       }
-      
+
       // Sempre adicionar Supabase
       newSteps.push({
         id: "supabase",
@@ -160,10 +159,9 @@ export function DomainDeactivationDialog({
         icon: <Database className="h-4 w-4" />,
         status: "pending",
       });
-      
+
       setSteps(newSteps);
       setCurrentStep("executing");
-      
     } catch (error: any) {
       console.error("Erro ao detectar integrações:", error);
       toast.error("Erro ao detectar integrações do domínio");
@@ -176,25 +174,21 @@ export function DomainDeactivationDialog({
   // Executar desativação
   const executeDeactivation = async () => {
     if (!domain || steps.length === 0) return;
-    
+
     setIsExecuting(true);
     let errorOccurred = false;
-    
+
     for (let i = 0; i < steps.length; i++) {
       setCurrentExecutingStep(i);
-      setExecutionProgress(((i) / steps.length) * 100);
-      
+      setExecutionProgress((i / steps.length) * 100);
+
       // Atualizar status para "running"
-      setSteps((prev) =>
-        prev.map((step, idx) =>
-          idx === i ? { ...step, status: "running" } : step
-        )
-      );
-      
+      setSteps((prev) => prev.map((step, idx) => (idx === i ? { ...step, status: "running" } : step)));
+
       try {
         const step = steps[i];
         let result;
-        
+
         switch (step.id) {
           case "wordpress":
             result = await fetch(`${API_BASE_URL}/api/domains/deactivation/step/wordpress`, {
@@ -203,7 +197,7 @@ export function DomainDeactivationDialog({
               body: JSON.stringify({ domainName: domain.domain_name }),
             });
             break;
-            
+
           case "cpanel":
             result = await fetch(`${API_BASE_URL}/api/domains/deactivation/step/cpanel`, {
               method: "POST",
@@ -211,7 +205,7 @@ export function DomainDeactivationDialog({
               body: JSON.stringify({ domainName: domain.domain_name }),
             });
             break;
-            
+
           case "cloudflare":
             result = await fetch(`${API_BASE_URL}/api/domains/deactivation/step/cloudflare`, {
               method: "POST",
@@ -219,7 +213,7 @@ export function DomainDeactivationDialog({
               body: JSON.stringify({ domainName: domain.domain_name }),
             });
             break;
-            
+
           case "supabase":
             result = await fetch(`${API_BASE_URL}/api/domains/deactivation/step/supabase`, {
               method: "POST",
@@ -228,10 +222,10 @@ export function DomainDeactivationDialog({
             });
             break;
         }
-        
+
         if (result) {
           const data = await result.json();
-          
+
           if (data.success) {
             setSteps((prev) =>
               prev.map((s, idx) =>
@@ -241,40 +235,33 @@ export function DomainDeactivationDialog({
                       status: data.skipped ? "skipped" : "success",
                       message: data.message,
                     }
-                  : s
-              )
+                  : s,
+              ),
             );
           } else {
             throw new Error(data.error || data.message || "Erro desconhecido");
           }
         }
-        
       } catch (error: any) {
         console.error(`Erro na etapa ${steps[i].name}:`, error);
         errorOccurred = true;
-        
-        setSteps((prev) =>
-          prev.map((s, idx) =>
-            idx === i
-              ? { ...s, status: "error", message: error.message }
-              : s
-          )
-        );
-        
+
+        setSteps((prev) => prev.map((s, idx) => (idx === i ? { ...s, status: "error", message: error.message } : s)));
+
         // Continuar para a próxima etapa mesmo com erro
       }
-      
+
       // Pequeno delay entre etapas
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
-    
+
     setExecutionProgress(100);
     setCurrentExecutingStep(-1);
     setIsExecuting(false);
     setExecutionComplete(true);
     setHasErrors(errorOccurred);
     setCurrentStep("complete");
-    
+
     if (!errorOccurred) {
       toast.success("Domínio desativado com sucesso!");
     } else {
@@ -337,16 +324,12 @@ export function DomainDeactivationDialog({
                 Atenção! Ação Irreversível
               </DialogTitle>
               <DialogDescription className="space-y-4 pt-4">
-                <p className="text-base">
-                  Você está prestes a desativar permanentemente o domínio:
-                </p>
+                <p className="text-base">Você está prestes a desativar permanentemente o domínio:</p>
                 <p className="text-lg font-bold text-foreground text-center py-2 bg-muted rounded-md">
                   {domain.domain_name}
                 </p>
                 <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-md p-4 space-y-2">
-                  <p className="font-semibold text-red-700 dark:text-red-300">
-                    Esta ação irá:
-                  </p>
+                  <p className="font-semibold text-red-700 dark:text-red-300">Esta ação irá:</p>
                   <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400 space-y-1">
                     <li>Excluir o domínio do sistema permanentemente</li>
                     <li>Remover todas as integrações com sistemas de terceiros</li>
@@ -380,13 +363,9 @@ export function DomainDeactivationDialog({
                 Confirme sua ação
               </DialogTitle>
               <DialogDescription className="space-y-4 pt-4">
-                <p>
-                  Para confirmar a desativação, digite exatamente o texto abaixo:
-                </p>
+                <p>Para confirmar a desativação, digite exatamente o texto abaixo:</p>
                 <div className="bg-muted p-3 rounded-md">
-                  <code className="text-sm font-mono text-foreground">
-                    {expectedText}
-                  </code>
+                  <code className="text-sm font-mono text-foreground">{expectedText}</code>
                 </div>
                 <Input
                   value={confirmationText}
@@ -400,9 +379,7 @@ export function DomainDeactivationDialog({
                   autoCapitalize="off"
                   spellCheck="false"
                 />
-                <p className="text-xs text-muted-foreground">
-                  * Copiar e colar está desabilitado. Digite manualmente.
-                </p>
+                <p className="text-xs text-muted-foreground">* Copiar e colar está desabilitado. Digite manualmente.</p>
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="gap-2 sm:gap-0">
@@ -486,9 +463,9 @@ export function DomainDeactivationDialog({
                     </div>
                   </div>
                 )}
-                
+
                 <Progress value={executionProgress} className="h-2" />
-                
+
                 <div className="space-y-2">
                   {steps.map((step, index) => (
                     <div
@@ -497,25 +474,32 @@ export function DomainDeactivationDialog({
                         index === currentExecutingStep
                           ? "bg-blue-50 dark:bg-blue-950"
                           : step.status === "success"
-                          ? "bg-green-50 dark:bg-green-950"
-                          : step.status === "error"
-                          ? "bg-red-50 dark:bg-red-950"
-                          : step.status === "skipped"
-                          ? "bg-gray-50 dark:bg-gray-900"
-                          : ""
+                            ? "bg-green-50 dark:bg-green-950"
+                            : step.status === "error"
+                              ? "bg-red-50 dark:bg-red-950"
+                              : step.status === "skipped"
+                                ? "bg-gray-50 dark:bg-gray-900"
+                                : ""
                       }`}
                     >
                       {renderStepStatus(step.status)}
                       <span className="flex items-center gap-2 flex-1">
                         {step.icon}
-                        <span className={step.status === "skipped" ? "text-gray-400" : ""}>
-                          {step.name}
-                        </span>
+                        <span className={step.status === "skipped" ? "text-gray-400" : ""}>{step.name}</span>
                       </span>
                       {step.message && (
-                        <span className="text-xs text-muted-foreground truncate max-w-[150px]">
-                          {step.message}
-                        </span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-xs text-muted-foreground truncate max-w-[150px] cursor-help">
+                                {step.message}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[300px]">
+                              <p className="text-xs">{step.message}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                     </div>
                   ))}
@@ -552,7 +536,7 @@ export function DomainDeactivationDialog({
                   O domínio <strong>{domain.domain_name}</strong> foi desativado
                   {hasErrors ? " com alguns erros." : " com sucesso."}
                 </p>
-                
+
                 <div className="space-y-2">
                   {steps.map((step) => (
                     <div
@@ -561,36 +545,39 @@ export function DomainDeactivationDialog({
                         step.status === "success"
                           ? "bg-green-50 dark:bg-green-950"
                           : step.status === "error"
-                          ? "bg-red-50 dark:bg-red-950"
-                          : step.status === "skipped"
-                          ? "bg-gray-50 dark:bg-gray-900"
-                          : ""
+                            ? "bg-red-50 dark:bg-red-950"
+                            : step.status === "skipped"
+                              ? "bg-gray-50 dark:bg-gray-900"
+                              : ""
                       }`}
                     >
                       {renderStepStatus(step.status)}
                       <span className="flex items-center gap-2 flex-1">
                         {step.icon}
-                        <span className={step.status === "skipped" ? "text-gray-400" : ""}>
-                          {step.name}
-                        </span>
+                        <span className={step.status === "skipped" ? "text-gray-400" : ""}>{step.name}</span>
                       </span>
                       {step.status === "error" && step.message && (
-                        <span className="text-xs text-red-500 truncate max-w-[150px]">
-                          {step.message}
-                        </span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-xs text-red-500 truncate max-w-[150px] cursor-help">
+                                {step.message}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[300px]">
+                              <p className="text-xs">{step.message}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
-                      {step.status === "skipped" && (
-                        <span className="text-xs text-gray-400">Pulado</span>
-                      )}
+                      {step.status === "skipped" && <span className="text-xs text-gray-400">Pulado</span>}
                     </div>
                   ))}
                 </div>
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button onClick={handleComplete}>
-                Fechar
-              </Button>
+              <Button onClick={handleComplete}>Fechar</Button>
             </DialogFooter>
           </>
         )}
