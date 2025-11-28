@@ -96,6 +96,30 @@ const DEFAULT_PERMISSIONS: Partial<UserPermission> = {
   can_send_invites: "none",
 };
 
+// Permissões totais para admins (tudo write)
+const ADMIN_PERMISSIONS: Partial<UserPermission> = {
+  permission_type: "total",
+  can_access_dashboard: "write",
+  can_access_domain_search: "write",
+  can_access_management: "write",
+  can_access_settings: "write",
+  can_view_critical_domains: "write",
+  can_view_integrations: "write",
+  can_view_balance: "write",
+  can_manual_purchase: "write",
+  can_ai_purchase: "write",
+  can_view_domain_details: "write",
+  can_change_domain_status: "write",
+  can_select_platform: "write",
+  can_select_traffic_source: "write",
+  can_insert_funnel_id: "write",
+  can_view_logs: "write",
+  can_change_nameservers: "write",
+  can_create_filters: "write",
+  can_manage_users: "write",
+  can_send_invites: "write",
+};
+
 function PermissionSelector({
   value,
   onChange,
@@ -223,10 +247,11 @@ export function UserManagement() {
       if (permissionsError) throw permissionsError;
 
       // Buscar invitations COM o campo invited_by para determinar quem é owner
+      // Ordenar por created_at ASC para pegar o primeiro convite de cada email
       const { data: invitations, error: invitationsError } = await supabase
         .from("invitations")
         .select("id, email, status, created_at, is_admin, invited_by")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: true });
 
       if (invitationsError) throw invitationsError;
 
@@ -441,8 +466,10 @@ export function UserManagement() {
       // Buscar email do usuário para atualizar invitations
       const { data: userProfile } = await supabase.from("profiles").select("email").eq("id", userId).single();
 
-      // Se promover a admin, atualizar profiles.is_admin = true E invitations.is_admin = true
-      // Usar supabaseAdmin para bypassa RLS
+      // Se promover a admin, atualizar:
+      // 1. profiles.is_admin = true
+      // 2. invitations.is_admin = true
+      // 3. user_permissions = ADMIN_PERMISSIONS (tudo write)
       if (promoteToAdmin) {
         const { error: adminError } = await supabaseAdmin.from("profiles").update({ is_admin: true }).eq("id", userId);
         if (adminError) {
@@ -450,14 +477,25 @@ export function UserManagement() {
           throw adminError;
         }
 
-        // Também atualizar na tabela invitations para manter consistência
+        // Atualizar na tabela invitations
         if (userProfile?.email) {
           await supabaseAdmin.from("invitations").update({ is_admin: true }).eq("email", userProfile.email);
         }
+
+        // Atualizar permissões para acesso total
+        const { error: permError } = await supabase
+          .from("user_permissions")
+          .upsert({ user_id: userId, ...ADMIN_PERMISSIONS }, { onConflict: "user_id" });
+
+        if (permError) throw permError;
+
+        return { promoteToAdmin, demoteFromAdmin };
       }
 
-      // Se rebaixar de admin, atualizar profiles.is_admin = false E invitations.is_admin = false
-      // Usar supabaseAdmin para bypassa RLS
+      // Se rebaixar de admin, atualizar:
+      // 1. profiles.is_admin = false
+      // 2. invitations.is_admin = false
+      // 3. user_permissions = permissões personalizadas (mantém as que foram passadas)
       if (demoteFromAdmin) {
         const { error: adminError } = await supabaseAdmin.from("profiles").update({ is_admin: false }).eq("id", userId);
         if (adminError) {
@@ -465,13 +503,13 @@ export function UserManagement() {
           throw adminError;
         }
 
-        // Também atualizar na tabela invitations para manter consistência
+        // Atualizar na tabela invitations
         if (userProfile?.email) {
           await supabaseAdmin.from("invitations").update({ is_admin: false }).eq("email", userProfile.email);
         }
       }
 
-      // Salvar permissões usando upsert para evitar erro de duplicidade
+      // Salvar permissões usando upsert (só chega aqui se NÃO for promoção)
       const { error } = await supabase
         .from("user_permissions")
         .upsert({ user_id: userId, ...permissions }, { onConflict: "user_id" });
@@ -497,7 +535,11 @@ export function UserManagement() {
       setSelectedUserId(null);
       setSelectedMember(null);
       setMakeAdminEdit(false);
+
+      // Invalidar todas as queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
+      queryClient.invalidateQueries({ queryKey: ["current-user-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["is-current-user-owner"] });
     },
     onError: (error: any) => {
       toast({ title: "Erro ao atualizar permissões", description: error.message, variant: "destructive" });
