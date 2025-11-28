@@ -14,8 +14,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Intervalo de verificação: 30 segundos
-const USER_CHECK_INTERVAL = 30000;
+// Intervalo de verificação: 10 segundos
+const USER_CHECK_INTERVAL = 10000;
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
