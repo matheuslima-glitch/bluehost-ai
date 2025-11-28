@@ -692,19 +692,37 @@ export function UserManagement() {
 
   const openEditPendingInvite = async (member: TeamMember) => {
     setSelectedPendingInvite(member);
-    setPendingMakeAdmin(member.is_admin);
 
-    // Buscar permissões atuais do convite
-    const { data: inviteData } = await supabaseAdmin
+    // Buscar permissões ATUAIS e REAIS do convite no banco
+    const { data: inviteData, error } = await supabaseAdmin
       .from("invitations")
       .select("permissions, is_admin")
       .eq("id", member.id)
       .single();
 
-    if (inviteData?.permissions) {
-      setPendingInvitePermissions(inviteData.permissions as Partial<UserPermission>);
+    if (error) {
+      console.error("Erro ao buscar permissões do convite:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as permissões do convite",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Usar os dados REAIS do banco
+    const realIsAdmin = inviteData?.is_admin ?? false;
+    const realPermissions = inviteData?.permissions as Partial<UserPermission> | null;
+
+    console.log("📋 Permissões carregadas do banco:", { realIsAdmin, realPermissions });
+
+    setPendingMakeAdmin(realIsAdmin);
+
+    if (realPermissions && Object.keys(realPermissions).length > 0) {
+      setPendingInvitePermissions(realPermissions);
     } else {
-      setPendingInvitePermissions(member.is_admin ? ADMIN_PERMISSIONS : DEFAULT_PERMISSIONS);
+      // Fallback se não houver permissões salvas
+      setPendingInvitePermissions(realIsAdmin ? ADMIN_PERMISSIONS : DEFAULT_PERMISSIONS);
     }
 
     setEditPendingDialogOpen(true);
@@ -1042,14 +1060,12 @@ export function UserManagement() {
                           size="sm"
                           onClick={() => handleResendInvite(member.email)}
                           disabled={resendInviteMutation.isPending}
+                          title="Reenviar convite"
                         >
                           {resendInviteMutation.isPending ? (
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                           ) : (
-                            <>
-                              <RefreshCw className="h-4 w-4 mr-2" />
-                              Reenviar
-                            </>
+                            <RefreshCw className="h-4 w-4" />
                           )}
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => openEditPendingInvite(member)}>
