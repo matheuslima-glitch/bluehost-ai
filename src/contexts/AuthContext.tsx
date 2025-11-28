@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useRef } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useRef, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -14,12 +14,72 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Intervalo de verificação: 30 segundos
+const USER_CHECK_INTERVAL = 30000;
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const initialized = useRef(false);
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Função para forçar logout quando usuário foi deletado
+  const forceLogout = useCallback(async () => {
+    console.log("AuthContext: Usuário foi removido do sistema. Forçando logout...");
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    navigate("/auth");
+  }, [navigate]);
+
+  // Função para verificar se o usuário ainda existe no banco
+  const checkUserExists = useCallback(
+    async (userId: string) => {
+      try {
+        const { data, error } = await supabase.from("profiles").select("id").eq("id", userId).maybeSingle();
+
+        // Se não encontrou o profile, usuário foi deletado
+        if (!data && !error) {
+          await forceLogout();
+          return false;
+        }
+
+        // Se deu erro de permissão (RLS), também pode indicar que foi removido
+        if (error && error.code === "PGRST116") {
+          await forceLogout();
+          return false;
+        }
+
+        return true;
+      } catch (err) {
+        console.error("AuthContext: Erro ao verificar usuário:", err);
+        return true; // Em caso de erro de rede, não deslogar
+      }
+    },
+    [forceLogout],
+  );
+
+  // Configurar verificação periódica
+  useEffect(() => {
+    if (user?.id) {
+      // Verificar imediatamente ao montar/mudar usuário
+      checkUserExists(user.id);
+
+      // Configurar verificação periódica
+      checkIntervalRef.current = setInterval(() => {
+        checkUserExists(user.id);
+      }, USER_CHECK_INTERVAL);
+    }
+
+    return () => {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
+      }
+    };
+  }, [user?.id, checkUserExists]);
 
   useEffect(() => {
     // Evitar inicialização dupla
