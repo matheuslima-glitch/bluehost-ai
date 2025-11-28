@@ -195,26 +195,83 @@ export default function AcceptInvite() {
       if (updateError) throw updateError;
       console.log("✅ Senha atualizada com sucesso");
 
+      // ⭐ CORREÇÃO: Buscar is_admin e permissions da tabela invitations (fonte de verdade)
+      // O user_metadata pode não ter sido atualizado corretamente
+      console.log("🔍 Buscando dados do convite na tabela invitations...");
+
+      const { data: invitationData, error: invitationFetchError } = await supabaseAdmin
+        .from("invitations")
+        .select("is_admin, permissions")
+        .eq("email", inviteData.email)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      // Usar dados do invitation se disponíveis, senão fallback para inviteData
+      const finalIsAdmin = invitationData?.is_admin ?? inviteData.is_admin ?? false;
+      const finalPermissions = invitationData?.permissions ?? permissions;
+
+      console.log("📋 Dados finais do convite:", {
+        finalIsAdmin,
+        hasPermissions: !!finalPermissions,
+        source: invitationData ? "invitations table" : "user_metadata",
+      });
+
       // Criar perfil no banco de dados
       const { error: profileError } = await supabase.from("profiles").upsert({
         id: inviteData.user.id,
         email: inviteData.email,
         full_name: fullName,
-        is_admin: inviteData.is_admin || false,
+        is_admin: finalIsAdmin,
       });
 
       if (profileError) throw profileError;
-      console.log("✅ Perfil criado com sucesso");
+      console.log("✅ Perfil criado com sucesso (is_admin:", finalIsAdmin, ")");
 
-      // Criar permissões personalizadas se não for admin
-      if (!inviteData.is_admin && permissions) {
+      // ⭐ CORREÇÃO CRÍTICA: Criar permissões para TODOS os usuários
+      // Admins recebem permissões totais, não-admins recebem as permissões configuradas
+      if (finalIsAdmin) {
+        // Admin: criar permissões totais
+        const adminPermissions = {
+          user_id: inviteData.user.id,
+          permission_type: "total" as const,
+          can_access_dashboard: "write" as const,
+          can_access_domain_search: "write" as const,
+          can_access_management: "write" as const,
+          can_access_settings: "write" as const,
+          can_view_critical_domains: "write" as const,
+          can_view_integrations: "write" as const,
+          can_view_balance: "write" as const,
+          can_manual_purchase: "write" as const,
+          can_ai_purchase: "write" as const,
+          can_view_domain_details: "write" as const,
+          can_change_domain_status: "write" as const,
+          can_select_platform: "write" as const,
+          can_select_traffic_source: "write" as const,
+          can_insert_funnel_id: "write" as const,
+          can_view_logs: "write" as const,
+          can_change_nameservers: "write" as const,
+          can_create_filters: "write" as const,
+          can_manage_users: "write" as const,
+          can_send_invites: "write" as const,
+        };
+
+        const { error: permissionsError } = await supabase.from("user_permissions").upsert(adminPermissions);
+        if (permissionsError) throw permissionsError;
+        console.log("✅ Permissões de ADMIN criadas com sucesso");
+      } else if (finalPermissions) {
+        // Não-admin: usar permissões configuradas
         const { error: permissionsError } = await supabase.from("user_permissions").upsert({
           user_id: inviteData.user.id,
-          ...permissions,
+          ...finalPermissions,
         });
 
         if (permissionsError) throw permissionsError;
-        console.log("✅ Permissões criadas com sucesso");
+        console.log("✅ Permissões personalizadas criadas com sucesso");
+      } else {
+        // Fallback: criar permissões padrão se não houver nada definido
+        console.log("⚠️ Nenhuma permissão definida, usando padrão limitado");
       }
 
       // ⭐ CORREÇÃO CRÍTICA: Usar supabaseAdmin para atualizar o convite ⭐

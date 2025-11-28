@@ -966,10 +966,12 @@ export function UserManagement() {
                 onValueChange={(value: "admin" | "personalizado") => {
                   if (value === "admin") {
                     setMakeAdmin(true);
-                    setInvitePermissions((prev) => ({ ...prev, permission_type: "total" }));
+                    // ⭐ CORREÇÃO: Aplicar TODAS as permissões de admin, não apenas permission_type
+                    setInvitePermissions(ADMIN_PERMISSIONS as Partial<UserPermission>);
                   } else {
                     setMakeAdmin(false);
-                    setInvitePermissions((prev) => ({ ...prev, permission_type: "personalizado" }));
+                    // Voltar para permissões padrão quando desmarcar admin
+                    setInvitePermissions(DEFAULT_PERMISSIONS);
                   }
                 }}
               >
