@@ -217,6 +217,9 @@ export function UserManagement() {
     useState<Partial<UserPermission>>(DEFAULT_PERMISSIONS);
   const [pendingMakeAdmin, setPendingMakeAdmin] = useState(false);
 
+  // Estado para rastrear qual email está sendo reenviado
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
+
   const { data: currentUserProfile } = useQuery({
     queryKey: ["current-user-profile", user?.id],
     queryFn: async () => {
@@ -509,6 +512,7 @@ export function UserManagement() {
         title: "Convite reenviado!",
         description: "O usuário receberá um novo e-mail com o link de convite.",
       });
+      setResendingEmail(null);
     },
     onError: (error: any) => {
       toast({
@@ -516,6 +520,7 @@ export function UserManagement() {
         description: error.message || "Não foi possível reenviar o convite",
         variant: "destructive",
       });
+      setResendingEmail(null);
     },
   });
 
@@ -687,6 +692,7 @@ export function UserManagement() {
   // HANDLERS PARA CONVITES PENDENTES
   // ============================================================
   const handleResendInvite = (email: string) => {
+    setResendingEmail(email);
     resendInviteMutation.mutate(email);
   };
 
@@ -1059,10 +1065,10 @@ export function UserManagement() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleResendInvite(member.email)}
-                          disabled={resendInviteMutation.isPending}
+                          disabled={resendingEmail === member.email}
                           title="Reenviar convite"
                         >
-                          {resendInviteMutation.isPending ? (
+                          {resendingEmail === member.email ? (
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                           ) : (
                             <RefreshCw className="h-4 w-4" />
