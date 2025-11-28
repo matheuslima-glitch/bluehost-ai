@@ -434,15 +434,23 @@ export function UserManagement() {
       demoteFromAdmin?: boolean;
     }) => {
       // Se promover a admin, atualizar profiles.is_admin = true
+      // Usar supabaseAdmin para bypassa RLS
       if (promoteToAdmin) {
-        const { error: adminError } = await supabase.from("profiles").update({ is_admin: true }).eq("id", userId);
-        if (adminError) throw adminError;
+        const { error: adminError } = await supabaseAdmin.from("profiles").update({ is_admin: true }).eq("id", userId);
+        if (adminError) {
+          console.error("Erro ao promover admin:", adminError);
+          throw adminError;
+        }
       }
 
       // Se rebaixar de admin, atualizar profiles.is_admin = false
+      // Usar supabaseAdmin para bypassa RLS
       if (demoteFromAdmin) {
-        const { error: adminError } = await supabase.from("profiles").update({ is_admin: false }).eq("id", userId);
-        if (adminError) throw adminError;
+        const { error: adminError } = await supabaseAdmin.from("profiles").update({ is_admin: false }).eq("id", userId);
+        if (adminError) {
+          console.error("Erro ao rebaixar admin:", adminError);
+          throw adminError;
+        }
       }
 
       // Salvar permissões usando upsert para evitar erro de duplicidade
