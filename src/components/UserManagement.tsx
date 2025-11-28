@@ -177,11 +177,34 @@ export function UserManagement() {
   const { data: currentUserProfile } = useQuery({
     queryKey: ["current-user-profile", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("is_admin, full_name").eq("id", user?.id).single();
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("is_admin, full_name, email")
+        .eq("id", user?.id)
+        .single();
       if (error) throw error;
       return data;
     },
     enabled: !!user?.id,
+  });
+
+  // Verificar se usuário atual é owner (admin que nunca foi convidado)
+  const { data: isCurrentUserOwner } = useQuery({
+    queryKey: ["is-current-user-owner", user?.id, currentUserProfile?.email],
+    queryFn: async () => {
+      if (!currentUserProfile?.is_admin) return false;
+
+      // Verificar se existe convite para o email do usuário atual
+      const { data: invitation } = await supabase
+        .from("invitations")
+        .select("invited_by")
+        .eq("email", currentUserProfile.email)
+        .maybeSingle();
+
+      // É owner se: é admin E (não foi convidado OU invited_by é null)
+      return !invitation || invitation.invited_by === null;
+    },
+    enabled: !!user?.id && !!currentUserProfile?.email,
   });
 
   const isCurrentUserAdmin = currentUserProfile?.is_admin || false;
@@ -199,23 +222,47 @@ export function UserManagement() {
       const { data: permissions, error: permissionsError } = await supabase.from("user_permissions").select("*");
       if (permissionsError) throw permissionsError;
 
+      // Buscar invitations COM o campo invited_by para determinar quem é owner
       const { data: invitations, error: invitationsError } = await supabase
         .from("invitations")
-        .select("id, email, status, created_at, is_admin")
+        .select("id, email, status, created_at, is_admin, invited_by")
         .order("created_at", { ascending: false });
 
       if (invitationsError) throw invitationsError;
 
-      // Emails de usuários que foram convidados (existem na tabela invitations)
-      const invitedEmails = new Set(invitations?.map((inv) => inv.email.toLowerCase()) || []);
+      // Criar mapa de email -> invitation data para verificar quem convidou quem
+      const invitationMap = new Map<string, { invited_by: string | null; status: string }>();
+      invitations?.forEach((inv) => {
+        // Só considera o primeiro convite (mais antigo) para cada email
+        if (!invitationMap.has(inv.email.toLowerCase())) {
+          invitationMap.set(inv.email.toLowerCase(), {
+            invited_by: inv.invited_by,
+            status: inv.status,
+          });
+        }
+      });
 
-      const membersWithPermissions = profiles.map((profile) => ({
-        ...profile,
-        permissions: permissions?.find((p) => p.user_id === profile.id) || null,
-        invitation_status: "accepted" as const,
-        // Owner é admin que NÃO foi convidado (não existe na tabela invitations)
-        is_owner: profile.is_admin && !invitedEmails.has(profile.email.toLowerCase()),
-      }));
+      // Owner é admin que:
+      // 1. NÃO tem registro na tabela invitations (nunca foi convidado), OU
+      // 2. Tem invited_by = null
+      // Admins convidados (com invited_by preenchido) NÃO são owners
+      const membersWithPermissions = profiles.map((profile) => {
+        const emailLower = profile.email.toLowerCase();
+        const invitation = invitationMap.get(emailLower);
+        const wasInvited = !!invitation;
+        const invitedBy = invitation?.invited_by;
+
+        // É owner APENAS se: é admin E (não foi convidado OU invited_by é null)
+        // Se foi convidado por alguém (invited_by tem valor), NÃO é owner
+        const isOwner = profile.is_admin && (!wasInvited || invitedBy === null);
+
+        return {
+          ...profile,
+          permissions: permissions?.find((p) => p.user_id === profile.id) || null,
+          invitation_status: "accepted" as const,
+          is_owner: isOwner,
+        };
+      });
 
       const pendingInvites = invitations
         ?.filter((inv) => inv.status === "pending")
@@ -754,18 +801,30 @@ export function UserManagement() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {/* Botão Permissões: para não-admins OU admins que não são owner */}
+                    {/* 
+                      Botão Permissões:
+                      - Owner pode gerenciar TODOS (exceto ele mesmo)
+                      - Admin (não owner) pode gerenciar todos EXCETO owners
+                      - Usuário comum não pode gerenciar ninguém
+                    */}
                     {canManageUsers &&
                       member.invitation_status === "accepted" &&
-                      !member.is_owner &&
-                      member.id !== user?.id && (
+                      member.id !== user?.id &&
+                      // Se eu sou owner, posso gerenciar qualquer um
+                      // Se não sou owner, só posso gerenciar quem não é owner
+                      (isCurrentUserOwner || !member.is_owner) && (
                         <Button variant="outline" size="sm" onClick={() => openEditPermissions(member)}>
                           <SettingsIcon className="h-4 w-4 mr-2" />
                           Permissões
                         </Button>
                       )}
 
-                    {member.id !== user?.id && isCurrentUserAdmin && !member.is_owner && (
+                    {/* 
+                      Botão Excluir:
+                      - Owner pode excluir TODOS (exceto ele mesmo)
+                      - Admin (não owner) pode excluir todos EXCETO owners
+                    */}
+                    {member.id !== user?.id && isCurrentUserAdmin && (isCurrentUserOwner || !member.is_owner) && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="sm">
