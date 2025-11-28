@@ -227,9 +227,9 @@ export default function AcceptInvite() {
       });
 
       if (profileError) throw profileError;
-      console.log("Perfil criado com sucesso (is_admin:", finalIsAdmin, ")");
+      console.log("✅ Perfil criado com sucesso (is_admin:", finalIsAdmin, ")");
 
-      // CORREÇÃO CRÍTICA: Criar permissões para TODOS os usuários
+      // ⭐ CORREÇÃO CRÍTICA: Criar permissões para TODOS os usuários
       // Admins recebem permissões totais, não-admins recebem as permissões configuradas
       if (finalIsAdmin) {
         // Admin: criar permissões totais
@@ -257,18 +257,23 @@ export default function AcceptInvite() {
           can_send_invites: "write" as const,
         };
 
-        const { error: permissionsError } = await supabase.from("user_permissions").upsert(adminPermissions);
+        const { error: permissionsError } = await supabase
+          .from("user_permissions")
+          .upsert(adminPermissions, { onConflict: "user_id" });
         if (permissionsError) throw permissionsError;
-        console.log("✅ Permissões de ADMIN criadas com sucesso");
+        console.log("✅ Permissões de ADMIN criadas/atualizadas com sucesso");
       } else if (finalPermissions) {
         // Não-admin: usar permissões configuradas
-        const { error: permissionsError } = await supabase.from("user_permissions").upsert({
-          user_id: inviteData.user.id,
-          ...finalPermissions,
-        });
+        const { error: permissionsError } = await supabase.from("user_permissions").upsert(
+          {
+            user_id: inviteData.user.id,
+            ...finalPermissions,
+          },
+          { onConflict: "user_id" },
+        );
 
         if (permissionsError) throw permissionsError;
-        console.log("✅ Permissões personalizadas criadas com sucesso");
+        console.log("✅ Permissões personalizadas criadas/atualizadas com sucesso");
       } else {
         // Fallback: criar permissões padrão se não houver nada definido
         console.log("⚠️ Nenhuma permissão definida, usando padrão limitado");
