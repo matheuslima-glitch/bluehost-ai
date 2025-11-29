@@ -472,13 +472,29 @@ export function UserManagement() {
     },
   });
 
+  // ⭐ CORRIGIDO: Agora usa a função RPC delete_pending_invite
   const deleteInviteMutation = useMutation({
     mutationFn: async (inviteId: string) => {
-      const { error } = await supabase.from("invitations").delete().eq("id", inviteId);
+      // Usar a função do banco que deleta o convite completamente
+      // (invitations, user_permissions temporário, profiles temporário)
+      const { data, error } = await supabase.rpc("delete_pending_invite", {
+        p_invite_id: inviteId,
+      });
+
       if (error) throw error;
+
+      // Verificar se a função retornou sucesso
+      if (data && !data.success) {
+        throw new Error(data.error || "Erro ao cancelar convite");
+      }
+
+      return data;
     },
-    onSuccess: () => {
-      toast({ title: "Convite removido", description: "O convite pendente foi removido" });
+    onSuccess: (data) => {
+      toast({
+        title: "Convite cancelado",
+        description: data?.message || "O convite pendente foi removido junto com as permissões temporárias",
+      });
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
     },
     onError: (error: any) => {
