@@ -403,37 +403,43 @@ export function CriticalDomainsTable({ domains, onDomainsChange }: CriticalDomai
                               <AlertCircle className="h-4 w-4" />
                             </Button>
                           )}
-                          {/* CORREÇÃO: Toggle desabilitado quando não tem permissão de edição */}
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  onClick={() => handleDeleteClick(domain)}
-                                  disabled={!canEditCriticalDomains}
-                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                    canEditCriticalDomains
-                                      ? "bg-blue-500 hover:bg-blue-600 cursor-pointer"
-                                      : "bg-gray-300 dark:bg-gray-600 cursor-not-allowed"
-                                  }`}
-                                  title={canEditCriticalDomains ? "Desativar domínio" : "Sem permissão para desativar"}
-                                >
-                                  <span
-                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                      canEditCriticalDomains ? "translate-x-6" : "translate-x-6 opacity-50"
+                          {/* Toggle só aparece para domínios SUSPENSOS ou EXPIRADOS */}
+                          {(domain.status?.toLowerCase() === "suspended" ||
+                            domain.status?.toLowerCase() === "suspend" ||
+                            domain.status?.toLowerCase() === "expired") && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={() => handleDeleteClick(domain)}
+                                    disabled={!canEditCriticalDomains}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                      canEditCriticalDomains
+                                        ? "bg-blue-500 hover:bg-blue-600 cursor-pointer"
+                                        : "bg-gray-300 dark:bg-gray-600 cursor-not-allowed"
                                     }`}
-                                  />
-                                  {!canEditCriticalDomains && (
-                                    <Lock className="absolute left-1 h-3 w-3 text-gray-500" />
-                                  )}
-                                </button>
-                              </TooltipTrigger>
-                              {!canEditCriticalDomains && (
-                                <TooltipContent>
-                                  <p>Você não tem permissão para desativar domínios</p>
-                                </TooltipContent>
-                              )}
-                            </Tooltip>
-                          </TooltipProvider>
+                                    title={
+                                      canEditCriticalDomains ? "Desativar domínio" : "Sem permissão para desativar"
+                                    }
+                                  >
+                                    <span
+                                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                        canEditCriticalDomains ? "translate-x-6" : "translate-x-6 opacity-50"
+                                      }`}
+                                    />
+                                    {!canEditCriticalDomains && (
+                                      <Lock className="absolute left-1 h-3 w-3 text-gray-500" />
+                                    )}
+                                  </button>
+                                </TooltipTrigger>
+                                {!canEditCriticalDomains && (
+                                  <TooltipContent>
+                                    <p>Você não tem permissão para desativar domínios</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
