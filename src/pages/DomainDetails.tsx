@@ -250,21 +250,30 @@ export default function DomainDetails() {
 
       if (logsError) throw logsError;
 
-      // Buscar informações dos usuários
-      const userIds = [...new Set(logsData?.map((log) => log.user_id) || [])];
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .in("id", userIds);
+      // Buscar informações dos usuários (apenas para user_ids não nulos)
+      const userIds = [...new Set(logsData?.map((log) => log.user_id).filter((id) => id !== null) || [])];
 
-      if (profilesError) throw profilesError;
+      let profilesData: any[] = [];
+      if (userIds.length > 0) {
+        const { data, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", userIds);
 
-      // Combinar dados
+        if (profilesError) throw profilesError;
+        profilesData = data || [];
+      }
+
+      // Combinar dados - usar user_name salvo quando user_id é NULL (usuário excluído)
       const logsWithProfiles =
-        logsData?.map((log) => ({
-          ...log,
-          profiles: profilesData?.find((p) => p.id === log.user_id) || null,
-        })) || [];
+        logsData?.map((log) => {
+          const profile = log.user_id ? profilesData?.find((p) => p.id === log.user_id) : null;
+
+          return {
+            ...log,
+            profiles: profile || (log.user_name ? { full_name: log.user_name, email: null } : null),
+          };
+        }) || [];
 
       setActivityLogs(logsWithProfiles);
     } catch (error: any) {
