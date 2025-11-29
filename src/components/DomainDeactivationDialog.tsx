@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 // URL base da API - ajuste conforme necessário
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://domainhub-backend.onrender.com";
@@ -58,6 +60,9 @@ export function DomainDeactivationDialog({
   domain,
   onDeactivationComplete,
 }: DomainDeactivationDialogProps) {
+  // Hook de autenticação para obter o usuário atual
+  const { user } = useAuth();
+
   // Estados do fluxo
   const [currentStep, setCurrentStep] = useState<"warning" | "confirmation" | "detecting" | "executing" | "complete">(
     "warning",
@@ -104,6 +109,27 @@ export function DomainDeactivationDialog({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
   }, []);
+
+  // Função para registrar log de atividade
+  const logActivity = async (actionType: string, oldValue: string | null, newValue: string | null) => {
+    if (!domain?.id || !user?.id) return;
+
+    try {
+      const { error } = await supabase.from("domain_activity_logs").insert({
+        domain_id: domain.id,
+        user_id: user.id,
+        action_type: actionType,
+        old_value: oldValue,
+        new_value: newValue,
+      });
+
+      if (error) {
+        console.error("Erro ao registrar log de atividade:", error);
+      }
+    } catch (error: any) {
+      console.error("Erro ao registrar log de atividade:", error);
+    }
+  };
 
   // Detectar integrações
   const detectIntegrations = async () => {
@@ -178,6 +204,9 @@ export function DomainDeactivationDialog({
     setIsExecuting(true);
     let errorOccurred = false;
 
+    // Lista para armazenar integrações removidas com sucesso (para o log consolidado)
+    const removedIntegrations: string[] = [];
+
     for (let i = 0; i < steps.length; i++) {
       setCurrentExecutingStep(i);
       setExecutionProgress((i / steps.length) * 100);
@@ -238,6 +267,17 @@ export function DomainDeactivationDialog({
                   : s,
               ),
             );
+
+            // Adicionar à lista de integrações removidas (se não foi pulado)
+            if (!data.skipped) {
+              const integrationNames: Record<string, string> = {
+                wordpress: "WordPress",
+                cpanel: "cPanel",
+                cloudflare: "Cloudflare",
+                supabase: "Banco de dados",
+              };
+              removedIntegrations.push(integrationNames[step.id] || step.id);
+            }
           } else {
             throw new Error(data.error || data.message || "Erro desconhecido");
           }
@@ -261,6 +301,16 @@ export function DomainDeactivationDialog({
     setExecutionComplete(true);
     setHasErrors(errorOccurred);
     setCurrentStep("complete");
+
+    // Registrar log de atividade consolidado
+    if (removedIntegrations.length > 0) {
+      const integrationsText = removedIntegrations.join(", ");
+      await logActivity(
+        "integrations_removed",
+        `Integrações ativas: ${integrationsText}`,
+        `Integrações removidas: ${integrationsText}. Domínio desativado.`,
+      );
+    }
 
     if (!errorOccurred) {
       toast.success("Domínio desativado com sucesso!");

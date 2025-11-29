@@ -310,6 +310,7 @@ export default function DomainDetails() {
       funnel_id_added: "ID do funil adicionado",
       funnel_id_removed: "ID do funil removido",
       status_changed: "Status alterado",
+      integrations_removed: "Integrações removidas",
     };
     return labels[actionType] || actionType;
   };
